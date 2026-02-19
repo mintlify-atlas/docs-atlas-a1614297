@@ -1,11 +1,11 @@
 {
   "projectType": "cli-tool",
   "projectName": "tmux",
-  "projectDescription": "A terminal multiplexer that enables multiple terminals to be created, accessed, and controlled from a single screen",
+  "projectDescription": "A terminal multiplexer that enables multiple terminals to be created, accessed, and controlled from a single screen.",
   "theme": "aspen",
   "primaryColor": "#1BB91F",
-  "lightColor": "#1BB91F",
-  "darkColor": "#1BB91F",
+  "lightColor": "#26D128",
+  "darkColor": "#159118",
   "navigation": {
     "tabs": [
       {
@@ -25,27 +25,28 @@
               "concepts/sessions",
               "concepts/windows",
               "concepts/panes",
-              "concepts/client-server"
+              "concepts/status-bar"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "configuration/overview",
+              "configuration/key-bindings",
+              "configuration/options",
+              "configuration/hooks",
+              "configuration/styles-and-colors"
             ]
           },
           {
             "group": "Guides",
             "pages": [
-              "guides/key-bindings",
-              "guides/configuration",
-              "guides/status-line",
+              "guides/basic-usage",
+              "guides/window-management",
+              "guides/pane-management",
               "guides/copy-mode",
-              "guides/mouse-support",
-              "guides/scripting"
-            ]
-          },
-          {
-            "group": "Advanced",
-            "pages": [
-              "advanced/formats",
-              "advanced/styles",
-              "advanced/hooks",
-              "advanced/control-mode"
+              "guides/scripting",
+              "guides/control-mode"
             ]
           }
         ]
@@ -57,37 +58,44 @@
             "group": "Command Reference",
             "pages": [
               "commands/overview",
-              "commands/sessions",
-              "commands/windows",
-              "commands/panes",
-              "commands/key-bindings",
-              "commands/options",
-              "commands/buffers",
-              "commands/miscellaneous"
+              "commands/session-commands",
+              "commands/window-commands",
+              "commands/pane-commands",
+              "commands/key-binding-commands",
+              "commands/option-commands",
+              "commands/buffer-commands",
+              "commands/client-commands",
+              "commands/miscellaneous-commands"
+            ]
+          },
+          {
+            "group": "Format Variables",
+            "pages": [
+              "commands/format-variables"
             ]
           }
         ]
       },
       {
-        "tab": "Configuration",
+        "tab": "Advanced",
         "groups": [
           {
-            "group": "Options Reference",
+            "group": "Advanced Topics",
             "pages": [
-              "options/overview",
-              "options/server",
-              "options/session",
-              "options/window",
-              "options/pane"
+              "advanced/terminal-features",
+              "advanced/layouts",
+              "advanced/mouse-support",
+              "advanced/clipboard-integration",
+              "advanced/sixel-images"
             ]
           },
           {
-            "group": "Examples",
+            "group": "Reference",
             "pages": [
-              "examples/basic-config",
-              "examples/advanced-config",
-              "examples/plugins",
-              "examples/use-cases"
+              "reference/options-reference",
+              "reference/key-reference",
+              "reference/faq",
+              "reference/changelog"
             ]
           }
         ]
@@ -95,27 +103,29 @@
     ]
   },
   "keyFeatures": [
-    "Terminal multiplexing with session persistence",
-    "Window and pane management",
-    "Customizable key bindings and status line",
-    "Copy mode with vi/emacs keybindings",
-    "Client-server architecture for session sharing",
-    "Extensive scripting and format system",
-    "Mouse support and control mode"
+    "Terminal multiplexing with sessions, windows, and panes",
+    "Detach and reattach sessions",
+    "Split windows into multiple panes",
+    "Customizable key bindings",
+    "Status bar customization",
+    "Copy mode for text selection",
+    "Mouse support",
+    "Control mode for programmatic control",
+    "Extensive configuration options",
+    "Cross-platform support"
   ],
   "publicApiSurface": [
+    "new-session",
     "attach-session",
     "detach-client",
-    "new-session",
     "kill-session",
-    "switch-client",
     "new-window",
     "kill-window",
     "select-window",
     "split-window",
+    "kill-pane",
     "select-pane",
     "resize-pane",
-    "swap-pane",
     "bind-key",
     "unbind-key",
     "set-option",
@@ -126,10 +136,38 @@
     "list-windows",
     "list-panes",
     "list-keys",
-    "send-keys",
-    "display-message",
     "source-file",
     "if-shell",
-    "run-shell"
+    "run-shell",
+    "display-message",
+    "command-prompt",
+    "send-keys",
+    "capture-pane",
+    "save-buffer",
+    "load-buffer",
+    "choose-tree",
+    "display-menu",
+    "display-panes",
+    "swap-pane",
+    "swap-window",
+    "move-window",
+    "break-pane",
+    "join-pane",
+    "rotate-window",
+    "select-layout",
+    "refresh-client",
+    "switch-client",
+    "lock-server",
+    "rename-session",
+    "rename-window",
+    "respawn-pane",
+    "respawn-window",
+    "resize-window",
+    "find-window",
+    "server-access",
+    "set-environment",
+    "show-environment",
+    "show-messages",
+    "wait-for"
   ]
 }
