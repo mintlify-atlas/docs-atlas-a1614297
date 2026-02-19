@@ -1,7 +1,7 @@
 {
   "projectType": "cli-tool",
   "projectName": "tmux",
-  "projectDescription": "A terminal multiplexer that enables multiple terminals to be created, accessed, and controlled from a single screen.",
+  "projectDescription": "A terminal multiplexer enabling multiple terminals to be created, accessed, and controlled from a single screen.",
   "theme": "aspen",
   "primaryColor": "#1BB91F",
   "lightColor": "#26D128",
@@ -25,7 +25,8 @@
               "concepts/sessions",
               "concepts/windows",
               "concepts/panes",
-              "concepts/status-bar"
+              "concepts/status-bar",
+              "concepts/client-server"
             ]
           },
           {
@@ -35,7 +36,8 @@
               "configuration/key-bindings",
               "configuration/options",
               "configuration/hooks",
-              "configuration/styles-and-colors"
+              "configuration/styles-and-colors",
+              "configuration/example-configs"
             ]
           },
           {
@@ -46,7 +48,8 @@
               "guides/pane-management",
               "guides/copy-mode",
               "guides/scripting",
-              "guides/control-mode"
+              "guides/control-mode",
+              "guides/popup-menus"
             ]
           }
         ]
@@ -83,6 +86,7 @@
             "group": "Advanced Topics",
             "pages": [
               "advanced/terminal-features",
+              "advanced/formats",
               "advanced/layouts",
               "advanced/mouse-support",
               "advanced/clipboard-integration",
@@ -92,9 +96,11 @@
           {
             "group": "Reference",
             "pages": [
+              "reference/command-line-flags",
               "reference/options-reference",
               "reference/key-reference",
               "reference/faq",
+              "reference/troubleshooting",
               "reference/changelog"
             ]
           }
@@ -103,29 +109,28 @@
     ]
   },
   "keyFeatures": [
-    "Terminal multiplexing with sessions, windows, and panes",
-    "Detach and reattach sessions",
-    "Split windows into multiple panes",
-    "Customizable key bindings",
-    "Status bar customization",
-    "Copy mode for text selection",
+    "Session persistence and detachment",
+    "Multiple windows and panes",
+    "Extensive customization via configuration file",
+    "Powerful key binding system",
+    "Copy and paste with scrollback",
+    "Scriptable with formats and hooks",
+    "Client-server architecture",
+    "Control mode for programmatic access",
     "Mouse support",
-    "Control mode for programmatic control",
-    "Extensive configuration options",
-    "Cross-platform support"
+    "Sixel image support"
   ],
   "publicApiSurface": [
     "new-session",
     "attach-session",
     "detach-client",
-    "kill-session",
-    "new-window",
-    "kill-window",
-    "select-window",
     "split-window",
-    "kill-pane",
+    "new-window",
     "select-pane",
-    "resize-pane",
+    "select-window",
+    "kill-session",
+    "kill-window",
+    "kill-pane",
     "bind-key",
     "unbind-key",
     "set-option",
@@ -136,38 +141,55 @@
     "list-windows",
     "list-panes",
     "list-keys",
+    "list-buffers",
+    "send-keys",
+    "display-message",
+    "display-popup",
+    "display-menu",
+    "display-panes",
     "source-file",
     "if-shell",
     "run-shell",
-    "display-message",
+    "choose-tree",
+    "choose-client",
+    "choose-buffer",
+    "resize-pane",
+    "resize-window",
+    "swap-pane",
+    "swap-window",
+    "break-pane",
+    "join-pane",
+    "move-pane",
+    "rotate-window",
+    "move-window",
+    "rename-session",
+    "rename-window",
+    "refresh-client",
+    "switch-client",
     "command-prompt",
-    "send-keys",
+    "confirm-before",
+    "find-window",
     "capture-pane",
     "save-buffer",
     "load-buffer",
-    "choose-tree",
-    "display-menu",
-    "display-panes",
-    "swap-pane",
-    "swap-window",
-    "move-window",
-    "break-pane",
-    "join-pane",
-    "rotate-window",
+    "set-buffer",
+    "show-buffer",
+    "delete-buffer",
     "select-layout",
-    "refresh-client",
-    "switch-client",
-    "lock-server",
-    "rename-session",
-    "rename-window",
     "respawn-pane",
     "respawn-window",
-    "resize-window",
-    "find-window",
-    "server-access",
+    "lock-server",
+    "start-server",
+    "kill-server",
+    "suspend-client",
     "set-environment",
     "show-environment",
     "show-messages",
-    "wait-for"
+    "wait-for",
+    "clock-mode",
+    "customize-mode",
+    "clear-history",
+    "server-access",
+    "show-prompt-history"
   ]
 }
