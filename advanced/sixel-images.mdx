@@ -1,0 +1,651 @@
+---
+title: 'Sixel Image Support'
+description: 'Sixel graphics protocol support for inline images in tmux'
+---
+
+## Overview
+
+Sixel is a bitmap graphics format that allows terminals to display images inline. tmux includes comprehensive sixel support when compiled with the appropriate libraries, enabling image display in panes.
+
+<Warning>
+Sixel support requires:
+- tmux compiled with sixel support (typically requires libsixel)
+- Terminal that supports sixel graphics
+- Enabled via `terminal-features`
+</Warning>
+
+## Sixel Protocol
+
+### Image Format
+
+From `image-sixel.c:26-54`, sixel images are represented internally as:
+
+```c
+struct sixel_image {
+    u_int   x;              // Width in pixels
+    u_int   y;              // Height in pixels
+    u_int   xpixel;         // Cell width in pixels
+    u_int   ypixel;         // Cell height in pixels
+    
+    u_int   set_ra;         // Raster attributes set
+    u_int   ra_x;           // Raster width
+    u_int   ra_y;           // Raster height
+    
+    u_int   *colours;       // Color palette
+    u_int   ncolours;       // Number of colors
+    u_int   used_colours;   // Colors used
+    u_int   p2;             // Color mode parameter
+    
+    u_int   dx;             // Current X position
+    u_int   dy;             // Current Y position  
+    u_int   dc;             // Current color
+    
+    struct sixel_line *lines;  // Image data
+};
+```
+
+### Sixel Line Structure
+
+From `image-sixel.c:29-32`:
+
+```c
+struct sixel_line {
+    u_int       x;          // Width of this line
+    uint16_t    *data;      // Pixel data (color indices)
+};
+```
+
+Each sixel line contains 6 pixels vertically, encoded as a single character.
+
+## Terminal Feature
+
+From `tty-features.c:350-358`, enable sixel support:
+
+```c
+static const char *const tty_feature_sixel_capabilities[] = {
+    "Sxl",    // Sixel capability
+    NULL
+};
+static const struct tty_feature tty_feature_sixel = {
+    "sixel",
+    tty_feature_sixel_capabilities,
+    TERM_SIXEL
+};
+```
+
+### Configuration
+
+```bash ~/.tmux.conf
+# Enable sixel support for xterm-compatible terminals
+set -g terminal-features "xterm*:sixel"
+
+# Verify sixel support
+tmux info | grep -i sixel
+```
+
+## Sixel Parsing
+
+### Image Sequence Format
+
+From `image-sixel.c:299-354`, sixel sequences start with:
+
+```
+\033P<parameters>q<sixel-data>\033\\
+```
+
+Where:
+- `\033P` - DCS (Device Control String) introducer
+- `<parameters>` - Optional parameters
+- `q` - Sixel command
+- `<sixel-data>` - Encoded image data
+- `\033\\` - ST (String Terminator)
+
+### Sixel Parser
+
+From `image-sixel.c:299-362`, the parser handles:
+
+```c
+struct sixel_image *
+sixel_parse(const char *buf, size_t len, u_int p2, u_int xpixel, u_int ypixel) {
+    struct sixel_image *si;
+    const char *cp = buf, *end = buf + len;
+    char ch;
+    
+    if (len == 0 || len == 1 || *cp++ != 'q') {
+        log_debug("%s: empty image", __func__);
+        return (NULL);
+    }
+    
+    si = xcalloc(1, sizeof *si);
+    si->xpixel = xpixel;
+    si->ypixel = ypixel;
+    si->p2 = p2;
+    
+    while (cp != end) {
+        ch = *cp++;
+        switch (ch) {
+        case '"':  // Raster attributes
+            cp = sixel_parse_attributes(si, cp, end);
+            break;
+        case '#':  // Color definition
+            cp = sixel_parse_colour(si, cp, end);
+            break;
+        case '!':  // Repeat sequence
+            cp = sixel_parse_repeat(si, cp, end);
+            break;
+        case '-':  // Carriage return / line feed
+            si->dx = 0;
+            si->dy += 6;
+            break;
+        case '$':  // Carriage return
+            si->dx = 0;
+            break;
+        default:   // Sixel data
+            if (ch < 0x3f || ch > 0x7e)
+                goto bad;
+            if (sixel_parse_write(si, ch - 0x3f) != 0)
+                goto bad;
+            si->dx++;
+            break;
+        }
+    }
+    
+    return (si);
+}
+```
+
+### Sixel Commands
+
+<Tabs>
+<Tab title="Raster Attributes">
+From `image-sixel.c:143-193`, define image dimensions:
+
+```
+"Pan;Pad;Ph;Pv
+```
+
+Where:
+- `Pan`: Pixel aspect ratio numerator
+- `Pad`: Pixel aspect ratio denominator  
+- `Ph`: Horizontal size in pixels
+- `Pv`: Vertical size in pixels
+
+Example:
+```
+"1;1;800;600
+```
+
+Defines an 800x600 image with 1:1 aspect ratio.
+</Tab>
+
+<Tab title="Color Definition">
+From `image-sixel.c:196-256`, define palette colors:
+
+```
+#Pc;Pu;Px;Py;Pz
+```
+
+Where:
+- `Pc`: Color number (0-255 typically)
+- `Pu`: Color coordinate system (1=HLS, 2=RGB)
+- `Px`, `Py`, `Pz`: Color components
+
+For RGB (Pu=2):
+- `Px`: Red (0-100)
+- `Py`: Green (0-100)
+- `Pz`: Blue (0-100)
+
+From `image-sixel.c:241-247`:
+
+```c
+if ((type != 1 && type != 2) ||
+    (type == 1 && (c1 > 360 || c2 > 100 || c3 > 100)) ||
+    (type == 2 && (c1 > 100 || c2 > 100 || c3 > 100))) {
+    log_debug("%s: invalid color %u;%u;%u;%u", __func__, type, c1, c2, c3);
+    return (NULL);
+}
+```
+
+Example:
+```
+#0;2;100;0;0    # Define color 0 as red (RGB)
+#1;2;0;100;0    # Define color 1 as green
+#2;2;0;0;100    # Define color 2 as blue
+```
+</Tab>
+
+<Tab title="Repeat Sequence">
+From `image-sixel.c:258-297`, repeat the next sixel character:
+
+```
+!<count><sixel>
+```
+
+Example:
+```
+!100?    # Repeat '?' (all bits clear) 100 times
+```
+
+From `image-sixel.c:282-295`:
+
+```c
+n = strtonum(tmp, 1, SIXEL_WIDTH_LIMIT, &errstr);
+if (n == 0 || errstr != NULL) {
+    log_debug("%s: repeat too wide", __func__);
+    return (NULL);
+}
+
+ch = (*last++) - 0x3f;
+for (i = 0; i < n; i++) {
+    if (sixel_parse_write(si, ch) != 0) {
+        log_debug("%s: width limit reached", __func__);
+        return (NULL);
+    }
+    si->dx++;
+}
+```
+</Tab>
+
+<Tab title="Sixel Data">
+From `image-sixel.c:122-140`, each character represents 6 vertical pixels:
+
+```c
+static int
+sixel_parse_write(struct sixel_image *si, u_int ch) {
+    struct sixel_line *sl;
+    u_int i;
+    
+    if (sixel_parse_expand_lines(si, si->dy + 6) != 0)
+        return (1);
+    sl = &si->lines[si->dy];
+    
+    for (i = 0; i < 6; i++) {
+        if (sixel_parse_expand_line(si, sl, si->dx + 1) != 0)
+            return (1);
+        if (ch & (1 << i))
+            sl->data[si->dx] = si->dc;
+        sl++;
+    }
+    return (0);
+}
+```
+
+Character value = base + bit pattern:
+- Base: 63 (0x3F, '?')
+- Bits 0-5: Six vertical pixels (LSB = top)
+
+Example:
+- '?' (63): 000000 - no pixels
+- '@' (64): 000001 - top pixel only
+- 'O' (79): 010000 - middle pixel
+- '~' (126): 111111 - all six pixels
+</Tab>
+</Tabs>
+
+## Image Size Limits
+
+From `image-sixel.c:26-27`:
+
+```c
+#define SIXEL_WIDTH_LIMIT 10000
+#define SIXEL_HEIGHT_LIMIT 10000
+```
+
+These limits prevent excessive memory usage:
+
+- Maximum width: 10,000 pixels
+- Maximum height: 10,000 pixels
+
+From `image-sixel.c:70-78` and `82-92`:
+
+```c
+static int
+sixel_parse_expand_lines(struct sixel_image *si, u_int y) {
+    if (y <= si->y)
+        return (0);
+    if (y > SIXEL_HEIGHT_LIMIT)
+        return (1);
+    si->lines = xrecallocarray(si->lines, si->y, y, sizeof *si->lines);
+    si->y = y;
+    return (0);
+}
+
+static int
+sixel_parse_expand_line(struct sixel_image *si, struct sixel_line *sl, u_int x) {
+    if (x <= sl->x)
+        return (0);
+    if (x > SIXEL_WIDTH_LIMIT)
+        return (1);
+    if (x > si->x)
+        si->x = x;
+    sl->data = xrecallocarray(sl->data, sl->x, si->x, sizeof *sl->data);
+    sl->x = si->x;
+    return (0);
+}
+```
+
+## Image Scaling
+
+From `image-sixel.c:416-484`, images can be scaled to fit terminal cells:
+
+```c
+struct sixel_image *
+sixel_scale(struct sixel_image *si, u_int xpixel, u_int ypixel, 
+    u_int ox, u_int oy, u_int sx, u_int sy, int colours) {
+    struct sixel_image *new;
+    u_int cx, cy, pox, poy, psx, psy, tsx, tsy, px, py;
+    
+    // Get section of image at ox,oy in image cells
+    // Map onto same size in terminal cells
+    
+    sixel_size_in_cells(si, &cx, &cy);
+    
+    // Convert cell coordinates to pixels
+    pox = ox * si->xpixel;
+    poy = oy * si->ypixel;
+    psx = sx * si->xpixel;
+    psy = sy * si->ypixel;
+    
+    // Target size in terminal pixels
+    tsx = sx * xpixel;
+    tsy = sy * ypixel;
+    
+    new = xcalloc(1, sizeof *si);
+    new->xpixel = xpixel;
+    new->ypixel = ypixel;
+    
+    // Scale pixel by pixel
+    for (y = 0; y < tsy; y++) {
+        py = poy + ((double)y * psy / tsy);
+        for (x = 0; x < tsx; x++) {
+            px = pox + ((double)x * psx / tsx);
+            sixel_set_pixel(new, x, y, sixel_get_pixel(si, px, py));
+        }
+    }
+    
+    return (new);
+}
+```
+
+### Cell Size Calculation
+
+From `image-sixel.c:403-414`:
+
+```c
+void
+sixel_size_in_cells(struct sixel_image *si, u_int *x, u_int *y) {
+    if ((si->x % si->xpixel) == 0)
+        *x = (si->x / si->xpixel);
+    else
+        *x = 1 + (si->x / si->xpixel);
+        
+    if ((si->y % si->ypixel) == 0)
+        *y = (si->y / si->ypixel);
+    else
+        *y = 1 + (si->y / si->ypixel);
+}
+```
+
+## Sixel Output
+
+From `image-sixel.c:571-656`, generating sixel sequences:
+
+```c
+char *
+sixel_print(struct sixel_image *si, struct sixel_image *map, size_t *size) {
+    char *buf, tmp[64];
+    size_t len, used = 0, tmplen;
+    
+    len = 8192;
+    buf = xmalloc(len);
+    
+    // Start sequence
+    tmplen = xsnprintf(tmp, sizeof tmp, "\033P0;%uq", si->p2);
+    sixel_print_add(&buf, &len, &used, tmp, tmplen);
+    
+    // Raster attributes
+    if (si->set_ra) {
+        tmplen = xsnprintf(tmp, sizeof tmp, "\"1;1;%u;%u", 
+            si->ra_x, si->ra_y);
+        sixel_print_add(&buf, &len, &used, tmp, tmplen);
+    }
+    
+    // Color definitions
+    for (i = 0; i < ncolours; i++) {
+        c = colours[i];
+        tmplen = xsnprintf(tmp, sizeof tmp, "#%u;%u;%u;%u;%u",
+            i, c >> 25, (c >> 16) & 0x1ff, (c >> 8) & 0xff, c & 0xff);
+        sixel_print_add(&buf, &len, &used, tmp, tmplen);
+    }
+    
+    // Image data (compressed)
+    for (y = 0; y < si->y; y += 6) {
+        sixel_print_compress_colors(si, chunks, y, active, &nactive);
+        // Output color chunks
+    }
+    
+    // End sequence
+    sixel_print_add(&buf, &len, &used, "\033\\", 2);
+    
+    return (buf);
+}
+```
+
+### Compression
+
+From `image-sixel.c:520-569`, sixel data is run-length encoded:
+
+```c
+static void
+sixel_print_repeat(char **buf, size_t *len, size_t *used, u_int count, char ch) {
+    char tmp[16];
+    size_t tmplen;
+    
+    if (count == 1)
+        sixel_print_add(buf, len, used, &ch, 1);
+    else if (count == 2) {
+        sixel_print_add(buf, len, used, &ch, 1);
+        sixel_print_add(buf, len, used, &ch, 1);
+    } else if (count == 3) {
+        sixel_print_add(buf, len, used, &ch, 1);
+        sixel_print_add(buf, len, used, &ch, 1);
+        sixel_print_add(buf, len, used, &ch, 1);
+    } else if (count != 0) {
+        tmplen = xsnprintf(tmp, sizeof tmp, "!%u%c", count, ch);
+        sixel_print_add(buf, len, used, tmp, tmplen);
+    }
+}
+```
+
+Short runs (1-3 pixels) are output directly. Longer runs use the repeat syntax.
+
+## Displaying Images
+
+### Screen Conversion
+
+From `image-sixel.c:658-690`, convert sixel to tmux screen:
+
+```c
+struct screen *
+sixel_to_screen(struct sixel_image *si) {
+    struct screen *s;
+    struct screen_write_ctx ctx;
+    struct grid_cell gc;
+    u_int x, y, sx, sy;
+    
+    sixel_size_in_cells(si, &sx, &sy);
+    
+    s = xmalloc(sizeof *s);
+    screen_init(s, sx, sy, 0);
+    
+    // Draw placeholder box with '~' characters
+    memcpy(&gc, &grid_default_cell, sizeof gc);
+    gc.attr |= (GRID_ATTR_CHARSET|GRID_ATTR_DIM);
+    utf8_set(&gc.data, '~');
+    
+    screen_write_start(&ctx, s);
+    if (sx == 1 || sy == 1) {
+        for (y = 0; y < sy; y++) {
+            for (x = 0; x < sx; x++)
+                grid_view_set_cell(s->grid, x, y, &gc);
+        }
+    } else {
+        screen_write_box(&ctx, sx, sy, BOX_LINES_DEFAULT, NULL, NULL);
+        for (y = 1; y < sy - 1; y++) {
+            for (x = 1; x < sx - 1; x++)
+                grid_view_set_cell(s->grid, x, y, &gc);
+        }
+    }
+    screen_write_stop(&ctx);
+    return (s);
+}
+```
+
+This creates a placeholder screen showing the image dimensions.
+
+## Debugging Sixel
+
+From `image-sixel.c:377-401`, log sixel image details:
+
+```c
+void
+sixel_log(struct sixel_image *si) {
+    struct sixel_line *sl;
+    char s[SIXEL_WIDTH_LIMIT + 1];
+    u_int i, x, y, cx, cy;
+    
+    sixel_size_in_cells(si, &cx, &cy);
+    log_debug("%s: image %ux%u (%ux%u)", __func__, si->x, si->y, cx, cy);
+    
+    for (i = 0; i < si->ncolours; i++)
+        log_debug("%s: colour %u is %07x", __func__, i, si->colours[i]);
+        
+    for (y = 0; y < si->y; y++) {
+        sl = &si->lines[y];
+        for (x = 0; x < si->x; x++) {
+            if (x >= sl->x)
+                s[x] = '_';
+            else if (sl->data[x] != 0)
+                s[x] = '0' + (sl->data[x] - 1) % 10;
+            else
+                s[x] = '.';
+        }
+        s[x] = '\0';
+        log_debug("%s: %4u: %s", __func__, y, s);
+    }
+}
+```
+
+Enable debug logging:
+
+```bash
+# Start tmux with verbose logging
+tmux -vvv new-session
+
+# Check tmux-client-*.log for sixel parsing info
+```
+
+## Supported Terminals
+
+Terminals with sixel support:
+
+<CardGroup cols={2}>
+<Card title="xterm" icon="terminal">
+Built-in sixel support (configure with `--enable-sixel-graphics`).
+
+```bash
+xterm -ti vt340
+```
+</Card>
+
+<Card title="mlterm" icon="terminal">
+Native sixel support, optimized for performance.
+</Card>
+
+<Card title="foot" icon="terminal">
+Modern Wayland terminal with sixel support.
+</Card>
+
+<Card title="WezTerm" icon="terminal">
+Cross-platform terminal with sixel support.
+</Card>
+
+<Card title="kitty" icon="terminal">
+Supports kitty graphics protocol (not sixel) but has sixel compatibility mode.
+</Card>
+
+<Card title="iTerm2" icon="terminal">
+Supports inline images protocol (not sixel directly).
+</Card>
+</CardGroup>
+
+## Image Tools
+
+### Convert images to sixel:
+
+```bash
+# Using ImageMagick with sixel support
+convert image.png sixel:- | cat
+
+# Using libsixel's img2sixel
+img2sixel image.png
+
+# Display in tmux pane
+img2sixel image.png > /dev/tty
+```
+
+### Image viewers:
+
+- **lsix**: Thumbnail browser using sixel
+- **viu**: Image viewer for terminals
+- **chafa**: Versatile image-to-text converter with sixel support
+
+## Limitations
+
+<Warning>
+Sixel support has several limitations:
+</Warning>
+
+1. **Color depth**: Limited to 256 colors typically (though some terminals support more)
+2. **Memory usage**: Large images consume significant memory
+3. **Performance**: Rendering can be slow for complex images
+4. **Terminal compatibility**: Not all terminals support sixel
+5. **tmux limitations**: Images may not persist across redraws in all situations
+
+From `image-sixel.c:210-215`:
+
+```c
+if (c > SIXEL_COLOUR_REGISTERS) {
+    log_debug("%s: too many colours", __func__);
+    return (NULL);
+}
+```
+
+## Best Practices
+
+<Check>
+Use appropriate image sizes - don't exceed terminal dimensions
+</Check>
+
+<Check>
+Limit color palette to 256 colors for best compatibility
+</Check>
+
+<Check>
+Test sixel support before deploying image-heavy applications
+</Check>
+
+<Check>
+Provide text fallbacks for terminals without sixel support
+</Check>
+
+## Related Configuration
+
+- [`terminal-features`](/options/global#terminal-features) - Enable sixel capability
+- [`default-terminal`](/options/global#default-terminal) - Terminal type
+
+## Resources
+
+- [VT340 Programmer Reference](https://vt100.net/docs/vt3xx-gp/chapter14.html) - Original sixel documentation
+- [libsixel](https://github.com/saitoha/libsixel) - Sixel encoder/decoder library
+- [Sixel Graphics Wikipedia](https://en.wikipedia.org/wiki/Sixel) - Protocol overview

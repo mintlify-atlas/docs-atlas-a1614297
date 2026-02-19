@@ -1,0 +1,370 @@
+---
+title: Option Commands
+description: Commands for setting, showing, and managing tmux options and environment variables
+---
+
+## Overview
+
+tmux has numerous options that control its behavior and appearance. Options can be set at different scopes: server (global), session, window, or pane.
+
+## Option Scopes
+
+- **Server (global) options**: Apply to the entire tmux server
+- **Session options**: Apply to a specific session
+- **Window options**: Apply to a specific window
+- **Pane options**: Apply to a specific pane
+
+## set-option
+
+Alias: `set`
+
+```bash
+set-option [-aFgopqsuUw] [-t target-pane] option [value]
+```
+
+Set a window option, session option, or server option.
+
+<ParamField path="-a" type="flag">
+  Append to a string option. For array options, append to the list.
+</ParamField>
+
+<ParamField path="-F" type="flag">
+  Expand formats in the option value.
+</ParamField>
+
+<ParamField path="-g" type="flag">
+  Set a global session or window option. This sets the default for all sessions or windows.
+</ParamField>
+
+<ParamField path="-o" type="flag">
+  Prevent setting an option that is already set.
+</ParamField>
+
+<ParamField path="-p" type="flag">
+  Set a pane option. Pane options are inherited from the window options.
+</ParamField>
+
+<ParamField path="-q" type="flag">
+  Suppress errors about unknown or ambiguous options.
+</ParamField>
+
+<ParamField path="-s" type="flag">
+  Set a server option.
+</ParamField>
+
+<ParamField path="-u" type="flag">
+  Unset an option. For inherited options (window or pane), inherit the value from the parent scope.
+</ParamField>
+
+<ParamField path="-U" type="flag">
+  Unset an option without inheriting (removes the option completely).
+</ParamField>
+
+<ParamField path="-w" type="flag">
+  Set a window option. This is the default for `set-option` (can be omitted).
+</ParamField>
+
+<ParamField path="-t" type="string">
+  For session options: target session
+  For window options: target window
+  For pane options: target pane
+</ParamField>
+
+<ParamField path="option" type="string" required>
+  The option name.
+</ParamField>
+
+<ParamField path="value" type="string">
+  The value to set. If omitted, the option is unset.
+</ParamField>
+
+### Examples
+
+```bash
+# Set global status bar color
+set-option -g status-style bg=blue
+
+# Set option for specific session
+set-option -t mysession status-position top
+
+# Append to an option
+set-option -ga status-left " [#S]"
+
+# Set window option
+set-option -w automatic-rename on
+
+# Set pane option
+set-option -p -t 0 remain-on-exit on
+
+# Unset option (inherit from parent)
+set-option -u -t mywindow mode-keys
+
+# Set with format expansion
+set-option -F message-command-style "fg=#{@my-color}"
+```
+
+## show-options
+
+Alias: `show`
+
+```bash
+show-options [-AgHpqsvw] [-t target-pane] [option]
+```
+
+Show options.
+
+<ParamField path="-A" type="flag">
+  Include options inherited from a parent scope.
+</ParamField>
+
+<ParamField path="-g" type="flag">
+  Show global session or window options.
+</ParamField>
+
+<ParamField path="-H" type="flag">
+  Include hooks (omitted by default).
+</ParamField>
+
+<ParamField path="-p" type="flag">
+  Show pane options.
+</ParamField>
+
+<ParamField path="-q" type="flag">
+  Suppress errors about unknown or ambiguous options.
+</ParamField>
+
+<ParamField path="-s" type="flag">
+  Show server options.
+</ParamField>
+
+<ParamField path="-v" type="flag">
+  Show only the option value, not the name.
+</ParamField>
+
+<ParamField path="-w" type="flag">
+  Show window options. This is the default.
+</ParamField>
+
+<ParamField path="-t" type="string">
+  Target pane, window, or session.
+</ParamField>
+
+<ParamField path="option" type="string">
+  The option to show. If omitted, all options are shown.
+</ParamField>
+
+### Examples
+
+```bash
+# Show all window options
+show-options
+
+# Show global session options
+show-options -g
+
+# Show specific option value
+show-options -gv status-position
+
+# Show server options
+show-options -s
+
+# Show pane options
+show-options -p -t 0
+
+# Show option including inherited values
+show-options -A mode-keys
+```
+
+## set-environment
+
+Alias: `setenv`
+
+```bash
+set-environment [-Fgru] [-t target-session] name [value]
+```
+
+Set or unset an environment variable.
+
+<ParamField path="-F" type="flag">
+  Expand formats in the value.
+</ParamField>
+
+<ParamField path="-g" type="flag">
+  Set in the global environment. This is the default if no target session is specified.
+</ParamField>
+
+<ParamField path="-r" type="flag">
+  Mark the variable as removed. It will be removed from the environment when the session is created.
+</ParamField>
+
+<ParamField path="-u" type="flag">
+  Unset the variable.
+</ParamField>
+
+<ParamField path="-t" type="string">
+  Set the variable in the session environment for the target session.
+</ParamField>
+
+<ParamField path="name" type="string" required>
+  The environment variable name.
+</ParamField>
+
+<ParamField path="value" type="string">
+  The value to set. Required unless `-u` is specified.
+</ParamField>
+
+### Examples
+
+```bash
+# Set global environment variable
+set-environment MYVAR myvalue
+
+# Set for specific session
+set-environment -t mysession DISPLAY :0
+
+# Unset variable
+set-environment -u MYVAR
+
+# Set with format expansion
+set-environment -F CURRENT_WINDOW "#{window_name}"
+
+# Mark as removed
+set-environment -r OLDVAR
+```
+
+## show-environment
+
+Alias: `showenv`
+
+```bash
+show-environment [-gs] [-t target-session] [name]
+```
+
+Show environment variables.
+
+<ParamField path="-g" type="flag">
+  Show the global environment. This is the default if no target session is specified.
+</ParamField>
+
+<ParamField path="-s" type="flag">
+  Output in a format suitable for sourcing in a shell.
+</ParamField>
+
+<ParamField path="-t" type="string">
+  Show the session environment for the target session.
+</ParamField>
+
+<ParamField path="name" type="string">
+  The environment variable to show. If omitted, all variables are shown.
+</ParamField>
+
+### Examples
+
+```bash
+# Show all global environment variables
+show-environment
+
+# Show session environment
+show-environment -t mysession
+
+# Show specific variable
+show-environment DISPLAY
+
+# Output in shell-sourceable format
+show-environment -s
+```
+
+## Common Options
+
+### Server Options
+
+Set with `set-option -s`, shown with `show-options -s`:
+
+- `buffer-limit`: Maximum number of automatic paste buffers (default 50)
+- `command-alias`: List of command aliases
+- `default-terminal`: Default terminal type (default "screen")
+- `escape-time`: Time in milliseconds tmux waits after escape key (default 500)
+- `exit-empty`: Exit when there are no active sessions (default on)
+- `exit-unattached`: Exit when no clients are attached (default off)
+- `history-file`: Path to command history file
+
+### Session Options
+
+Set with `set-option`, shown with `show-options`:
+
+- `base-index`: Start window numbering at this value (default 0)
+- `default-command`: Default command for new windows
+- `default-shell`: Default shell (default $SHELL or /bin/sh)
+- `default-size`: Default size of windows (default 80x24)
+- `display-time`: Duration of display-message in milliseconds (default 750)
+- `history-limit`: Maximum lines per window history (default 2000)
+- `key-table`: Default key table (default "root")
+- `lock-after-time`: Lock session after seconds of inactivity (default 0, disabled)
+- `message-style`: Style for command prompt messages
+- `prefix`: Prefix key (default C-b)
+- `renumber-windows`: Renumber windows when one is closed (default off)
+- `repeat-time`: Time for repeating key bindings in milliseconds (default 500)
+- `status`: Show or hide status bar (default on)
+- `status-interval`: Update status bar every interval seconds (default 15)
+- `status-position`: Status bar position: top or bottom (default bottom)
+- `status-style`: Style for status bar
+
+### Window Options
+
+Set with `set-option -w`, shown with `show-options -w`:
+
+- `aggressive-resize`: Resize window to smallest or largest client (default on)
+- `automatic-rename`: Automatically rename windows (default on)
+- `automatic-rename-format`: Format for automatic window names
+- `clock-mode-colour`: Color of clock
+- `clock-mode-style`: Clock format: 12 or 24 (default 24)
+- `mode-keys`: Key bindings in copy mode: vi or emacs (default emacs)
+- `mode-style`: Style for indicators and highlighting in modes
+- `monitor-activity`: Monitor for activity in windows (default off)
+- `monitor-bell`: Monitor for bell in windows (default on)
+- `monitor-silence`: Monitor for silence (seconds) in windows (default 0, disabled)
+- `pane-base-index`: Start pane numbering at this value (default 0)
+- `remain-on-exit`: Keep window after program exits (default off)
+- `synchronize-panes`: Send input to all panes in the window (default off)
+- `window-status-format`: Format for window status in status bar
+- `window-status-current-format`: Format for current window status
+- `window-status-style`: Style for window status
+
+### Pane Options
+
+Set with `set-option -p`, shown with `show-options -p`:
+
+- `allow-passthrough`: Allow passthrough sequences (default off)
+- `allow-rename`: Allow applications to rename windows (default on)
+- `alternate-screen`: Use alternate screen feature (default on)
+- `remain-on-exit`: Keep pane after program exits (default off)
+- `window-active-style`: Style for active pane
+- `window-style`: Style for inactive panes
+
+## Option Value Types
+
+### Boolean
+
+Values: `on`, `off`, `yes`, `no`, `1`, `0`, `true`, `false`
+
+### Number
+
+Integer values
+
+### String
+
+Text values, may include format variables
+
+### Style
+
+Style specifications: `fg=color`, `bg=color`, `bold`, `dim`, `underscore`, `blink`, `reverse`, `italics`, `strikethrough`, etc.
+
+### Array
+
+Comma-separated list of values. Use `-a` to append.
+
+### Color
+
+Color names: `black`, `red`, `green`, `yellow`, `blue`, `magenta`, `cyan`, `white`, `default`
+
+Or: `colour0` to `colour255`, `#rrggbb` hex values

@@ -1,0 +1,541 @@
+---
+title: Client Commands
+description: Commands for managing and controlling tmux clients
+---
+
+## Overview
+
+Clients are terminal connections to the tmux server. Each client is attached to a session to interact with it. Multiple clients can be attached to the same session.
+
+## refresh-client
+
+Alias: `refresh`
+
+```bash
+refresh-client [-cDlLRSU] [-A pane:state] [-B name:what:format] [-C size] 
+               [-f flags] [-r pane:report] [-t target-client] [adjustment]
+```
+
+Refresh the current client if bound to a key, or a single client if one is given with `-t`.
+
+<ParamField path="-c" type="flag">
+  Return to tracking the cursor automatically. The visible portion follows the cursor.
+</ParamField>
+
+<ParamField path="-D" type="flag">
+  Move the visible portion of the window down by adjustment rows (default 1).
+</ParamField>
+
+<ParamField path="-l" type="flag">
+  Request the clipboard from the client using the xterm escape sequence.
+</ParamField>
+
+<ParamField path="-L" type="flag">
+  Move the visible portion left by adjustment columns.
+</ParamField>
+
+<ParamField path="-R" type="flag">
+  Move the visible portion right by adjustment columns.
+</ParamField>
+
+<ParamField path="-S" type="flag">
+  Only update the client's status line.
+</ParamField>
+
+<ParamField path="-U" type="flag">
+  Move the visible portion up by adjustment rows.
+</ParamField>
+
+<ParamField path="-A" type="string">
+  Allow a control mode client to trigger actions on a pane. Format: `pane-id:state` where state is `on`, `off`, `continue`, or `pause`.
+  - `off`: Stop sending output from pane to client
+  - `continue`: Resume sending output if paused
+  - `pause`: Pause the pane
+  
+  May be given multiple times for different panes.
+</ParamField>
+
+<ParamField path="-B" type="string">
+  Set a subscription to a format for a control mode client. Format: `name:what:format`
+  - `name`: Name for the subscription
+  - `what`: Item to subscribe to (pane ID like `%0`, `%*` for all panes, window ID like `@0`, `@*` for all windows, or empty for session)
+  - `format`: The format string
+  
+  Changes reported via `%subscription-changed` notification. Pass only name to remove subscription.
+</ParamField>
+
+<ParamField path="-C" type="string">
+  Set the width and height of a control mode client. Format: `widthxheight` or `window-id:widthxheight` (e.g., `80x24` or `@0:80x24`).
+</ParamField>
+
+<ParamField path="-f" type="string">
+  Set comma-separated list of client flags (see `attach-session`).
+</ParamField>
+
+<ParamField path="-r" type="string">
+  Provide information about a pane via a report in control mode. Format: `pane-id:report` where report is an escape sequence.
+</ParamField>
+
+<ParamField path="-t" type="string">
+  The target client.
+</ParamField>
+
+<ParamField path="adjustment" type="number">
+  Number of rows or columns to move by (default 1).
+</ParamField>
+
+### Visible Portion Control
+
+The visible position is a property of the client. When a window is larger than the client, only a portion is visible. Use `-U`, `-D`, `-L`, `-R` to pan, and `-c` to return to following the cursor.
+
+### Examples
+
+```bash
+# Refresh the current client
+refresh-client
+
+# Update only the status line
+refresh-client -S
+
+# Pan the visible portion up by 5 rows
+refresh-client -U 5
+
+# Return to cursor tracking
+refresh-client -c
+
+# Set client size in control mode
+refresh-client -C 80x24
+```
+
+## list-clients
+
+Alias: `lsc`
+
+```bash
+list-clients [-r] [-F format] [-f filter] [-O sort-order] [-t target-session]
+```
+
+List all clients attached to the server.
+
+<ParamField path="-r" type="flag">
+  Reverse the sort order.
+</ParamField>
+
+<ParamField path="-F" type="string">
+  Specify the format of each line. Available client format variables:
+  - `#{client_name}`: Name of client
+  - `#{client_tty}`: Pseudo terminal of client
+  - `#{client_width}`, `#{client_height}`: Client dimensions
+  - `#{client_created}`: Time client was created
+  - `#{client_activity}`: Time of last activity
+  - `#{client_session}`: Name of attached session
+  - `#{client_prefix}`: 1 if prefix key has been pressed
+  - `#{client_readonly}`: 1 if client is read-only
+</ParamField>
+
+<ParamField path="-f" type="string">
+  Only show clients for which the filter is true.
+</ParamField>
+
+<ParamField path="-O" type="string">
+  Specify sort order: `name`, `size`, `creation` (time), or `activity` (time).
+</ParamField>
+
+<ParamField path="-t" type="string">
+  List only clients connected to the target session.
+</ParamField>
+
+### Examples
+
+```bash
+# List all clients
+list-clients
+
+# List with custom format
+list-clients -F "#{client_name}: #{client_session}"
+
+# List clients for specific session
+list-clients -t mysession
+
+# List sorted by activity
+list-clients -O activity
+```
+
+## lock-client
+
+Alias: `lockc`
+
+```bash
+lock-client [-t target-client]
+```
+
+Lock the target client. Runs the command specified by the `lock-command` option.
+
+<ParamField path="-t" type="string">
+  The target client to lock.
+</ParamField>
+
+### Examples
+
+```bash
+# Lock current client
+lock-client
+
+# Lock specific client
+lock-client -t /dev/pts/1
+```
+
+## suspend-client
+
+Alias: `suspendc`
+
+```bash
+suspend-client [-t target-client]
+```
+
+Suspend a client by sending SIGTSTP (tty stop signal).
+
+<ParamField path="-t" type="string">
+  The target client to suspend.
+</ParamField>
+
+### Examples
+
+```bash
+# Suspend current client
+suspend-client
+
+# Suspend specific client
+suspend-client -t /dev/pts/1
+```
+
+## display-message
+
+Alias: `display`
+
+```bash
+display-message [-aINpv] [-c target-client] [-d delay] [-F format] 
+                [-t target-pane] [message]
+```
+
+Display a message in the status line or print it to stdout.
+
+<ParamField path="-a" type="flag">
+  List the format variables and their values.
+</ParamField>
+
+<ParamField path="-I" type="flag">
+  Forward any input read from stdin to the empty pane given by target-pane.
+</ParamField>
+
+<ParamField path="-N" type="flag">
+  Ignore keys pressed while the message is displayed.
+</ParamField>
+
+<ParamField path="-p" type="flag">
+  Print the message to stdout instead of displaying in status line.
+</ParamField>
+
+<ParamField path="-v" type="flag">
+  Print verbose logging as the format is parsed.
+</ParamField>
+
+<ParamField path="-c" type="string">
+  The target client.
+</ParamField>
+
+<ParamField path="-d" type="number">
+  Duration in milliseconds for which the message is shown. Default uses the `display-time` option.
+</ParamField>
+
+<ParamField path="-F" type="string">
+  Format string. Overrides the message argument.
+</ParamField>
+
+<ParamField path="-t" type="string">
+  The target pane for context.
+</ParamField>
+
+<ParamField path="message" type="string">
+  Message to display. Can include format variables.
+</ParamField>
+
+### Examples
+
+```bash
+# Display a simple message
+display-message "Hello, World!"
+
+# Display with format variables
+display-message "Session: #{session_name}, Window: #{window_index}"
+
+# Print to stdout
+display-message -p "#{pane_current_path}"
+
+# Display for 2 seconds
+display-message -d 2000 "Custom duration"
+
+# List all format variables
+display-message -a
+
+# Use -F for format
+display-message -p -F "#{window_name}"
+```
+
+## show-messages
+
+Alias: `showmsgs`
+
+```bash
+show-messages [-JT] [-t target-client]
+```
+
+Show server messages or jobs. Messages are stored in a per-client queue.
+
+<ParamField path="-J" type="flag">
+  Show jobs instead of messages.
+</ParamField>
+
+<ParamField path="-T" type="flag">
+  Show debugging information about the format tree.
+</ParamField>
+
+<ParamField path="-t" type="string">
+  The target client.
+</ParamField>
+
+### Examples
+
+```bash
+# Show messages for current client
+show-messages
+
+# Show messages for specific client
+show-messages -t /dev/pts/1
+
+# Show running jobs
+show-messages -J
+```
+
+## display-menu
+
+Alias: `menu`
+
+```bash
+display-menu [-O] [-c target-client] [-t target-pane] [-T title] [-x position] 
+             [-y position] name key command ...
+```
+
+Display a menu on the target client.
+
+<ParamField path="-O" type="flag">
+  Do not close the menu after an item is selected.
+</ParamField>
+
+<ParamField path="-c" type="string">
+  The target client.
+</ParamField>
+
+<ParamField path="-t" type="string">
+  The target pane.
+</ParamField>
+
+<ParamField path="-T" type="string">
+  Title for the menu.
+</ParamField>
+
+<ParamField path="-x" type="string">
+  Horizontal position. Can be a number, `C` for center, `R` for right, `P` for mouse position, `M` for mouse menu position, `W` for window position, or `S` for status line position.
+</ParamField>
+
+<ParamField path="-y" type="string">
+  Vertical position. Same options as `-x` for vertical positioning.
+</ParamField>
+
+<ParamField path="name" type="string" required>
+  Menu item name (displayed text). Use empty string for separator.
+</ParamField>
+
+<ParamField path="key" type="string" required>
+  Key shortcut for the item. Use empty string for no shortcut.
+</ParamField>
+
+<ParamField path="command" type="string" required>
+  Command to execute when item is selected. Use empty string for separator.
+</ParamField>
+
+Menu items are specified in triplets: name, key, command. Repeat for each menu item.
+
+### Examples
+
+```bash
+# Simple menu
+display-menu -T "My Menu" \
+  "New Window" "c" "new-window" \
+  "Split Horizontal" "|" "split-window -h" \
+  "" "" "" \
+  "Kill Pane" "x" "kill-pane"
+
+# Menu at mouse position
+display-menu -x M -y M \
+  "Vertical Split" "v" "split-window -v" \
+  "Horizontal Split" "h" "split-window -h"
+
+# Menu in center
+display-menu -x C -y C -T "Layout" \
+  "Even Horizontal" "1" "select-layout even-horizontal" \
+  "Even Vertical" "2" "select-layout even-vertical" \
+  "Tiled" "3" "select-layout tiled"
+```
+
+## display-popup
+
+Alias: `popup`
+
+```bash
+display-popup [-CE] [-c target-client] [-d start-directory] [-h height] 
+              [-t target-pane] [-T title] [-w width] [-x position] 
+              [-y position] [shell-command]
+```
+
+Display a popup on the target client.
+
+<ParamField path="-C" type="flag">
+  Close any popup already open.
+</ParamField>
+
+<ParamField path="-E" type="flag">
+  Close the popup automatically when the shell command exits.
+</ParamField>
+
+<ParamField path="-c" type="string">
+  The target client.
+</ParamField>
+
+<ParamField path="-d" type="string">
+  Starting directory for the shell command.
+</ParamField>
+
+<ParamField path="-h" type="string">
+  Height of the popup. Can be a number or percentage (e.g., `50%`).
+</ParamField>
+
+<ParamField path="-t" type="string">
+  The target pane.
+</ParamField>
+
+<ParamField path="-T" type="string">
+  Title for the popup.
+</ParamField>
+
+<ParamField path="-w" type="string">
+  Width of the popup. Can be a number or percentage.
+</ParamField>
+
+<ParamField path="-x" type="string">
+  Horizontal position. Same options as display-menu `-x`.
+</ParamField>
+
+<ParamField path="-y" type="string">
+  Vertical position. Same options as display-menu `-y`.
+</ParamField>
+
+<ParamField path="shell-command" type="string">
+  Shell command to run in the popup.
+</ParamField>
+
+### Examples
+
+```bash
+# Simple popup with command
+display-popup -E "top"
+
+# Centered popup with specific size
+display-popup -x C -y C -w 80% -h 80% -E "htop"
+
+# Popup with title
+display-popup -T "File Browser" -E "ranger"
+
+# Close any open popup
+display-popup -C
+```
+
+## choose-client
+
+```bash
+choose-client [-NrZ] [-F format] [-f filter] [-K key-format] [-O sort-order] 
+              [-t target-pane] [template]
+```
+
+Put a pane into client mode, where a client may be chosen interactively from a list.
+
+<ParamField path="-N" type="flag">
+  Start without the preview.
+</ParamField>
+
+<ParamField path="-r" type="flag">
+  Reverse the sort order.
+</ParamField>
+
+<ParamField path="-Z" type="flag">
+  Zoom the pane.
+</ParamField>
+
+<ParamField path="-F" type="string">
+  Format for each item in the list.
+</ParamField>
+
+<ParamField path="-f" type="string">
+  Initial filter (as a format expression).
+</ParamField>
+
+<ParamField path="-K" type="string">
+  Format for each shortcut key.
+</ParamField>
+
+<ParamField path="-O" type="string">
+  Initial sort order: `name`, `size`, `creation`, or `activity`.
+</ParamField>
+
+<ParamField path="-t" type="string">
+  Target pane.
+</ParamField>
+
+<ParamField path="template" type="string">
+  After a client is chosen, `%%` is replaced by the client name and the result is executed as a command.
+</ParamField>
+
+### Examples
+
+```bash
+# Choose client interactively
+choose-client
+
+# Choose to detach a client
+choose-client "detach-client -t '%%'"
+```
+
+## Control Mode
+
+Control mode (`tmux -C`) is a special mode where tmux acts as a background daemon and communicates with a client program via a simple text protocol.
+
+In control mode:
+- Output is sent as notifications
+- Input is parsed as commands
+- No terminal UI is displayed
+- Useful for integrating tmux with other programs
+
+### Control Mode Client Flags
+
+- `no-output`: Client does not receive pane output
+- `pause-after=seconds`: Pause output when behind
+- `read-only`: Client is read-only
+- `wait-exit`: Wait for empty line before exiting
+
+### Control Mode Notifications
+
+- `%output`: Pane output
+- `%layout-change`: Window layout changed
+- `%session-changed`: Session changed
+- `%window-add`, `%window-close`: Window events
+- `%subscription-changed`: Format subscription changed

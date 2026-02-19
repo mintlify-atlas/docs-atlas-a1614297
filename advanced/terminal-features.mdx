@@ -1,0 +1,421 @@
+---
+title: 'Terminal Features'
+description: 'Terminal feature detection and capability management in tmux'
+---
+
+## Overview
+
+tmux includes a sophisticated terminal feature detection system that automatically identifies and enables advanced terminal capabilities. This allows tmux to provide enhanced functionality when the underlying terminal supports it.
+
+## Terminal Features System
+
+### Feature Detection
+
+tmux detects terminal features through multiple mechanisms:
+
+- **terminfo capabilities**: Standard terminal database entries
+- **Terminal type identification**: Recognizing specific terminal emulators
+- **Device Attributes (DA)**: Querying the terminal at runtime
+- **Manual specification**: Using the `terminal-features` option
+
+The feature detection code is implemented in `tty-features.c`.
+
+### Available Terminal Features
+
+tmux supports the following terminal features:
+
+#### Color Support
+
+<CodeGroup>
+```bash 256 Colors
+# Enable 256 color support
+set -g terminal-features "xterm*:256"
+```
+
+```bash RGB/True Color
+# Enable 24-bit RGB color support
+set -g terminal-features "xterm*:RGB"
+```
+</CodeGroup>
+
+From `tty-features.c:116-128`, the RGB feature includes:
+
+- `setrgbf`: Set RGB foreground color (\E[38;2;%p1%d;%p2%d;%p3%dm)
+- `setrgbb`: Set RGB background color (\E[48;2;%p1%d;%p2%d;%p3%dm)
+- Support for 256-color palette alongside RGB
+
+#### Text Attributes
+
+<AccordionGroup>
+<Accordion title="Strikethrough" icon="strikethrough">
+Enables strikethrough text formatting:
+
+```bash
+set -g terminal-features "*:strikethrough"
+```
+
+Implemented as escape sequence: `\E[9m`
+</Accordion>
+
+<Accordion title="Overline" icon="overline">
+Enables overline text attribute:
+
+```bash
+set -g terminal-features "*:overline"
+```
+
+Sequence: `Smol=\E[53m` (from `tty-features.c:144-152`)
+</Accordion>
+
+<Accordion title="Underscore Styles" icon="underline">
+Advanced underscore styling with colors:
+
+```bash
+set -g terminal-features "*:usstyle"
+```
+
+Supports:
+- Different underscore types (single, double, curly, dotted, dashed)
+- Underscore colors independent of text color
+- RGB colors for underscores
+
+From `tty-features.c:155-166`:
+- `Smulx`: Set underscore style
+- `Setulc`: Set underscore RGB color
+- `Setulc1`: Set underscore palette color
+</Accordion>
+</AccordionGroup>
+
+#### Advanced Features
+
+<CardGroup cols={2}>
+<Card title="Title Setting" icon="window">
+Window title escape sequences:
+
+```bash
+set -g terminal-features "*:title"
+```
+
+From `tty-features.c:51-60`:
+- `tsl=\E]0;` - To status line
+- `fsl=\a` - From status line
+</Card>
+
+<Card title="Clipboard" icon="clipboard">
+OSC 52 clipboard integration:
+
+```bash
+set -g terminal-features "*:clipboard"
+```
+
+Sequence: `Ms=\E]52;%p1%s;%p2%s\a` (`tty-features.c:86-94`)
+</Card>
+
+<Card title="Mouse Support" icon="mouse-pointer">
+Xterm-style mouse tracking:
+
+```bash
+set -g terminal-features "*:mouse"
+```
+
+Capability: `kmous=\E[M` (`tty-features.c:75-83`)
+</Card>
+
+<Card title="Focus Reporting" icon="eye">
+Focus in/out events:
+
+```bash
+set -g terminal-features "*:focus"
+```
+
+From `tty-features.c:181-190`:
+- Enable: `Enfcs=\E[?1004h`
+- Disable: `Dsfcs=\E[?1004l`
+</Card>
+</CardGroup>
+
+#### Cursor Customization
+
+```bash Cursor Styles
+# Enable cursor style changes
+set -g terminal-features "*:cstyle"
+```
+
+From `tty-features.c:193-202`:
+- `Ss=\E[%p1%d q` - Set cursor style
+- `Se=\E[2 q` - Reset cursor style
+
+Supports various cursor shapes: block, underline, bar, with blinking variants.
+
+```bash Cursor Colors
+# Enable cursor color customization
+set -g terminal-features "*:ccolour"
+```
+
+From `tty-features.c:205-214`:
+- `Cs=\E]12;%p1%s\a` - Set cursor color
+- `Cr=\E]112\a` - Reset cursor color
+
+#### Modern Terminal Features
+
+<Tabs>
+<Tab title="Extended Keys">
+Enhanced keyboard protocol support:
+
+```bash
+set -g terminal-features "*:extkeys"
+```
+
+From `tty-features.c:239-248`:
+- Enable: `Eneks=\E[>4;2m`
+- Disable: `Dseks=\E[>4m`
+
+Allows distinguishing more key combinations.
+</Tab>
+
+<Tab title="Synchronized Updates">
+Reduces flickering during redraws:
+
+```bash
+set -g terminal-features "*:sync"
+```
+
+Sequence: `Sync=\E[?2026%?%p1%{1}%-%tl%eh%;` (`tty-features.c:228-236`)
+</Tab>
+
+<Tab title="Hyperlinks">
+OSC 8 hyperlink support:
+
+```bash
+set -g terminal-features "*:hyperlinks"
+```
+
+From `tty-features.c:97-109`:
+- `Hls=\E]8;%?%p1%l%tid=%p1%s%;;%p2%s\E\\`
+</Tab>
+
+<Tab title="Bracketed Paste">
+Safe paste mode detection:
+
+```bash
+set -g terminal-features "*:bpaste"
+```
+
+From `tty-features.c:169-178`:
+- Enable: `Enbp=\E[?2004h`
+- Disable: `Dsbp=\E[?2004l`
+</Tab>
+</Tabs>
+
+#### Graphics Features
+
+<Warning>
+Graphics features require terminal support and compile-time configuration.
+</Warning>
+
+```bash Sixel Graphics
+set -g terminal-features "*:sixel"
+```
+
+From `tty-features.c:350-358`, enables sixel image support when compiled with the appropriate libraries.
+
+```bash DECFRA Rectangle Fill
+set -g terminal-features "*:rectfill"
+```
+
+From `tty-features.c:265-273`, enables fast rectangle filling operations:
+- Capability: `Rect`
+- Used for optimized screen redraws
+
+```bash DECSLRM Margins
+set -g terminal-features "*:margins"
+```
+
+From `tty-features.c:251-262`, scroll region margins:
+- Enable: `Enmg=\E[?69h`
+- Disable: `Dsmg=\E[?69l`
+- Set margins: `Cmg=\E[%i%p1%d;%p2%ds`
+
+## Default Terminal Configurations
+
+tmux includes predefined feature sets for popular terminals (from `tty-features.c:468-514`):
+
+### Modern Terminals Base Set
+
+Most modern terminals support:
+```
+256,RGB,bpaste,clipboard,mouse,strikethrough,title
+```
+
+<Tabs>
+<Tab title="tmux">
+When running tmux inside tmux:
+```
+256,RGB,bpaste,clipboard,mouse,strikethrough,title,
+ccolour,cstyle,focus,overline,usstyle,hyperlinks
+```
+</Tab>
+
+<Tab title="iTerm2">
+```
+256,RGB,bpaste,clipboard,mouse,strikethrough,title,
+cstyle,extkeys,margins,usstyle,sync,osc7,hyperlinks
+```
+</Tab>
+
+<Tab title="XTerm">
+```
+256,RGB,bpaste,clipboard,mouse,strikethrough,title,
+ccolour,cstyle,extkeys,focus
+```
+
+Note: XTerm also supports margins and rectfill, but they can be disabled, so tmux detects them via secondary DA.
+</Tab>
+
+<Tab title="mintty">
+```
+256,RGB,bpaste,clipboard,mouse,strikethrough,title,
+ccolour,cstyle,extkeys,margins,overline,usstyle
+```
+</Tab>
+
+<Tab title="foot">
+```
+256,RGB,bpaste,clipboard,mouse,strikethrough,title,
+cstyle,extkeys
+```
+</Tab>
+
+<Tab title="rxvt-unicode">
+```
+256,bpaste,ccolour,cstyle,mouse,title,ignorefkeys
+```
+
+Note: rxvt-unicode has quirky function key handling, so tmux uses `ignorefkeys` to use built-in sequences instead.
+</Tab>
+</Tabs>
+
+## Configuration Examples
+
+### Override Terminal Type
+
+Force specific features for all terminals:
+
+```bash ~/.tmux.conf
+# Enable all supported features for any xterm-compatible terminal
+set -g terminal-features "xterm*:256:RGB:cstyle:ccolour:clipboard:title:mouse:focus"
+
+# Enable features for tmux terminals specifically
+set -ga terminal-features "tmux*:hyperlinks:sync:usstyle:overline"
+
+# Enable strikethrough for all terminals
+set -ga terminal-features "*:strikethrough"
+```
+
+### Working Directory Tracking
+
+```bash OSC 7 Support
+# Enable working directory tracking
+set -g terminal-features "*:osc7"
+
+# Capability from tty-features.c:63-72:
+# Swd=\E]7; fsl=\a
+```
+
+### Disable Specific Features
+
+To disable features that cause problems:
+
+```bash
+# Don't use terminal's function keys (use tmux built-ins)
+set -g terminal-features "rxvt*:ignorefkeys"
+```
+
+From `tty-features.c:276-347`, this disables `kf0` through `kf63` terminal capabilities.
+
+## Feature Application
+
+<Steps>
+<Step title="Feature Detection">
+tmux applies features in this order:
+
+1. Default features based on `$TERM` environment variable
+2. Device Attributes response (if available)
+3. User-specified `terminal-features` option
+</Step>
+
+<Step title="Capability Override">
+From `tty-features.c:434-464`, when features are applied:
+
+```c
+for (i = 0; i < nitems(tty_features); i++) {
+    if ((term->features & (1 << i)) || (~feat & (1 << i)))
+        continue;
+    tf = tty_features[i];
+    
+    log_debug("applying terminal feature: %s", tf->name);
+    if (tf->capabilities != NULL) {
+        capability = tf->capabilities;
+        while (*capability != NULL) {
+            log_debug("adding capability: %s", *capability);
+            tty_term_apply(term, *capability, 1);
+            capability++;
+        }
+    }
+    term->flags |= tf->flags;
+}
+```
+</Step>
+
+<Step title="Verification">
+Check active features:
+
+```bash
+# From outside tmux
+tmux show -g terminal-features
+
+# Check detected features in server info
+tmux info | grep features
+```
+</Step>
+</Steps>
+
+## Best Practices
+
+<Check>
+Let tmux auto-detect features when possible - manual overrides may cause issues
+</Check>
+
+<Check>
+Test feature changes thoroughly - some terminals report capabilities they don't fully support
+</Check>
+
+<Check>
+Use wildcards carefully - `*` matches all terminal types
+</Check>
+
+<Warning>
+Some features interact with terminal settings. For example:
+- `extkeys` requires terminal support for the extended keyboard protocol
+- `sync` may cause artifacts on slow connections
+- `margins` can conflict with certain terminal scrollback implementations
+</Warning>
+
+## Debugging Features
+
+Enable tmux logging to see feature detection:
+
+```bash
+# Start tmux with verbose logging
+tmux -vvv new-session
+
+# Check tmux-client-*.log for lines like:
+# "adding terminal feature: RGB"
+# "adding capability: setrgbf=..."
+```
+
+## Related Configuration
+
+- [`terminal-overrides`](/options/global#terminal-overrides) - Override specific capabilities
+- [`default-terminal`](/options/global#default-terminal) - Set TERM value inside tmux
+- [`allow-passthrough`](/options/global#allow-passthrough) - Control escape sequence passthrough

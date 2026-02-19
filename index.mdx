@@ -1,198 +1,97 @@
 ---
-title: "Introduction to tmux"
-description: "A powerful terminal multiplexer for managing multiple terminal sessions from a single window"
+title: "Introduction"
+description: "Welcome to the new home for your documentation"
 ---
 
-## What is tmux?
+## Setting up
 
-**tmux** is a terminal multiplexer that enables multiple terminals to be created, accessed, and controlled from a single screen. It allows you to detach from a screen and have it continue running in the background, then later reattach.
+Get your documentation site up and running in minutes.
 
-<Info>
-The name "tmux" stands for **terminal multiplexer** - a tool that lets you manage multiple terminal sessions within a single window.
-</Info>
+<Card
+  title="Start here"
+  icon="rocket"
+  href="/quickstart"
+  horizontal
+>
+  Follow our three step quickstart guide.
+</Card>
 
-## Why Use tmux?
+## Make it yours
 
-<CardGroup cols={2}>
-  <Card title="Session Persistence" icon="floppy-disk">
-    Sessions continue running even after disconnection. Perfect for remote work and long-running processes.
+Design a docs site that looks great and empowers your users.
+
+<Columns cols={2}>
+  <Card
+    title="Edit locally"
+    icon="pen-to-square"
+    href="/development"
+  >
+    Edit your docs locally and preview them in real time.
   </Card>
-  <Card title="Window Management" icon="window-restore">
-    Organize your workspace with multiple windows and panes in a single terminal.
+  <Card
+    title="Customize your site"
+    icon="palette"
+    href="/essentials/settings"
+  >
+    Customize the design and colors of your site to match your brand.
   </Card>
-  <Card title="Collaboration" icon="users">
-    Share sessions with other users for pair programming and remote assistance.
+    <Card
+    title="Set up navigation"
+    icon="map"
+    href="/essentials/navigation"
+  >
+    Organize your docs to help users find what they need and succeed with your product.
   </Card>
-  <Card title="Productivity" icon="bolt">
-    Navigate and control multiple terminals efficiently with keyboard shortcuts.
+  <Card
+    title="API documentation"
+    icon="terminal"
+    href="/api-reference/introduction"
+  >
+    Auto-generate API documentation from OpenAPI specifications.
   </Card>
-</CardGroup>
+</Columns>
 
-## Key Features
+## Create beautiful pages
 
-### Session Management
-Sessions are persistent and survive disconnection. You can:
-- Create multiple named sessions
-- Detach and reattach at will
-- Share sessions between multiple clients
-- Automatically restore your work environment
+Everything you need to create world-class documentation.
 
-### Window and Pane Splitting
-Organize your workspace efficiently:
-- Split windows horizontally and vertically into panes
-- Create multiple windows within a session
-- Navigate between windows and panes with keyboard shortcuts
-- Resize and rearrange panes to fit your workflow
-
-### Customization
-Tailor tmux to your preferences:
-- Extensive configuration options
-- Custom key bindings
-- Scriptable commands and hooks
-- Status line customization with dynamic content
-
-### Client-Server Architecture
-tmux uses a client-server model where:
-- The **server** manages all sessions, windows, and panes
-- **Clients** connect to view and interact with sessions
-- Multiple clients can attach to the same session simultaneously
-- The server continues running even when all clients disconnect
-
-## Core Concepts
-
-<Accordion title="Sessions">
-A **session** is a collection of windows under tmux management. Each session:
-- Has a unique name and ID
-- Maintains its own environment and options
-- Persists until explicitly destroyed
-- Can have multiple clients attached
-
-Learn more in [Sessions](/concepts/sessions).
-</Accordion>
-
-<Accordion title="Windows">
-A **window** occupies the entire screen and contains one or more panes. Windows:
-- Are numbered starting from 0 (by default)
-- Have names that can be set manually or automatically
-- Can be linked to multiple sessions
-- Support various layout arrangements
-
-Learn more in [Windows](/concepts/windows).
-</Accordion>
-
-<Accordion title="Panes">
-A **pane** is a rectangular section of a window running a terminal. Panes:
-- Can be split horizontally or vertically
-- Each runs its own shell or command
-- Can be resized, moved, and rearranged
-- Support synchronized input across multiple panes
-
-Learn more in [Panes](/concepts/panes).
-</Accordion>
-
-<Accordion title="Client-Server Model">
-tmux uses a **client-server architecture** where:
-- The server process manages all sessions
-- Client processes connect to view/control sessions
-- Communication happens over Unix domain sockets
-- Multiple clients can share the same session
-
-Learn more in [Client-Server Architecture](/concepts/client-server).
-</Accordion>
-
-## Common Use Cases
-
-### Remote Server Management
-Keep long-running processes alive even when SSH connections drop:
-
-```bash
-# Start a tmux session on remote server
-ssh user@server
-tmux new -s work
-
-# Run your processes
-npm run dev
-
-# Detach with Ctrl-b d
-# Close SSH connection
-
-# Later, reconnect and reattach
-ssh user@server
-tmux attach -t work
-```
-
-### Development Workflow
-Organize your development environment with multiple panes:
-
-```bash
-# Create session for project
-tmux new -s myproject
-
-# Split into editor, server, and terminal
-# Ctrl-b " (horizontal split)
-# Ctrl-b % (vertical split)
-```
-
-### Pair Programming
-Share a tmux session for collaborative work:
-
-```bash
-# Create a shared session
-tmux new -s pairing
-
-# Other user connects to same session
-tmux attach -t pairing
-```
-
-### Monitoring and Logging
-Watch multiple log files or processes simultaneously:
-
-```bash
-# Create monitoring session with multiple windows
-tmux new -s monitor
-tmux neww -t monitor -n logs
-tmux neww -t monitor -n metrics
-```
-
-## Platform Support
-
-tmux runs on multiple Unix-like operating systems:
-
-- OpenBSD
-- FreeBSD
-- NetBSD
-- Linux (all major distributions)
-- macOS
-- Solaris
-- Cygwin (Windows)
-- Haiku
-
-## Quick Start
-
-Ready to get started? Follow these next steps:
-
-<CardGroup cols={2}>
-  <Card title="Installation" icon="download" href="/installation">
-    Install tmux on your platform
+<Columns cols={2}>
+  <Card
+    title="Write with MDX"
+    icon="pen-fancy"
+    href="/essentials/markdown"
+  >
+    Use MDX to style your docs pages.
   </Card>
-  <Card title="Quickstart" icon="rocket" href="/quickstart">
-    Learn the basics in 5 minutes
+  <Card
+    title="Code samples"
+    icon="code"
+    href="/essentials/code"
+  >
+    Add sample code to demonstrate how to use your product.
   </Card>
-  <Card title="Key Bindings" icon="keyboard" href="/guides/key-bindings">
-    Master keyboard shortcuts
+  <Card
+    title="Images"
+    icon="image"
+    href="/essentials/images"
+  >
+    Display images and other media.
   </Card>
-  <Card title="Configuration" icon="gear" href="/guides/configuration">
-    Customize tmux to your needs
+  <Card
+    title="Reusable snippets"
+    icon="recycle"
+    href="/essentials/reusable-snippets"
+  >
+    Write once and reuse across your docs.
   </Card>
-</CardGroup>
+</Columns>
 
-## Community and Support
+## Need inspiration?
 
-- **GitHub Repository**: [github.com/tmux/tmux](https://github.com/tmux/tmux)
-- **Wiki**: [github.com/tmux/tmux/wiki](https://github.com/tmux/tmux/wiki)
-- **FAQ**: [github.com/tmux/tmux/wiki/FAQ](https://github.com/tmux/tmux/wiki/FAQ)
-- **Mailing List**: [tmux-users@googlegroups.com](https://groups.google.com/forum/#!forum/tmux-users)
-
-<Tip>
-For debugging, run tmux with `-v` or `-vv` flags to generate detailed log files in the current directory.
-</Tip>
+<Card
+  title="See complete examples"
+  icon="stars"
+  href="https://mintlify.com/customers"
+>
+  Browse our showcase of exceptional documentation sites.
+</Card>

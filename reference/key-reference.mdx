@@ -1,0 +1,295 @@
+---
+title: 'Key Bindings Reference'
+description: 'Complete reference for all default tmux key bindings and shortcuts'
+---
+
+This page provides a comprehensive reference for all default tmux key bindings. By default, tmux uses `C-b` (Control-b) as the prefix key.
+
+## Prefix Key Bindings
+
+These keys must be preceded by the prefix key (default: `C-b`).
+
+### Session Management
+
+| Key | Description | Command |
+|-----|-------------|----------|
+| `$` | Rename current session | `command-prompt -I'#S' { rename-session -- '%%' }` |
+| `(` | Switch to previous client | `switch-client -p` |
+| `)` | Switch to next client | `switch-client -n` |
+| `L` | Switch to the last client | `switch-client -l` |
+| `s` | Choose a session from a list | `choose-tree -Zs` |
+| `d` | Detach the current client | `detach-client` |
+| `D` | Choose and detach a client from a list | `choose-client -Z` |
+
+### Window Management
+
+| Key | Description | Command |
+|-----|-------------|----------|
+| `c` | Create a new window | `new-window` |
+| `,` | Rename current window | `command-prompt -I'#W' { rename-window -- '%%' }` |
+| `.` | Move the current window | `command-prompt -T target { move-window -t '%%' }` |
+| `&` | Kill current window | `confirm-before -p"kill-window #W? (y/n)" kill-window` |
+| `'` | Prompt for window index to select | `command-prompt -T window-target -pindex { select-window -t ':%%' }` |
+| `0-9` | Select window 0 to 9 | `select-window -t:=N` |
+| `n` | Select the next window | `next-window` |
+| `p` | Select the previous window | `previous-window` |
+| `l` | Select the previously current window | `last-window` |
+| `w` | Choose a window from a list | `choose-tree -Zw` |
+| `f` | Search for a pane | `command-prompt { find-window -Z -- '%%' }` |
+| `i` | Display window information | `display-message` |
+
+### Pane Management
+
+| Key | Description | Command |
+|-----|-------------|----------|
+| `"` | Split window vertically | `split-window` |
+| `%` | Split window horizontally | `split-window -h` |
+| `!` | Break pane to a new window | `break-pane` |
+| `x` | Kill the active pane | `confirm-before -p"kill-pane #P? (y/n)" kill-pane` |
+| `z` | Zoom the active pane | `resize-pane -Z` |
+| `o` | Select the next pane | `select-pane -t:.+` |
+| `;` | Move to the previously active pane | `last-pane` |
+| `q` | Display pane numbers | `display-panes` |
+| `m` | Toggle the marked pane | `select-pane -m` |
+| `M` | Clear the marked pane | `select-pane -M` |
+| `{` | Swap the active pane with the pane above | `swap-pane -U` |
+| `}` | Swap the active pane with the pane below | `swap-pane -D` |
+
+### Pane Navigation
+
+| Key | Description | Command |
+|-----|-------------|----------|
+| `Up` | Select the pane above the active pane | `select-pane -U` |
+| `Down` | Select the pane below the active pane | `select-pane -D` |
+| `Left` | Select the pane to the left of the active pane | `select-pane -L` |
+| `Right` | Select the pane to the right of the active pane | `select-pane -R` |
+
+Note: Arrow key bindings are repeatable (bound with `-r` flag).
+
+### Pane Resizing
+
+| Key | Description | Command |
+|-----|-------------|----------|
+| `C-Up` | Resize the pane up | `resize-pane -U` |
+| `C-Down` | Resize the pane down | `resize-pane -D` |
+| `C-Left` | Resize the pane left | `resize-pane -L` |
+| `C-Right` | Resize the pane right | `resize-pane -R` |
+| `M-Up` | Resize the pane up by 5 | `resize-pane -U 5` |
+| `M-Down` | Resize the pane down by 5 | `resize-pane -D 5` |
+| `M-Left` | Resize the pane left by 5 | `resize-pane -L 5` |
+| `M-Right` | Resize the pane right by 5 | `resize-pane -R 5` |
+
+Note: All resize bindings are repeatable.
+
+### Layouts
+
+| Key | Description | Command |
+|-----|-------------|----------|
+| `Space` | Select next layout | `next-layout` |
+| `E` | Spread panes out evenly | `select-layout -E` |
+| `M-1` | Set the even-horizontal layout | `select-layout even-horizontal` |
+| `M-2` | Set the even-vertical layout | `select-layout even-vertical` |
+| `M-3` | Set the main-horizontal layout | `select-layout main-horizontal` |
+| `M-4` | Set the main-vertical layout | `select-layout main-vertical` |
+| `M-5` | Select the tiled layout | `select-layout tiled` |
+| `M-6` | Set the main-horizontal-mirrored layout | `select-layout main-horizontal-mirrored` |
+| `M-7` | Set the main-vertical-mirrored layout | `select-layout main-vertical-mirrored` |
+
+### Copy Mode
+
+| Key | Description | Command |
+|-----|-------------|----------|
+| `[` | Enter copy mode | `copy-mode` |
+| `]` | Paste the most recent paste buffer | `paste-buffer -p` |
+| `PPage` | Enter copy mode and scroll up | `copy-mode -u` |
+| `#` | List all paste buffers | `list-buffers` |
+| `=` | Choose a paste buffer from a list | `choose-buffer -Z` |
+| `-` | Delete the most recent paste buffer | `delete-buffer` |
+
+### Other Commands
+
+| Key | Description | Command |
+|-----|-------------|----------|
+| `C-b` | Send the prefix key | `send-prefix` |
+| `C-o` | Rotate through the panes | `rotate-window` |
+| `M-o` | Rotate through the panes in reverse | `rotate-window -D` |
+| `C-z` | Suspend the current client | `suspend-client` |
+| `:` | Prompt for a command | `command-prompt` |
+| `?` | List key bindings | `list-keys -N` |
+| `/` | Describe key binding | `command-prompt -kpkey { list-keys -1N '%%' }` |
+| `r` | Redraw the current client | `refresh-client` |
+| `t` | Show a clock | `clock-mode` |
+| `~` | Show messages | `show-messages` |
+| `C` | Customize options | `customize-mode -Z` |
+| `M-n` | Select the next window with an alert | `next-window -a` |
+| `M-p` | Select the previous window with an alert | `previous-window -a` |
+
+### Window Scrolling
+
+| Key | Description | Command |
+|-----|-------------|----------|
+| `S-Up` | Move the visible part of the window up | `refresh-client -U 10` |
+| `S-Down` | Move the visible part of the window down | `refresh-client -D 10` |
+| `S-Left` | Move the visible part of the window left | `refresh-client -L 10` |
+| `S-Right` | Move the visible part of the window right | `refresh-client -R 10` |
+| `DC` | Reset so the visible part of the window follows the cursor | `refresh-client -c` |
+
+Note: All scrolling bindings are repeatable.
+
+### Menus
+
+| Key | Description | Command |
+|-----|-------------|----------|
+| `<` | Display window menu | `display-menu -xW -yW ...` |
+| `>` | Display pane menu | `display-menu -xP -yP ...` |
+
+## Mouse Bindings
+
+These bindings work when the `mouse` option is enabled.
+
+### Pane Actions
+
+| Action | Description | Command |
+|--------|-------------|----------|
+| `MouseDown1Pane` | Select pane and send mouse event | `select-pane -t=; send -M` |
+| `C-MouseDown1Pane` | Swap pane with target | `swap-pane -s@` |
+| `MouseDrag1Pane` | Enter copy mode if not in mode | `if ... { send -M } { copy-mode -M }` |
+| `MouseDrag1Border` | Resize pane | `resize-pane -M` |
+| `WheelUpPane` | Copy mode or send mouse | `if ... { send -M } { copy-mode -e }` |
+| `MouseDown2Pane` | Paste if not in mode | `select-pane -t=; if ... { send -M } { paste -p }` |
+| `DoubleClick1Pane` | Select word | `select-pane -t=; if ... { send -M } { copy-mode -H; send -X select-word; ... }` |
+| `TripleClick1Pane` | Select line | `select-pane -t=; if ... { send -M } { copy-mode -H; send -X select-line; ... }` |
+| `MouseDown3Pane` | Display pane menu | `display-menu -t= -xM -yM ...` |
+
+### Status Line Actions
+
+| Action | Description | Command |
+|--------|-------------|----------|
+| `MouseDown1Status` | Switch to window | `switch-client -t=` |
+| `C-MouseDown1Status` | Swap window | `swap-window -t@` |
+| `WheelDownStatus` | Next window | `next-window` |
+| `WheelUpStatus` | Previous window | `previous-window` |
+| `MouseDown3Status` | Display window menu | `display-menu -t= -xW -yW ...` |
+| `MouseDown3StatusLeft` | Display session menu | `display-menu -t= -xM -yW ...` |
+
+### Scrollbar Actions
+
+| Action | Description | Command |
+|--------|-------------|----------|
+| `MouseDown1ScrollbarUp` | Page up or enter copy mode | `if ... { send -X page-up } { copy-mode -u }` |
+| `MouseDown1ScrollbarDown` | Page down or enter copy mode | `if ... { send -X page-down } { copy-mode -d }` |
+| `MouseDrag1ScrollbarSlider` | Scroll to mouse position | `if ... { send -X scroll-to-mouse } { copy-mode -S }` |
+
+## Copy Mode Bindings (Emacs)
+
+In copy mode with emacs key bindings:
+
+| Key | Description | Command |
+|-----|-------------|----------|
+| `C-Space` | Begin selection | `send -X begin-selection` |
+| `C-a` | Start of line | `send -X start-of-line` |
+| `C-e` | End of line | `send -X end-of-line` |
+| `C-f` | Cursor right | `send -X cursor-right` |
+| `C-b` | Cursor left | `send -X cursor-left` |
+| `C-n` | Cursor down | `send -X cursor-down` |
+| `C-p` | Cursor up | `send -X cursor-up` |
+| `C-v` | Page down | `send -X page-down` |
+| `M-v` | Page up | `send -X page-up` |
+| `C-w` | Copy selection and cancel | `send -X copy-pipe-and-cancel` |
+| `M-w` | Copy selection and cancel | `send -X copy-pipe-and-cancel` |
+| `C-c` | Cancel | `send -X cancel` |
+| `Escape` | Cancel | `send -X cancel` |
+| `C-g` | Clear selection | `send -X clear-selection` |
+| `C-r` | Incremental search backward | `command-prompt -T search ...` |
+| `C-s` | Incremental search forward | `command-prompt -T search ...` |
+| `M-<` | History top | `send -X history-top` |
+| `M->` | History bottom | `send -X history-bottom` |
+| `M-b` | Previous word | `send -X previous-word` |
+| `M-f` | Next word end | `send -X next-word-end` |
+| `M-m` | Back to indentation | `send -X back-to-indentation` |
+| `M-r` | Middle line | `send -X middle-line` |
+| `M-R` | Top line | `send -X top-line` |
+| `Arrow Keys` | Navigate | `send -X cursor-up/down/left/right` |
+
+## Copy Mode Bindings (Vi)
+
+In copy mode with vi key bindings:
+
+| Key | Description | Command |
+|-----|-------------|----------|
+| `Space` | Begin selection | `send -X begin-selection` |
+| `Enter` | Copy selection and cancel | `send -X copy-pipe-and-cancel` |
+| `Escape` | Clear selection | `send -X clear-selection` |
+| `0` | Start of line | `send -X start-of-line` |
+| `$` | End of line | `send -X end-of-line` |
+| `:` | Go to line | `command-prompt -p'(goto line)' ...` |
+| `/` | Search forward | `command-prompt -T search -p'(search down)' ...` |
+| `?` | Search backward | `command-prompt -T search -p'(search up)' ...` |
+| `n` | Search again | `send -X search-again` |
+| `N` | Search reverse | `send -X search-reverse` |
+| `h` | Cursor left | `send -X cursor-left` |
+| `j` | Cursor down | `send -X cursor-down` |
+| `k` | Cursor up | `send -X cursor-up` |
+| `l` | Cursor right | `send -X cursor-right` |
+| `w` | Next word | `send -X next-word` |
+| `b` | Previous word | `send -X previous-word` |
+| `e` | Next word end | `send -X next-word-end` |
+| `B` | Previous space | `send -X previous-space` |
+| `W` | Next space | `send -X next-space` |
+| `E` | Next space end | `send -X next-space-end` |
+| `f` | Jump forward | `command-prompt -1p'(jump forward)' ...` |
+| `F` | Jump backward | `command-prompt -1p'(jump backward)' ...` |
+| `t` | Jump to forward | `command-prompt -1p'(jump to forward)' ...` |
+| `T` | Jump to backward | `command-prompt -1p'(jump to backward)' ...` |
+| `;` | Jump again | `send -X jump-again` |
+| `,` | Jump reverse | `send -X jump-reverse` |
+| `g` | History top | `send -X history-top` |
+| `G` | History bottom | `send -X history-bottom` |
+| `H` | Top line | `send -X top-line` |
+| `M` | Middle line | `send -X middle-line` |
+| `L` | Bottom line | `send -X bottom-line` |
+| `C-b` | Page up | `send -X page-up` |
+| `C-f` | Page down | `send -X page-down` |
+| `C-d` | Half page down | `send -X halfpage-down` |
+| `C-u` | Half page up | `send -X halfpage-up` |
+| `C-v` | Rectangle toggle | `send -X rectangle-toggle` |
+| `v` | Rectangle toggle | `send -X rectangle-toggle` |
+| `V` | Select line | `send -X select-line` |
+| `A` | Append selection and cancel | `send -X append-selection-and-cancel` |
+| `D` | Copy end of line and cancel | `send -X copy-pipe-end-of-line-and-cancel` |
+| `q` | Cancel | `send -X cancel` |
+| `%` | Next matching bracket | `send -X next-matching-bracket` |
+| `{` | Previous paragraph | `send -X previous-paragraph` |
+| `}` | Next paragraph | `send -X next-paragraph` |
+| `#` | Search backward for cursor word | `send -FX search-backward -- '#{copy_cursor_word}'` |
+| `*` | Search forward for cursor word | `send -FX search-forward -- '#{copy_cursor_word}'` |
+
+## Customizing Key Bindings
+
+You can customize key bindings using the `bind-key` command:
+
+```bash
+# Bind a key in the prefix table
+tmux bind-key C-a send-prefix
+
+# Bind a key without prefix
+tmux bind-key -n C-Left select-pane -L
+
+# Bind with a note (shown in list-keys -N)
+tmux bind-key -N 'My custom binding' C-x command-prompt
+
+# Make a binding repeatable
+tmux bind-key -r C-Up resize-pane -U
+```
+
+To view all current key bindings:
+
+```bash
+tmux list-keys
+```
+
+To view bindings with their descriptions:
+
+```bash
+tmux list-keys -N
+```

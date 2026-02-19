@@ -1,0 +1,523 @@
+---
+title: Miscellaneous Commands
+description: Utility and control flow commands for tmux
+---
+
+## Overview
+
+Miscellaneous commands provide control flow, conditional execution, and utility functions in tmux.
+
+## if-shell
+
+Alias: `if`
+
+```bash
+if-shell [-bF] [-t target-pane] shell-command command [command]
+```
+
+Execute a command conditionally based on the success or failure of a shell command.
+
+<ParamField path="-b" type="flag">
+  Run shell-command in the background.
+</ParamField>
+
+<ParamField path="-F" type="flag">
+  Do not execute shell-command. Instead, consider it successful if it is neither empty nor zero after formats are expanded.
+</ParamField>
+
+<ParamField path="-t" type="string">
+  The target pane for format expansion context.
+</ParamField>
+
+<ParamField path="shell-command" type="string" required>
+  Shell command to execute (or format to evaluate with `-F`).
+</ParamField>
+
+<ParamField path="command" type="string" required>
+  Command to execute if shell-command succeeds (exits with 0). The second optional command is executed if it fails.
+</ParamField>
+
+### Format Expansion
+
+Before being executed, `shell-command` is expanded using format rules.
+
+### Examples
+
+```bash
+# Execute command if shell command succeeds
+if-shell "test -f ~/.tmux.local.conf" "source ~/.tmux.local.conf"
+
+# With else clause
+if-shell "test -n $SSH_CONNECTION" \
+  "set status-bg red" \
+  "set status-bg green"
+
+# Using formats without executing shell
+if-shell -F "#{==:#{host},myhost}" \
+  "set status-bg blue"
+
+# Background execution
+if-shell -b "sleep 5 && echo done" "display 'Command finished'"
+
+# Check session existence
+if-shell -F "#{session_attached}" \
+  "display 'Session is attached'" \
+  "display 'Session is detached'"
+```
+
+## run-shell
+
+Alias: `run`
+
+```bash
+run-shell [-bCE] [-c start-directory] [-d delay] [-t target-pane] [shell-command]
+```
+
+Execute a shell command or tmux command in the background without creating a window.
+
+<ParamField path="-b" type="flag">
+  Run the command in the background. By default, the command blocks.
+</ParamField>
+
+<ParamField path="-C" type="flag">
+  Execute as a tmux command instead of a shell command.
+</ParamField>
+
+<ParamField path="-E" type="flag">
+  Redirect the command's stderr to stdout instead of ignoring it.
+</ParamField>
+
+<ParamField path="-c" type="string">
+  Set the current working directory to start-directory.
+</ParamField>
+
+<ParamField path="-d" type="number">
+  Wait for delay seconds before starting the command.
+</ParamField>
+
+<ParamField path="-t" type="string">
+  The target pane. Any output to stdout is displayed in view mode in this pane after the command finishes (unless `-b` is given or the command is a tmux command with `-C`).
+</ParamField>
+
+<ParamField path="shell-command" type="string">
+  Shell command to execute. Before execution, expanded using format rules.
+</ParamField>
+
+### Output Display
+
+Without `-C` or `-b`, output to stdout is displayed in view mode in the target pane (or current pane) after the command finishes. The exit status is also displayed if the command fails.
+
+### Examples
+
+```bash
+# Run command and show output
+run-shell "uptime"
+
+# Run in background
+run-shell -b "sleep 10 && tmux display 'Done'"
+
+# Run tmux command
+run-shell -C "new-window"
+
+# With delay
+run-shell -d 5 "echo 'After 5 seconds'"
+
+# With working directory
+run-shell -c /tmp "pwd"
+
+# Capture stderr
+run-shell -E "command-that-errors 2>&1"
+
+# Complex example with formats
+run-shell "echo 'Current window: #{window_name}' > /tmp/tmux.log"
+```
+
+## wait-for
+
+Alias: `wait`
+
+```bash
+wait-for [-L | -S | -U] channel
+```
+
+Block or signal a channel for synchronization between commands.
+
+<ParamField path="-L" type="flag">
+  Lock the channel. Any clients that try to lock the same channel are made to wait until it is unlocked with `-U`.
+</ParamField>
+
+<ParamField path="-S" type="flag">
+  Signal the channel. Wake any clients waiting on this channel.
+</ParamField>
+
+<ParamField path="-U" type="flag">
+  Unlock the channel (use with `-L`).
+</ParamField>
+
+<ParamField path="channel" type="string" required>
+  The name of the channel to wait on, signal, lock, or unlock.
+</ParamField>
+
+### Behavior
+
+Without options, prevents the client from exiting until woken using `wait-for -S` with the same channel.
+
+### Examples
+
+```bash
+# Simple wait and signal
+# Terminal 1:
+run-shell "sleep 5 && tmux wait-for -S mychannel"
+
+# Terminal 2 (will wait for signal):
+wait-for mychannel ; display "Signal received"
+
+# Lock pattern
+run-shell -b '
+  tmux wait-for -L mylock
+  # ... critical section ...
+  sleep 2
+  tmux wait-for -U mylock
+'
+
+# Multiple commands waiting
+run-shell -b "tmux wait-for mychan ; tmux display 'Job 1 done'"
+run-shell -b "tmux wait-for mychan ; tmux display 'Job 2 done'"
+run-shell "sleep 3 && tmux wait-for -S mychan"
+
+# Coordination between sessions
+if-shell '[ -f /tmp/setup-done ]' '' '
+  wait-for -L setup
+  if-shell "[ ! -f /tmp/setup-done ]" "
+    run-shell setup-script.sh
+    run-shell touch /tmp/setup-done
+  "
+  wait-for -U setup
+'
+```
+
+## source-file
+
+Alias: `source`
+
+```bash
+source-file [-Fnqv] path ...
+```
+
+Execute commands from one or more files.
+
+<ParamField path="-F" type="flag">
+  Expand formats in the file.
+</ParamField>
+
+<ParamField path="-n" type="flag">
+  Do not execute commands, just parse them and report errors.
+</ParamField>
+
+<ParamField path="-q" type="flag">
+  Suppress errors about non-existent files.
+</ParamField>
+
+<ParamField path="-v" type="flag">
+  Verbose output showing each command as it is executed.
+</ParamField>
+
+<ParamField path="path" type="string" required>
+  Path to configuration file(s) to source. Can specify multiple files.
+</ParamField>
+
+### Examples
+
+```bash
+# Source a configuration file
+source-file ~/.tmux.conf
+
+# Source multiple files
+source-file ~/.tmux.conf ~/.tmux.local.conf
+
+# Source with error suppression
+source-file -q ~/.tmux.optional.conf
+
+# Validate configuration without executing
+source-file -n ~/.tmux.conf
+
+# Verbose execution
+source-file -v ~/.tmux.conf
+
+# Source with format expansion
+source-file -F ~/.tmux.#{host}.conf
+```
+
+## clock-mode
+
+```bash
+clock-mode [-t target-pane]
+```
+
+Display a large clock in the target pane.
+
+<ParamField path="-t" type="string">
+  The target pane.
+</ParamField>
+
+Press any key to exit clock mode.
+
+### Related Options
+
+- `clock-mode-colour`: Color of the clock
+- `clock-mode-style`: Clock format (12 or 24)
+
+### Examples
+
+```bash
+# Display clock in current pane
+clock-mode
+
+# Display clock in specific pane
+clock-mode -t 0
+
+# Set clock options and display
+set-option -w clock-mode-colour blue
+set-option -w clock-mode-style 12
+clock-mode
+```
+
+## lock-server
+
+Alias: `lock`
+
+```bash
+lock-server
+```
+
+Lock each client individually by running the command specified by the `lock-command` option.
+
+### Related Options
+
+- `lock-command`: Command to run when locking (default: `lock -np`)
+- `lock-after-time`: Lock session after seconds of inactivity (default 0, disabled)
+
+### Examples
+
+```bash
+# Lock all clients
+lock-server
+
+# Set custom lock command
+set-option -g lock-command "vlock"
+
+# Enable auto-lock after 5 minutes
+set-option -g lock-after-time 300
+```
+
+## confirm-before
+
+Alias: `confirm`
+
+```bash
+confirm-before [-b] [-p prompt] [-t target-client] command
+```
+
+Ask for confirmation before executing a command.
+
+<ParamField path="-b" type="flag">
+  Show the prompt in the background (allow other commands to run).
+</ParamField>
+
+<ParamField path="-p" type="string">
+  Custom prompt message. Default is "command (y/n)".
+</ParamField>
+
+<ParamField path="-t" type="string">
+  The target client for displaying the prompt.
+</ParamField>
+
+<ParamField path="command" type="string" required>
+  The command to execute if confirmed.
+</ParamField>
+
+### Examples
+
+```bash
+# Confirm before killing pane
+confirm-before kill-pane
+
+# Custom prompt
+confirm-before -p "Kill session? (y/n)" kill-session
+
+# Bind to key
+bind-key X confirm-before -p "Kill window #{window_name}? (y/n)" kill-window
+```
+
+## command-prompt
+
+```bash
+command-prompt [-1FikNTW] [-I inputs] [-p prompts] [-t target-client] [template]
+```
+
+Open a command prompt in the status line.
+
+<ParamField path="-1" type="flag">
+  Accept only one key press as input.
+</ParamField>
+
+<ParamField path="-F" type="flag">
+  Expand formats in the template.
+</ParamField>
+
+<ParamField path="-i" type="flag">
+  Execute the template immediately without waiting for user input.
+</ParamField>
+
+<ParamField path="-k" type="flag">
+  Accept a key name instead of a command.
+</ParamField>
+
+<ParamField path="-N" type="flag">
+  Accept only numeric input.
+</ParamField>
+
+<ParamField path="-T" type="flag">
+  Accept only a target (session, window, or pane).
+</ParamField>
+
+<ParamField path="-W" type="flag">
+  Accept only a window name.
+</ParamField>
+
+<ParamField path="-I" type="string">
+  Comma-separated list of initial input values.
+</ParamField>
+
+<ParamField path="-p" type="string">
+  Comma-separated list of prompt strings.
+</ParamField>
+
+<ParamField path="-t" type="string">
+  The target client.
+</ParamField>
+
+<ParamField path="template" type="string">
+  Command template. `%%` is replaced by the user's input, or `%1`, `%2`, etc. for multiple prompts.
+</ParamField>
+
+### Examples
+
+```bash
+# Simple command prompt
+command-prompt
+
+# Rename window prompt
+command-prompt -I "#{window_name}" -p "New window name:" "rename-window '%%'"
+
+# Multiple prompts
+command-prompt -p "Width:","Height:" "resize-window -x %1 -y %2"
+
+# Numeric only
+command-prompt -N -p "Window index:" "select-window -t:%1"
+
+# Target selection
+command-prompt -T -p "Target pane:" "swap-pane -t '%%'"
+
+# Single key press
+command-prompt -1 -p "Key:" "send-keys '%%'"
+```
+
+## list-commands
+
+Alias: `lscm`
+
+```bash
+list-commands [-F format] [command]
+```
+
+List the syntax of commands supported by tmux.
+
+<ParamField path="-F" type="string">
+  Format for each line. Available format variables:
+  - `#{command_list_name}`: Command name
+  - `#{command_list_alias}`: Command alias
+  - `#{command_list_usage}`: Command usage
+</ParamField>
+
+<ParamField path="command" type="string">
+  List only this command. If omitted, all commands are listed.
+</ParamField>
+
+### Examples
+
+```bash
+# List all commands
+list-commands
+
+# List specific command
+list-commands new-window
+
+# Custom format
+list-commands -F "#{command_list_name} (#{command_list_alias})"
+```
+
+## start-server
+
+Alias: `start`
+
+```bash
+start-server
+```
+
+Start the tmux server if not already running. Normally not needed as the server is started automatically.
+
+## Practical Examples
+
+### Conditional Configuration
+
+```bash
+# Load different configs based on hostname
+if-shell -F "#{==:#{host},work-laptop}" \
+  "source ~/.tmux.work.conf" \
+  "source ~/.tmux.home.conf"
+
+# Load optional local config
+if-shell "test -f ~/.tmux.local.conf" \
+  "source ~/.tmux.local.conf"
+```
+
+### Background Jobs
+
+```bash
+# Monitor and notify
+run-shell -b '
+  while true; do
+    if some-check; then
+      tmux display "Check passed"
+      break
+    fi
+    sleep 60
+  done
+'
+```
+
+### Synchronized Setup
+
+```bash
+# Ensure one-time setup
+if-shell "test ! -f ~/.tmux-setup-done" "
+  run-shell setup-script.sh
+  run-shell touch ~/.tmux-setup-done
+"
+```
+
+### Interactive Prompts
+
+```bash
+# Quick window creation with prompt
+bind-key C-n command-prompt -p "Window name:" "new-window -n '%%'"
+
+# Rename with current name as default
+bind-key , command-prompt -I "#{window_name}" \
+  "rename-window '%%'"
+
+# Jump to window
+bind-key j command-prompt -p "Jump to window:" \
+  "select-window -t '%%'"
+```

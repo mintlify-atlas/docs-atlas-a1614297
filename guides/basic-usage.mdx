@@ -1,0 +1,336 @@
+---
+title: 'Basic Usage'
+description: 'Day-to-day workflows and common patterns for using tmux'
+---
+
+## Starting tmux
+
+The simplest way to start tmux is to run it without any arguments:
+
+```bash
+$ tmux
+```
+
+This creates a new session with a single window. When tmux is started, it:
+- Creates a new **session** with a single **window**
+- Displays a status line at the bottom showing session information
+- Starts your default shell in the window
+
+### Creating Named Sessions
+
+It's useful to name your sessions for easier management:
+
+```bash
+$ tmux new-session -s myproject
+$ tmux new -s myproject  # Short form
+```
+
+## The Prefix Key
+
+tmux is controlled using a key combination of a prefix key followed by a command key. The default prefix is `C-b` (Ctrl-b).
+
+<Note>
+To send a command to tmux, press the prefix key first, release it, then press the command key.
+</Note>
+
+### Common Commands
+
+After pressing the prefix key (`C-b`), you can use these commands:
+
+| Key | Action |
+|-----|--------|
+| `?` | List all key bindings |
+| `:` | Enter the tmux command prompt |
+| `d` | Detach from the current session |
+| `c` | Create a new window |
+| `[` | Enter copy mode |
+| `]` | Paste the most recently copied text |
+
+## Sessions
+
+A session is a single collection of pseudo terminals under tmux management. Sessions persist even when you disconnect.
+
+<Steps>
+
+### Creating a Session
+
+```bash
+tmux new-session -s work
+tmux new -s work -n editor  # With window name
+```
+
+### Detaching from a Session
+
+Press `C-b d` or use:
+
+```bash
+tmux detach
+```
+
+The session continues running in the background.
+
+### Listing Sessions
+
+```bash
+$ tmux list-sessions
+$ tmux ls  # Short form
+```
+
+### Attaching to a Session
+
+```bash
+$ tmux attach-session -t work
+$ tmux attach -t work  # Short form
+$ tmux a -t work       # Even shorter
+```
+
+If you omit the target, tmux attaches to the most recently used session:
+
+```bash
+$ tmux attach
+```
+
+### Switching Between Sessions
+
+Inside tmux, press:
+- `C-b s` - Interactive session selector
+- `C-b (` - Switch to the previous session
+- `C-b )` - Switch to the next session
+- `C-b L` - Switch to the last session
+
+</Steps>
+
+## Windows
+
+Each session has one or more windows. A window occupies the entire screen and may be split into panes.
+
+### Window Navigation
+
+| Keys | Action |
+|------|--------|
+| `C-b c` | Create a new window |
+| `C-b n` | Move to the next window |
+| `C-b p` | Move to the previous window |
+| `C-b l` | Move to the previously selected window |
+| `C-b 0-9` | Select windows 0 to 9 |
+| `C-b '` | Prompt for window index to select |
+| `C-b w` | Choose window interactively |
+| `C-b f` | Prompt to search for text in open windows |
+
+### Window Management
+
+```bash
+# Create a window with a name
+tmux new-window -n editor
+
+# Rename the current window
+tmux rename-window -t 0 database
+
+# Kill the current window
+tmux kill-window -t 2
+```
+
+Or use key bindings:
+- `C-b ,` - Rename the current window
+- `C-b &` - Kill the current window (with confirmation)
+
+## Basic Panes
+
+Panes allow you to divide a window into multiple sections.
+
+### Creating Panes
+
+| Keys | Action |
+|------|--------|
+| `C-b "` | Split the current pane horizontally (top and bottom) |
+| `C-b %` | Split the current pane vertically (left and right) |
+
+### Navigating Panes
+
+| Keys | Action |
+|------|--------|
+| `C-b o` | Select the next pane |
+| `C-b ;` | Move to the previously active pane |
+| `C-b Up/Down/Left/Right` | Change to the pane in that direction |
+| `C-b q` | Briefly display pane indexes |
+
+## The Command Prompt
+
+Press `C-b :` to enter the command prompt. This allows you to run any tmux command interactively.
+
+Examples:
+
+```bash
+# Create a new window with a specific name
+:new-window -n logs
+
+# Set a session option
+:set-option -g status-style bg=cyan
+
+# Show all options
+:show-options -g
+```
+
+## Getting Help
+
+<Tabs>
+  <Tab title="Key Bindings">
+    Press `C-b ?` to see a list of all key bindings.
+  </Tab>
+  <Tab title="Command List">
+    ```bash
+    $ tmux list-commands
+    $ tmux lscm  # Short form
+    ```
+  </Tab>
+  <Tab title="Manual Page">
+    ```bash
+    $ man tmux
+    ```
+  </Tab>
+</Tabs>
+
+## Configuration File
+
+tmux loads configuration from:
+1. `/etc/tmux.conf` (system-wide, if present)
+2. `~/.tmux.conf` or `$XDG_CONFIG_HOME/tmux/tmux.conf` (user-specific)
+
+The configuration file contains tmux commands executed when the server starts.
+
+### Basic Configuration Example
+
+```bash
+# Change prefix from C-b to C-a
+set-option -g prefix C-a
+unbind-key C-b
+bind-key C-a send-prefix
+
+# Start window numbering at 1
+set-option -g base-index 1
+
+# Enable mouse support
+set-option -g mouse on
+
+# Increase history limit
+set-option -g history-limit 5000
+
+# Customize status bar
+set-option -g status-style bg=blue,fg=white
+```
+
+### Reloading Configuration
+
+After editing your configuration file:
+
+```bash
+tmux source-file ~/.tmux.conf
+```
+
+Or bind it to a key in your config:
+
+```bash
+bind-key R source-file ~/.tmux.conf \; \
+    display-message "Configuration reloaded"
+```
+
+Then press `C-b R` to reload.
+
+## Common Workflows
+
+### Development Session
+
+Create a development environment with multiple windows:
+
+```bash
+# Create a new session
+tmux new-session -s dev -n editor
+
+# Create additional windows
+tmux new-window -n console
+tmux new-window -n server
+
+# Split panes as needed
+tmux select-window -t editor
+tmux split-window -h
+```
+
+### Remote Server Management
+
+```bash
+# SSH and start tmux
+ssh server.example.com
+tmux new -s maintenance
+
+# Run long-running tasks
+# Detach with C-b d
+
+# Later, reconnect and reattach
+ssh server.example.com
+tmux attach -t maintenance
+```
+
+<Tip>
+Sessions survive accidental disconnections, making tmux invaluable for SSH connections that might timeout.
+</Tip>
+
+## Default Key Bindings Reference
+
+Here's a complete reference of the default key bindings (all require pressing `C-b` first):
+
+<Accordion title="Session Management">
+  - `d` - Detach from session
+  - `D` - Choose a client to detach
+  - `s` - Select a new session interactively
+  - `$` - Rename the current session
+  - `(` - Switch to previous session
+  - `)` - Switch to next session
+  - `L` - Switch to last session
+</Accordion>
+
+<Accordion title="Window Management">
+  - `c` - Create a new window
+  - `&` - Kill the current window
+  - `n` - Move to next window
+  - `p` - Move to previous window
+  - `l` - Move to previously selected window
+  - `0-9` - Select windows 0 to 9
+  - `'` - Prompt for window index
+  - `,` - Rename current window
+  - `.` - Prompt for window index to move
+  - `w` - Choose window interactively
+  - `f` - Search for text in windows
+</Accordion>
+
+<Accordion title="Pane Management">
+  - `"` - Split pane horizontally
+  - `%` - Split pane vertically
+  - `o` - Select next pane
+  - `;` - Move to previously active pane
+  - `q` - Show pane numbers
+  - `x` - Kill current pane
+  - `z` - Toggle pane zoom
+  - `!` - Break pane into window
+  - `{` - Swap with previous pane
+  - `}` - Swap with next pane
+  - `Up/Down/Left/Right` - Move to pane in direction
+  - `C-Up/C-Down/C-Left/C-Right` - Resize pane by 1 cell
+  - `M-Up/M-Down/M-Left/M-Right` - Resize pane by 5 cells
+  - `Space` - Cycle through preset layouts
+  - `M-1` to `M-7` - Arrange in preset layouts
+</Accordion>
+
+<Accordion title="Copy Mode and Other">
+  - `[` - Enter copy mode
+  - `]` - Paste buffer
+  - `#` - List paste buffers
+  - `=` - Choose buffer to paste interactively
+  - `-` - Delete most recent paste buffer
+  - `:` - Enter command prompt
+  - `?` - List key bindings
+  - `t` - Show time
+  - `i` - Display window information
+  - `~` - Show previous messages
+  - `r` - Force redraw
+  - `C-z` - Suspend tmux client
+</Accordion>

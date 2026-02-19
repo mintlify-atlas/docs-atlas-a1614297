@@ -1,0 +1,320 @@
+---
+title: Session Commands
+description: Commands for creating, managing, and controlling tmux sessions
+---
+
+## Overview
+
+The tmux server manages clients, sessions, windows, and panes. Clients are attached to sessions to interact with them. Each session has one or more windows linked into it.
+
+## attach-session
+
+Alias: `attach`
+
+```bash
+attach-session [-dErx] [-c working-directory] [-f flags] [-t target-session]
+```
+
+Attach to an existing session. If run from outside tmux, attach to `target-session` in the current terminal. If used from inside tmux, switch the currently attached session.
+
+<ParamField path="-d" type="flag">
+  Detach any other clients attached to the session.
+</ParamField>
+
+<ParamField path="-E" type="flag">
+  Do not apply the `update-environment` option.
+</ParamField>
+
+<ParamField path="-r" type="flag">
+  Alias for `-f read-only,ignore-size`. Makes the client read-only.
+</ParamField>
+
+<ParamField path="-x" type="flag">
+  Send SIGHUP to the parent process of the client as well as detaching, typically causing it to exit.
+</ParamField>
+
+<ParamField path="-c" type="string">
+  Set the session working directory (used for new windows) to `working-directory`.
+</ParamField>
+
+<ParamField path="-f" type="string">
+  Comma-separated list of client flags:
+  - `active-pane` - client has an independent active pane
+  - `ignore-size` - client does not affect the size of other clients
+  - `no-detach-on-destroy` - do not detach when session is destroyed if other sessions exist
+  - `no-output` - client does not receive pane output in control mode
+  - `pause-after=seconds` - output is paused once pane is seconds behind in control mode
+  - `read-only` - client is read-only
+  - `wait-exit` - wait for empty line input before exiting in control mode
+  
+  Prefix with `!` to turn a flag off if client is already attached.
+</ParamField>
+
+<ParamField path="-t" type="string">
+  The target session. Must already exist.
+</ParamField>
+
+### Target Session Selection
+
+When tmux needs to select the most recently used session, it prefers the most recently used unattached session.
+
+## new-session
+
+Alias: `new`
+
+```bash
+new-session [-AdDEPX] [-c start-directory] [-e environment] [-f flags] 
+            [-F format] [-n window-name] [-s session-name] [-t group-name] 
+            [-x width] [-y height] [shell-command [argument ...]]
+```
+
+Create a new session with name `session-name`.
+
+<ParamField path="-A" type="flag">
+  If `session-name` already exists, behave like `attach-session`. When combined with `-D`, behaves like `-d` to `attach-session`, and with `-X`, behaves like `-x` to `attach-session`.
+</ParamField>
+
+<ParamField path="-d" type="flag">
+  Do not attach the new session to the current terminal (create in detached mode).
+</ParamField>
+
+<ParamField path="-D" type="flag">
+  With `-A`, detach other clients when attaching (like `-d` to `attach-session`).
+</ParamField>
+
+<ParamField path="-E" type="flag">
+  Do not apply the `update-environment` option.
+</ParamField>
+
+<ParamField path="-P" type="flag">
+  Print information about the new session after it has been created. Default format is `#{session_name}:` but can be changed with `-F`.
+</ParamField>
+
+<ParamField path="-X" type="flag">
+  With `-A`, send SIGHUP to parent process when attaching (like `-x` to `attach-session`).
+</ParamField>
+
+<ParamField path="-c" type="string">
+  Specify the working directory for the new session.
+</ParamField>
+
+<ParamField path="-e" type="string">
+  Set an environment variable for the newly created session in the form `VARIABLE=value`. May be specified multiple times.
+</ParamField>
+
+<ParamField path="-f" type="string">
+  Comma-separated list of client flags (see `attach-session`).
+</ParamField>
+
+<ParamField path="-F" type="string">
+  Format for output when `-P` is used.
+</ParamField>
+
+<ParamField path="-n" type="string">
+  Name for the initial window.
+</ParamField>
+
+<ParamField path="-s" type="string">
+  Name for the new session.
+</ParamField>
+
+<ParamField path="-t" type="string">
+  Specify a session group. Sessions in the same group share the same set of windows. The argument may be:
+  - Name of an existing group
+  - Name of an existing session (new session joins same group)
+  - Name for a new group containing only the new session
+  
+  Cannot be used with `-n` or `shell-command`.
+</ParamField>
+
+<ParamField path="-x" type="number">
+  Width for the session. Use `-` for the size of the current client.
+</ParamField>
+
+<ParamField path="-y" type="number">
+  Height for the session. Use `-` for the size of the current client.
+</ParamField>
+
+<ParamField path="shell-command" type="string">
+  Shell command to execute in the initial window.
+</ParamField>
+
+### Initial Size
+
+With `-d`, the initial size comes from the `default-size` option. Use `-x` and `-y` to specify a different size. If `-x` or `-y` is given, the `default-size` option is set for the session.
+
+## detach-client
+
+Alias: `detach`
+
+```bash
+detach-client [-aP] [-E shell-command] [-s target-session] [-t target-client]
+```
+
+Detach the current client if bound to a key, the client specified with `-t`, or all clients currently attached to the session specified by `-s`.
+
+<ParamField path="-a" type="flag">
+  Kill all clients except the client given with `-t`.
+</ParamField>
+
+<ParamField path="-P" type="flag">
+  Send SIGHUP to the parent process of the client, typically causing it to exit.
+</ParamField>
+
+<ParamField path="-E" type="string">
+  Run `shell-command` to replace the client.
+</ParamField>
+
+<ParamField path="-s" type="string">
+  Detach all clients attached to `target-session`.
+</ParamField>
+
+<ParamField path="-t" type="string">
+  The target client to detach.
+</ParamField>
+
+## has-session
+
+Alias: `has`
+
+```bash
+has-session [-t target-session]
+```
+
+Report an error and exit with 1 if the specified session does not exist. If it does exist, exit with 0.
+
+<ParamField path="-t" type="string">
+  The target session to check.
+</ParamField>
+
+## kill-session
+
+```bash
+kill-session [-aC] [-t target-session]
+```
+
+Destroy the given session, closing any windows linked to it and no other sessions, and detaching all clients attached to it.
+
+<ParamField path="-a" type="flag">
+  Kill all sessions except the specified one.
+</ParamField>
+
+<ParamField path="-C" type="flag">
+  Clear alerts (bell, activity, or silence) in all windows linked to the session.
+</ParamField>
+
+<ParamField path="-t" type="string">
+  The target session to destroy.
+</ParamField>
+
+## list-sessions
+
+Alias: `ls`
+
+```bash
+list-sessions [-r] [-F format] [-f filter] [-O sort-order]
+```
+
+List all sessions managed by the server.
+
+<ParamField path="-r" type="flag">
+  Reverse the sort order.
+</ParamField>
+
+<ParamField path="-F" type="string">
+  Specify the format of each line. See the FORMATS section.
+</ParamField>
+
+<ParamField path="-f" type="string">
+  Only show sessions for which the filter is true.
+</ParamField>
+
+<ParamField path="-O" type="string">
+  Specify sort order: `index`, `name`, `creation` (time), or `activity` (time).
+</ParamField>
+
+## rename-session
+
+Alias: `rename`
+
+```bash
+rename-session [-t target-session] new-name
+```
+
+Rename the session to `new-name`.
+
+<ParamField path="-t" type="string">
+  The target session to rename.
+</ParamField>
+
+<ParamField path="new-name" type="string" required>
+  The new name for the session.
+</ParamField>
+
+## lock-session
+
+Alias: `locks`
+
+```bash
+lock-session [-t target-session]
+```
+
+Lock all clients attached to `target-session`.
+
+<ParamField path="-t" type="string">
+  The target session to lock.
+</ParamField>
+
+## kill-server
+
+```bash
+kill-server
+```
+
+Kill the tmux server and clients and destroy all sessions.
+
+## switch-client
+
+Alias: `switchc`
+
+```bash
+switch-client [-ElnprZ] [-c target-client] [-t target-session] [-T key-table]
+```
+
+Switch the current client to another session or manipulate its key table.
+
+<ParamField path="-E" type="flag">
+  Do not apply the `update-environment` option.
+</ParamField>
+
+<ParamField path="-l" type="flag">
+  Move to the last session.
+</ParamField>
+
+<ParamField path="-n" type="flag">
+  Move to the next session.
+</ParamField>
+
+<ParamField path="-p" type="flag">
+  Move to the previous session.
+</ParamField>
+
+<ParamField path="-r" type="flag">
+  Toggle the client read-only flag.
+</ParamField>
+
+<ParamField path="-Z" type="flag">
+  Keep the window zoomed if it was zoomed.
+</ParamField>
+
+<ParamField path="-c" type="string">
+  Specify the target client.
+</ParamField>
+
+<ParamField path="-t" type="string">
+  The target session.
+</ParamField>
+
+<ParamField path="-T" type="string">
+  Set the client's key table to `key-table`. The next key will be looked up in this table. Useful for creating custom key bindings.
+</ParamField>

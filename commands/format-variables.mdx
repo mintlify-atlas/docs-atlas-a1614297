@@ -1,0 +1,530 @@
+---
+title: Format Variables
+description: Complete guide to tmux format strings and variables
+---
+
+## Overview
+
+Format strings allow you to customize the output of many tmux commands and the appearance of the status line. Variables are enclosed in `#{` and `}` and are replaced with their values.
+
+## Basic Syntax
+
+```bash
+# Simple variable
+#{session_name}
+
+# Multiple variables
+#{session_name}:#{window_index}.#{pane_index}
+
+# In commands
+list-sessions -F "Session: #{session_name}"
+display-message "Current window: #{window_name}"
+```
+
+## Special Characters
+
+<ParamField path="##" type="string">
+  Replaced by a single `#`
+</ParamField>
+
+<ParamField path="#," type="string">
+  Replaced by a `,` (use inside conditionals to escape commas)
+</ParamField>
+
+<ParamField path="#}" type="string">
+  Replaced by a `}` (use inside conditionals to escape closing braces)
+</ParamField>
+
+## Single-Character Aliases
+
+Some common variables have short aliases:
+
+- `#S` → `#{session_name}`
+- `#W` → `#{window_name}`
+- `#I` → `#{window_index}`
+- `#P` → `#{pane_index}`
+- `#D` → `#{pane_id}`
+- `#F` → `#{window_flags}`
+- `#T` → `#{pane_title}`
+- `#H` → `#{host}`
+- `#h` → `#{host_short}`
+
+## Conditionals
+
+Conditionals use the `?` prefix and allow branching based on variable values.
+
+### Basic Conditional
+
+```bash
+#{?session_attached,attached,not attached}
+```
+
+If `session_attached` is non-zero, shows "attached", otherwise "not attached".
+
+### With Default
+
+```bash
+#{?window_zoomed_flag,ZOOMED,}
+```
+
+Shows "ZOOMED" if the window is zoomed, otherwise shows nothing.
+
+### Nested Conditionals
+
+```bash
+#{?pane_in_mode,#[fg=yellow],#{?synchronize-panes,#[fg=red],#[fg=green]}}MODE
+```
+
+### Multiple Conditions
+
+```bash
+#{?session_format,session,window_format,window,pane}
+```
+
+Shows "session" for session format, "window" for window format, "pane" otherwise.
+
+### Escaping Inside Conditionals
+
+Inside conditionals, use `#,` for comma and `#}` for closing brace:
+
+```bash
+#{?pane_in_mode,#[fg=white#,bg=red],#[fg=red#,bg=white]}#W
+```
+
+## Comparisons
+
+### String Comparisons
+
+```bash
+# Equality
+#{==:#{host},myhost}
+
+# Inequality
+#{!=:#{session_name},default}
+
+# Less than
+#{<:#{window_index},5}
+
+# Greater than
+#{>:#{pane_width},80}
+
+# Less than or equal
+#{<=:#{window_panes},4}
+
+# Greater than or equal
+#{>=:#{session_windows},2}
+```
+
+Returns `1` if true, `0` if false.
+
+### Logical Operators
+
+```bash
+# OR
+#{||:#{pane_in_mode},#{alternate_on}}
+
+# AND
+#{&&:#{session_attached},#{window_active}}
+
+# NOT
+#{!:#{pane_in_mode}}
+
+# Double NOT (convert to canonical boolean)
+#{!!:#{window_name}}
+```
+
+## Pattern Matching
+
+### Glob Pattern
+
+```bash
+# Default: glob pattern
+#{m:*foo*,#{host}}
+
+# Case-insensitive glob
+#{m/i:*foo*,#{host}}
+```
+
+### Regular Expression
+
+```bash
+# Regex match
+#{m/r:^[0-9]+$,#{window_index}}
+
+# Case-insensitive regex
+#{m/ri:^A,#{window_name}}
+```
+
+### Content Search
+
+```bash
+# Search pane content
+#{C:Error}
+
+# Regex search
+#{C/r:^ERROR:}
+
+# Case-insensitive
+#{C/ri:warning}
+```
+
+Returns line number if found, 0 if not found.
+
+## Numeric Operations
+
+Prefix with `e` and an operator:
+
+### Arithmetic
+
+```bash
+# Addition
+#{e|+:5,3}  # → 8
+
+# Subtraction
+#{e|-:10,3}  # → 7
+
+# Multiplication
+#{e|*:4,5}  # → 20
+
+# Division
+#{e|/:15,3}  # → 5
+
+# Modulus
+#{e|m:10,3}  # → 1
+#{e|%:10,3}  # → 1
+```
+
+### Floating Point
+
+Add `f` flag for floating point operations:
+
+```bash
+# Floating point multiplication with 4 decimal places
+#{e|*|f|4:5.5,3}  # → 16.5000
+
+# Floating point division
+#{e|/|f|2:10,3}  # → 3.33
+```
+
+### Numeric Comparisons
+
+```bash
+#{e|==:#{window_panes},1}  # → 1 if one pane
+#{e|>:#{pane_width},80}    # → 1 if width > 80
+```
+
+## String Manipulation
+
+### Length
+
+```bash
+# Character count
+#{n:window_name}
+
+# Display width
+#{w:window_name}
+```
+
+### Truncation
+
+```bash
+# First 10 characters
+#{=10:pane_title}
+
+# Last 10 characters
+#{=-10:pane_title}
+
+# With ellipsis suffix
+#{=/10/...:pane_title}
+
+# With ellipsis prefix
+#{=-10/.../p:pane_title}
+```
+
+### Padding
+
+```bash
+# Pad to 10 characters (left padding)
+#{p10:window_name}
+
+# Pad right
+#{p-10:window_name}
+```
+
+### Repetition
+
+```bash
+# Repeat string 5 times
+#{R:=,5}  # → =====
+
+# Repeat with format
+#{R:#{window_name},3}
+```
+
+### Case Conversion
+
+```bash
+# Basename
+#{b:pane_current_path}
+
+# Dirname
+#{d:pane_current_path}
+```
+
+### Quoting
+
+```bash
+# Shell quote
+#{q:window_name}
+
+# Quote hash characters
+#{q/h:window_name}  # # becomes ##
+```
+
+### Substitution
+
+```bash
+# Replace foo with bar
+#{s/foo/bar/:window_name}
+
+# Regex substitution
+#{s/([0-9]+)/NUM/r:window_name}
+
+# Case-insensitive
+#{s/foo/bar/i:window_name}
+
+# Use different delimiter
+#{s|/tmp/|/var/|:pane_current_path}
+```
+
+## Time Formatting
+
+### Convert to String
+
+```bash
+# Default format
+#{t:window_activity}  # → Sun Oct 25 09:25:02 2015
+
+# Short format for past times
+#{t/p:window_activity}
+```
+
+### Custom Format
+
+Use `strftime` format (escape `%` as `%%` if needed):
+
+```bash
+#{t/f/%%H#:%%M:window_activity}  # → 09:25
+#{t/f/%%Y-%%m-%%d:session_created}  # → 2015-10-25
+```
+
+## Character Conversion
+
+```bash
+# ASCII to character
+#{a:65}  # → A
+#{a:97}  # → a
+
+# Color to hex
+#{c:blue}  # → #0000ff
+```
+
+## Expansion
+
+### Single Expansion
+
+```bash
+# Expand format in variable
+#{E:status-left}
+```
+
+### Double Expansion with strftime
+
+```bash
+# Expand and process time formats
+#{T:status-left}
+```
+
+### Literal
+
+```bash
+# Don't expand
+#{l:#{?pane_in_mode,yes,no}}  # → #{?pane_in_mode,yes,no}
+```
+
+## Loops
+
+### Loop Over Items
+
+```bash
+# Loop sessions
+#{S:#{session_name} }
+
+# Loop windows
+#{W:#{window_index}:#{window_name} }
+
+# Loop panes
+#{P:#{pane_index} }
+
+# Loop clients
+#{L:#{client_name} }
+```
+
+### With Sort Order
+
+```bash
+# Sort by index
+#{S/i:#{session_name} }
+
+# Sort by name
+#{W/n:#{window_name} }
+
+# Sort by activity time
+#{S/t:#{session_name} }
+
+# Reverse sort
+#{W/r:#{window_index} }
+```
+
+### With Different Formats
+
+Provide two comma-separated formats (second for current/active item):
+
+```bash
+#{W:#{window_name},#[fg=red]#{window_name}}
+```
+
+### Check Existence
+
+```bash
+# Check window exists
+#{N/w:mywindow}  # → 1 if exists
+
+# Check session exists
+#{N/s:mysession}  # → 1 if exists
+```
+
+## Common Format Variables
+
+### Session Variables
+
+- `#{session_name}` (alias: `#S`): Name of session
+- `#{session_id}`: Unique session ID ($1, $2, etc.)
+- `#{session_created}`: Time session created
+- `#{session_activity}`: Time of last activity
+- `#{session_attached}`: Number of clients attached
+- `#{session_windows}`: Number of windows
+- `#{session_group}`: Name of session group
+- `#{session_grouped}`: 1 if session in a group
+
+### Window Variables
+
+- `#{window_name}` (alias: `#W`): Name of window
+- `#{window_index}` (alias: `#I`): Index of window
+- `#{window_id}`: Unique window ID (@1, @2, etc.)
+- `#{window_active}`: 1 if window is active
+- `#{window_flags}` (alias: `#F`): Window flags
+- `#{window_panes}`: Number of panes in window
+- `#{window_width}`, `#{window_height}`: Window dimensions
+- `#{window_layout}`: Layout description
+- `#{window_zoomed_flag}`: 1 if window is zoomed
+
+### Pane Variables
+
+- `#{pane_id}` (alias: `#D`): Unique pane ID (%1, %2, etc.)
+- `#{pane_index}` (alias: `#P`): Index of pane
+- `#{pane_title}` (alias: `#T`): Title of pane
+- `#{pane_current_path}`: Current working directory
+- `#{pane_current_command}`: Current command
+- `#{pane_width}`, `#{pane_height}`: Pane dimensions
+- `#{pane_active}`: 1 if active pane
+- `#{pane_in_mode}`: Number of modes pane is in
+- `#{pane_pid}`: PID of first process in pane
+- `#{pane_tty}`: Pseudo terminal of pane
+
+### Client Variables
+
+- `#{client_name}`: Name of client
+- `#{client_tty}`: Pseudo terminal of client
+- `#{client_width}`, `#{client_height}`: Client dimensions
+- `#{client_session}`: Name of attached session
+- `#{client_created}`: Time client created
+- `#{client_activity}`: Time of last activity
+- `#{client_prefix}`: 1 if prefix key pressed
+- `#{client_readonly}`: 1 if client is read-only
+
+### Server Variables
+
+- `#{host}` (alias: `#H`): Hostname
+- `#{host_short}` (alias: `#h`): Hostname without domain
+- `#{pid}`: Server PID
+- `#{socket_path}`: Server socket path
+- `#{start_time}`: Server start time
+- `#{version}`: Server version
+- `#{server_sessions}`: Number of sessions
+
+### Buffer Variables
+
+- `#{buffer_name}`: Name of buffer
+- `#{buffer_size}`: Size in bytes
+- `#{buffer_created}`: Time created
+- `#{buffer_sample}`: Sample of buffer content
+
+### Other Variables
+
+- `#{cursor_x}`, `#{cursor_y}`: Cursor position
+- `#{scroll_region_upper}`, `#{scroll_region_lower}`: Scroll region
+- `#{alternate_on}`: 1 if alternate screen is on
+- `#{history_size}`: Number of lines in history
+- `#{history_limit}`: Maximum history lines
+- `#{copy_cursor_x}`, `#{copy_cursor_y}`: Copy mode cursor
+- `#{selection_present}`: 1 if selection in copy mode
+
+## Practical Examples
+
+### Status Line
+
+```bash
+# Session info with colors
+set -g status-left "#[fg=green]#S #[fg=yellow]#I:#P"
+
+# Right status with conditionals
+set -g status-right "#{?client_prefix,#[fg=red],#[fg=green]}#{host_short}"
+
+# Window status
+set -g window-status-format "#I:#W#{?window_flags,#{window_flags}, }"
+set -g window-status-current-format "#[fg=red]#I:#W#F"
+```
+
+### List Formatting
+
+```bash
+# Custom session list
+list-sessions -F "#{session_name}: #{session_windows} windows, #{session_attached} clients"
+
+# Window list with activity
+list-windows -F "#I: #W #{?window_activity_flag,(active),}"
+
+# Pane info
+list-panes -F "Pane #P: #{pane_current_command} in #{pane_current_path}"
+```
+
+### Conditional Logic
+
+```bash
+# Show different info based on context
+display-message "Status: #{?session_attached,Attached,Detached} #{?window_zoomed_flag,- Zoomed,}"
+
+# Dynamic colors
+set -g status-style "bg=#{?client_prefix,red,green}"
+```
+
+### Complex Formats
+
+```bash
+# Truncate and pad window name
+set -g window-status-format "#{=/10/...:window_name}#{p-15:pane_title}"
+
+# Count and display
+set -g status-right "#{E:#{e|+:#{window_panes},0}} panes"
+```

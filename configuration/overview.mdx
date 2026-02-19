@@ -1,0 +1,180 @@
+---
+title: "Configuration Overview"
+description: "Understanding tmux configuration files, syntax, and loading order"
+---
+
+tmux configuration allows you to customize sessions, windows, panes, key bindings, and visual appearance. Configuration is loaded from files at startup and can be modified at runtime.
+
+## Configuration Files
+
+tmux searches for and loads configuration files in the following order:
+
+1. **System-wide configuration**: `/etc/tmux.conf`
+2. **User configuration**: `~/.tmux.conf` or `$XDG_CONFIG_HOME/tmux/tmux.conf`
+3. **Command-line specified**: Files passed with `-f` flag
+
+The configuration file locations are checked by the `load_cfg()` function in cfg.c:108. If a file is not found and the `-q` (quiet) flag is not set, tmux will report an error.
+
+<Info>
+If you have both `~/.tmux.conf` and `$XDG_CONFIG_HOME/tmux/tmux.conf`, tmux will use `~/.tmux.conf` as it's checked first.
+</Info>
+
+## Configuration Syntax
+
+Configuration files use tmux's command syntax. Each line contains a command that would normally be entered at the tmux command prompt.
+
+### Basic Commands
+
+```bash
+# Set server options
+set -g default-terminal "tmux-256color"
+
+# Set session options
+set -g status-position top
+
+# Set window options
+set -g monitor-activity on
+
+# Bind keys
+bind C-a send-prefix
+```
+
+### Comments
+
+Lines beginning with `#` are comments:
+
+```bash
+# This is a comment
+set -g status-bg red  # This is also valid
+```
+
+### Conditional Configuration
+
+tmux supports conditional blocks using `%if`, `%elif`, `%else`, and `%endif`:
+
+```bash
+# If running inside tmux ($TMUX is set), change status line to red
+%if #{TMUX}
+set -g status-bg red
+%endif
+```
+
+From example_tmux.conf:11-14, this shows how to apply different settings based on environment variables or format variables.
+
+## Loading Configuration
+
+Configuration files are processed by the `cmd_parse_from_file()` function. The loading process:
+
+1. **Parsing**: Each line is parsed according to tmux command syntax
+2. **Validation**: Commands are validated for correct syntax and arguments  
+3. **Execution**: Valid commands are added to a queue and executed
+4. **Error Handling**: Parse errors are collected and displayed after loading
+
+### Loading at Startup
+
+The `start_cfg()` function (cfg.c:64-93) manages configuration loading at startup:
+
+- Runs in the global command queue with no client attached
+- Blocks the initial client until configuration completes
+- Shows any errors or warnings after loading
+
+### Runtime Configuration
+
+You can load additional configuration files while tmux is running:
+
+```bash
+# Load a configuration file
+tmux source-file ~/.tmux.conf
+
+# Load with quiet flag (suppress errors)
+tmux source-file -q ~/optional-config.conf
+```
+
+## Example Configuration
+
+Here's an example from example_tmux.conf showing common configuration patterns:
+
+```bash
+# Status line customization
+set -g status-right "%H:%M"
+set -g window-status-current-style "underscore"
+
+# Enable RGB colour if running in xterm
+set-option -sa terminal-features ",xterm*:RGB"
+
+# Change the default $TERM to tmux-256color
+set -g default-terminal "tmux-256color"
+
+# No bells at all
+set -g bell-action none
+
+# Keep windows around after they exit
+set -g remain-on-exit on
+
+# Change the prefix key to C-a
+set -g prefix C-a
+unbind C-b
+bind C-a send-prefix
+
+# Turn the mouse on, but without copy mode dragging
+set -g mouse on
+unbind -n MouseDrag1Pane
+unbind -Tcopy-mode MouseDrag1Pane
+```
+
+## Configuration Errors
+
+When configuration files contain errors, tmux collects them via `cfg_add_cause()` (cfg.c:206-219) and displays them:
+
+- **Control mode clients**: Receive errors via `%config-error` messages
+- **Normal clients**: Errors are shown in a view mode window
+- **No attached sessions**: Errors are queued until a session is attached
+
+<Warning>
+Configuration errors don't prevent tmux from starting, but affected commands won't execute. Always check for error messages after loading configuration.
+</Warning>
+
+## Loading Order and Precedence
+
+1. **Built-in defaults**: tmux has default values for all options
+2. **System configuration**: `/etc/tmux.conf` (if it exists)
+3. **User configuration**: `~/.tmux.conf` or XDG config
+4. **Command-line options**: Options set via `-f` flag
+5. **Runtime commands**: Commands executed in tmux prompt or via `source-file`
+
+Later settings override earlier ones. For example, a `set -g prefix C-b` in your user config will override any prefix setting from the system config.
+
+## Configuration Best Practices
+
+<Steps>
+  <Step title="Start with the example">
+    Copy example_tmux.conf as a starting point and modify to your needs
+  </Step>
+  <Step title="Organize by sections">
+    Group related settings together (colors, bindings, options)
+  </Step>
+  <Step title="Comment your config">
+    Document why you made specific choices
+  </Step>
+  <Step title="Test incrementally">
+    Load config changes with `source-file` to test before restarting
+  </Step>
+  <Step title="Handle errors gracefully">
+    Use `-q` flag for optional configuration files
+  </Step>
+</Steps>
+
+## Reloading Configuration
+
+To reload your configuration file without restarting tmux:
+
+```bash
+# Reload configuration file
+bind r source-file ~/.tmux.conf \; display-message "Config reloaded!"
+```
+
+This binding allows you to reload configuration with `prefix + r`.
+
+<Note>
+Some changes (like `default-terminal`) only apply to new sessions or windows. You may need to restart tmux or create new windows to see these changes take effect.
+</Note>

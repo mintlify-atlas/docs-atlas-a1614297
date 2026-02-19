@@ -1,0 +1,578 @@
+---
+title: 'Clipboard Integration'
+description: 'System clipboard integration and OSC 52 support in tmux'
+---
+
+## Overview
+
+tmux supports bidirectional clipboard integration with the host system using the OSC 52 escape sequence. This allows copying from tmux to the system clipboard and pasting from the system clipboard into tmux.
+
+## Clipboard Architecture
+
+### OSC 52 Protocol
+
+From `tty-features.c:86-94`, clipboard support uses the OSC 52 escape sequence:
+
+```c
+static const char *const tty_feature_clipboard_capabilities[] = {
+    "Ms=\\E]52;%p1%s;%p2%s\\a",
+    NULL
+};
+static const struct tty_feature tty_feature_clipboard = {
+    "clipboard",
+    tty_feature_clipboard_capabilities,
+    0
+};
+```
+
+The sequence format:
+```
+\033]52;<clipboard>;<base64-data>\007
+```
+
+or with ST terminator:
+```
+\033]52;<clipboard>;<base64-data>\033\\
+```
+
+### Clipboard Targets
+
+OSC 52 supports multiple clipboard targets:
+
+- `c`: Clipboard (standard system clipboard)
+- `p`: Primary selection (X11 middle-click paste)
+- `s`: Secondary selection
+- `0-7`: Cut buffers (rarely used)
+
+tmux typically uses `c` for the main clipboard.
+
+## Configuration
+
+### Enable Clipboard Support
+
+```bash ~/.tmux.conf
+# Enable clipboard integration (default: on for supported terminals)
+set -g set-clipboard on
+```
+
+From `options-table.c:505-510`, the option accepts:
+
+```c
+static const char *options_table_set_clipboard_list[] = {
+    "off",      // Disabled
+    "external", // Only for external applications
+    "on",       // Enabled for tmux and applications
+    NULL
+};
+```
+
+<Tabs>
+<Tab title="on">
+Full clipboard integration:
+- Copies from copy mode set system clipboard
+- Applications can set clipboard via OSC 52
+- Bidirectional sync enabled
+
+Default for most modern terminals.
+</Tab>
+
+<Tab title="external">
+Only applications can set clipboard:
+- Copy mode selections stay in tmux buffers only
+- Applications' OSC 52 sequences are passed through
+- Useful if you prefer manual clipboard management
+</Tab>
+
+<Tab title="off">
+No clipboard integration:
+- All clipboard operations stay within tmux
+- OSC 52 sequences are ignored
+- Use for terminals without clipboard support
+</Tab>
+</Tabs>
+
+### Terminal Feature Detection
+
+```bash
+# Explicitly enable clipboard feature for terminal
+set -g terminal-features "xterm*:clipboard"
+
+# Check if terminal supports clipboard
+tmux info | grep clipboard
+```
+
+From `tty-features.c:475-477`, modern terminals include clipboard by default:
+
+```c
+#define TTY_FEATURES_BASE_MODERN_XTERM \
+    "256,RGB,bpaste,clipboard,mouse,strikethrough,title"
+```
+
+## Copy to Clipboard
+
+### From Copy Mode
+
+When text is selected in copy mode:
+
+```c
+// From window-copy.c:4991-4998
+if (options_get_number(global_options, "set-clipboard") != 0) {
+    screen_write_setselection(&ctx, "", buf, len);
+    notify_pane("pane-set-clipboard", wp);
+}
+```
+
+The selection is automatically sent to the system clipboard using OSC 52.
+
+### Using copy-pipe
+
+From `window-copy.c:5034-5080`, the `copy-pipe` command copies selection and pipes to external command:
+
+```bash
+# Copy to system clipboard with external command
+bind -T copy-mode-vi y send -X copy-pipe-and-cancel "xclip -selection clipboard"
+
+# On macOS
+bind -T copy-mode-vi y send -X copy-pipe-and-cancel "pbcopy"
+
+# On Wayland
+bind -T copy-mode-vi y send -X copy-pipe-and-cancel "wl-copy"
+```
+
+Default bindings from `key-bindings.c:456-459`:
+
+```bash
+# Double-click word selection
+bind -n DoubleClick1Pane {
+    select-pane -t=
+    if -F '#{||:#{pane_in_mode},#{mouse_any_flag}}' {
+        send -M
+    } {
+        copy-mode -H
+        send -X select-word
+        run -d0.3
+        send -X copy-pipe-and-cancel
+    }
+}
+
+# Triple-click line selection
+bind -n TripleClick1Pane {
+    select-pane -t=
+    if -F '#{||:#{pane_in_mode},#{mouse_any_flag}}' {
+        send -M
+    } {
+        copy-mode -H
+        send -X select-line
+        run -d0.3
+        send -X copy-pipe-and-cancel
+    }
+}
+```
+
+### Copy Commands
+
+<CodeGroup>
+```bash Basic Copy
+# Copy selection to tmux buffer only
+send -X copy-selection
+
+# Copy selection and exit copy mode
+send -X copy-selection-and-cancel
+```
+
+```bash Copy to Clipboard
+# Copy selection, clear, and exit
+send -X copy-pipe-and-cancel
+
+# Copy to clipboard but stay in copy mode
+send -X copy-pipe-no-clear "xclip -i"
+```
+
+```bash Copy Line
+# Copy entire line
+send -X copy-pipe-line-and-cancel
+
+# Copy from cursor to end of line  
+send -X copy-pipe-end-of-line-and-cancel
+```
+</CodeGroup>
+
+From `window-copy.c:2776-2819`, copy-pipe commands:
+
+- `copy-pipe-end-of-line`
+- `copy-pipe-end-of-line-and-cancel`
+- `copy-pipe-line`
+- `copy-pipe-line-and-cancel`
+- `copy-pipe-no-clear`
+- `copy-pipe`
+- `copy-pipe-and-cancel`
+
+## Paste from Clipboard
+
+### Get Clipboard Option
+
+From `options-table.c:411-420`, control how tmux responds to clipboard requests:
+
+```c
+static const char *options_table_get_clipboard_list[] = {
+    "off",      // Ignore requests
+    "buffer",   // Return tmux buffer content
+    "request",  // Request from terminal
+    "both",     // Try request, fall back to buffer
+    NULL
+};
+```
+
+```bash Configuration
+# Application requests clipboard - try terminal first, fall back to buffer
+set -g get-clipboard both
+
+# Only use terminal clipboard
+set -g get-clipboard request
+
+# Only use tmux buffers
+set -g get-clipboard buffer
+```
+
+### OSC 52 Clipboard Request
+
+From `input.c:3099-3109`, when an application requests the clipboard:
+
+```c
+state = options_get_number(global_options, "get-clipboard");
+switch (state) {
+case 1: // buffer
+    // Return tmux buffer
+    break;
+case 2: // request
+ case 3: // both
+    // Request from terminal
+    if (ictx->event->flags & INPUT_EVENT_CRLF)
+        input_reply_clipboard(ictx->event, buf, len, "\007");
+    else
+        input_reply_clipboard(ictx->event, buf, len, "\033\\");
+    break;
+}
+```
+
+### Manual Paste
+
+```bash
+# Paste from most recent tmux buffer
+tmux paste-buffer
+
+# Paste from system clipboard (requires external tool)
+tmux set-buffer "$(xclip -o -selection clipboard)"; tmux paste-buffer
+```
+
+## Clipboard Query
+
+From `tty.c:3021-3028`, tmux can query the terminal clipboard:
+
+```c
+void tty_clipboard_query(struct tty *tty) {
+    struct timeval tv = { .tv_sec = TTY_QUERY_TIMEOUT };
+
+    tty_putcode_ss(tty, TTYC_MS, "", "?");
+    evtimer_add(&tty->clipboard_timer, &tv);
+}
+```
+
+The query sends:
+```
+\033]52;c;?\007
+```
+
+Terminal responds with clipboard contents.
+
+### Clipboard Query Callback
+
+From `tty.c:3013-3019`:
+
+```c
+static void
+tty_clipboard_query_callback(__unused int fd, __unused short events, void *data) {
+    struct tty *tty = data;
+
+    evtimer_del(&tty->clipboard_timer);
+}
+```
+
+Timeout if terminal doesn't respond within `TTY_QUERY_TIMEOUT`.
+
+## Clipboard Response Handling
+
+From `tty-keys.c:1305-1402`, parsing OSC 52 responses:
+
+```c
+static int
+tty_keys_clipboard(struct tty *tty, const char *buf, size_t len, size_t *size) {
+    struct input_request_clipboard_data cd;
+    
+    // First five bytes are always \033]52;
+    if (buf[0] != '\033') return (-1);
+    if (buf[1] != ']') return (-1);
+    if (buf[2] != '5') return (-1);
+    if (buf[3] != '2') return (-1);
+    if (buf[4] != ';') return (-1);
+    
+    // Find terminator (\007 or \033\\)
+    for (end = 5; end < len; end++) {
+        if (buf[end] == '\007') {
+            terminator = 1;
+            break;
+        }
+        if (end > 5 && buf[end - 1] == '\033' && buf[end] == '\\') {
+            terminator = 2;
+            break;
+        }
+    }
+    
+    // Base64 decode clipboard data
+    // ...
+}
+```
+
+<Steps>
+<Step title="Receive Response">
+Terminal sends back:
+```
+\033]52;c;<base64-data>\007
+```
+</Step>
+
+<Step title="Base64 Decode">
+tmux decodes the base64 data to get the actual clipboard content.
+</Step>
+
+<Step title="Store in Buffer">
+Content is stored in tmux paste buffer and can be used.
+</Step>
+</Steps>
+
+## Clipboard Hook
+
+From `options-table.c:1609`:
+
+```bash
+# Hook triggered when pane sets clipboard
+set-hook -g pane-set-clipboard 'display "Clipboard updated"'
+```
+
+Example uses:
+
+```bash ~/.tmux.conf
+# Log clipboard changes
+set-hook -g pane-set-clipboard 'run "echo $(date): Clipboard set >> ~/tmux-clipboard.log"'
+
+# Sync to external clipboard tool
+set-hook -g pane-set-clipboard 'run "tmux save-buffer - | xclip -selection clipboard"'
+```
+
+## External Clipboard Tools
+
+### Platform-Specific Integration
+
+<Tabs>
+<Tab title="Linux (X11)">
+```bash ~/.tmux.conf
+# Copy to X clipboard
+bind -T copy-mode-vi y send -X copy-pipe-and-cancel "xclip -selection clipboard -i"
+
+# Alternative: xsel
+bind -T copy-mode-vi y send -X copy-pipe-and-cancel "xsel --clipboard --input"
+
+# Paste from X clipboard
+bind p run "tmux set-buffer \"$(xclip -selection clipboard -o)\"; tmux paste-buffer"
+```
+</Tab>
+
+<Tab title="Linux (Wayland)">
+```bash ~/.tmux.conf
+# Copy to Wayland clipboard
+bind -T copy-mode-vi y send -X copy-pipe-and-cancel "wl-copy"
+
+# Paste from Wayland clipboard  
+bind p run "tmux set-buffer \"$(wl-paste)\"; tmux paste-buffer"
+```
+</Tab>
+
+<Tab title="macOS">
+```bash ~/.tmux.conf
+# Copy to macOS clipboard
+bind -T copy-mode-vi y send -X copy-pipe-and-cancel "pbcopy"
+
+# Paste from macOS clipboard
+bind p run "tmux set-buffer \"$(pbpaste)\"; tmux paste-buffer"
+
+# Enable native macOS clipboard (no OSC 52 needed)
+set -g set-clipboard on
+```
+</Tab>
+
+<Tab title="Windows (WSL)">
+```bash ~/.tmux.conf
+# Copy to Windows clipboard from WSL
+bind -T copy-mode-vi y send -X copy-pipe-and-cancel "clip.exe"
+
+# Paste from Windows clipboard
+bind p run "tmux set-buffer \"$(powershell.exe Get-Clipboard)\"; tmux paste-buffer"
+```
+</Tab>
+</Tabs>
+
+### Clipboard Manager Integration
+
+```bash
+# Copy to clipboard manager (e.g., clipmenu, rofi)
+bind -T copy-mode-vi y send -X copy-pipe-and-cancel "tee >(xclip -i) | clipmenu"
+
+# Save to persistent clipboard history
+bind -T copy-mode-vi y send -X copy-pipe-and-cancel "tee ~/.clipboard-history"
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+<Accordion title="Clipboard not working in terminal" icon="clipboard">
+Verify terminal supports OSC 52:
+
+```bash
+# Test terminal clipboard support
+printf "\033]52;c;$(echo -n 'test' | base64)\007"
+
+# Check tmux clipboard feature
+tmux show -g set-clipboard
+tmux info | grep clipboard
+```
+
+From `tty-keys.c:752`, tmux logs clipboard events:
+```bash
+# Enable verbose logging
+tmux -vvv
+# Check for "clipboard" in logs
+```
+</Accordion>
+
+<Accordion title="Clipboard data truncated" icon="scissors">
+OSC 52 has size limits depending on terminal:
+
+- Most terminals: 100KB - 1MB
+- Some terminals: Unlimited
+- SSH: May have lower limits
+
+For large data, use external clipboard tools instead.
+</Accordion>
+
+<Accordion title="Clipboard not accessible to applications" icon="terminal">
+Applications must explicitly request clipboard:
+
+```bash
+# Check get-clipboard setting
+tmux show -g get-clipboard
+
+# Ensure it's not "off"
+set -g get-clipboard both
+```
+</Accordion>
+
+<Accordion title="Timer issues with clipboard query" icon="clock">
+From `tty-keys.c:1402`, query timeout:
+
+```c
+evtimer_del(&tty->clipboard_timer);
+```
+
+If queries time out:
+```bash
+# Disable clipboard queries
+set -g get-clipboard buffer
+```
+</Accordion>
+</AccordionGroup>
+
+## Security Considerations
+
+<Warning>
+Clipboard integration has security implications:
+</Warning>
+
+### OSC 52 Risks
+
+1. **Application access**: Any application in tmux can read/write clipboard
+2. **Remote access**: SSH sessions can access local clipboard
+3. **Data leakage**: Clipboard content may be logged
+
+### Mitigation Strategies
+
+```bash
+# Disable clipboard for untrusted applications
+set -g set-clipboard external
+
+# Require confirmation for clipboard operations
+set-hook -g pane-set-clipboard 'confirm-before "Clipboard set by pane %%%: #{pane_current_command}"'
+
+# Limit clipboard to local sessions only
+if-shell '[ -n "$SSH_CONNECTION" ]' 'set -g set-clipboard off'
+```
+
+### Audit Clipboard Usage
+
+```bash
+# Log all clipboard operations
+set-hook -g pane-set-clipboard 'run "echo $(date) #{pane_id} #{pane_current_command} >> ~/tmux-clipboard-audit.log"'
+```
+
+## Advanced Techniques
+
+### Bidirectional Sync Script
+
+```bash ~/bin/tmux-clipboard-sync
+#!/bin/sh
+# Continuously sync tmux and system clipboard
+
+while true; do
+    # Get tmux buffer
+    tmux_buf=$(tmux save-buffer - 2>/dev/null)
+    
+    # Get system clipboard
+    sys_clip=$(xclip -selection clipboard -o 2>/dev/null)
+    
+    # Sync if different
+    if [ "$tmux_buf" != "$sys_clip" ]; then
+        if [ -n "$sys_clip" ]; then
+            tmux set-buffer "$sys_clip"
+        fi
+    fi
+    
+    sleep 1
+done
+```
+
+### Clipboard History Manager
+
+```bash
+# Save all copies to history with timestamp
+bind -T copy-mode-vi y send -X copy-pipe-and-cancel '
+    tee -a ~/.clipboard-history | \
+    awk "{print \"[\" strftime(\"%Y-%m-%d %H:%M:%S\") \"] \" \$0}" >> ~/.clipboard-log; \
+    xclip -selection clipboard -i
+'
+
+# Browse clipboard history
+bind P run "cat ~/.clipboard-history | fzf | tmux load-buffer -; tmux paste-buffer"
+```
+
+## Related Options
+
+- [`set-clipboard`](/options/global#set-clipboard) - Enable clipboard integration
+- [`get-clipboard`](/options/global#get-clipboard) - Control clipboard requests
+- [`terminal-features`](/options/global#terminal-features) - Clipboard capability
+
+## Related Commands
+
+- [`set-buffer`](/commands/set-buffer) - Set tmux paste buffer
+- [`save-buffer`](/commands/save-buffer) - Save buffer to file
+- [`load-buffer`](/commands/load-buffer) - Load buffer from file
+- [`paste-buffer`](/commands/paste-buffer) - Insert buffer contents
+- [`choose-buffer`](/commands/choose-buffer) - Interactively select buffer

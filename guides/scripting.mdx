@@ -1,782 +1,667 @@
 ---
-title: Scripting tmux
-description: Automating tmux with scripts and commands
+title: 'Scripting tmux'
+description: 'Using if-shell, run-shell, display-message, and source-file for tmux automation'
 ---
 
-## Overview
+## Introduction to tmux Scripting
 
-tmux provides powerful scripting capabilities for automation, including conditional execution, shell integration, and event-driven hooks. You can create complex workflows and automate repetitive tasks.
+tmux provides powerful scripting capabilities that allow you to:
+- Automate session and window creation
+- Execute conditional logic
+- Run shell commands in the background
+- Display formatted information
+- Load and organize configuration files
 
-## Script Execution
+<Note>
+All tmux commands can be scripted, whether from configuration files, shell scripts, or key bindings.
+</Note>
 
-### Run-Shell Command
+## The if-shell Command
 
-<CodeGroup>
+The `if-shell` command executes tmux commands conditionally based on shell command results.
 
-```bash Basic Run-Shell
-# Execute shell command from tmux
-run-shell "ls -la ~"
+### Basic Syntax
 
-# Short form
-run "ls -la ~"
+```bash
+if-shell [-bF] [-t target-pane] shell-command tmux-command [else-command]
 ```
 
-```bash With Delay
-# Run after delay (seconds)
-run -d 2 "echo 'Delayed execution'"
+### Simple Conditional
 
-# Useful for sequencing
-run "first_command"
-run -d 1 "second_command"
-run -d 2 "third_command"
+```bash
+# If shell command succeeds, run tmux command
+if-shell "test -f ~/.tmux.local.conf" "source ~/.tmux.local.conf"
+
+# With else clause
+if-shell "[ -d /opt/local ]" \
+  "set-option -g default-command /opt/local/bin/bash" \
+  "set-option -g default-command /bin/bash"
 ```
 
-```bash Background Execution
-# Run in background (default)
-run -b "long_running_command"
+### Background Execution
 
-# Equivalent to
-run "long_running_command &"
+```bash
+# Run shell command in background with -b
+if-shell -b "sleep 5 && echo done" "display 'Command completed'"
+
+# Without -b, subsequent commands wait for shell command to finish
+if-shell "curl -s https://api.example.com" "display 'API available'"
 ```
 
-```bash Capture Output
-# Output goes to tmux's message area
-run "date"
+### Format Expansion
 
-# Or to a pane
-run "echo 'Result:' ; some_command"
+Use `-F` to treat the shell command as a format string instead of executing it:
+
+```bash
+# Check if format evaluates to non-empty and non-zero
+if-shell -F '#{window_zoomed_flag}' \
+  'set-option status-style bg=red' \
+  'set-option status-style bg=green'
+
+# Check session count
+if-shell -F '#{>:#{session_windows},5}' \
+  'display "Too many windows!"'
+
+# String comparison
+if-shell -F '#{==:#{host},myserver}' \
+  'set-option -g status-left "[SERVER] "'
 ```
 
-</CodeGroup>
-
-### If-Shell Command
-
-From tmux.1 manual, conditional execution:
+### Real-World Examples
 
 <Tabs>
-  <Tab title="Basic Syntax">
+  <Tab title="Conditional Config Loading">
     ```bash
-    # Execute command if shell command succeeds
-    if-shell "test -f ~/.tmux.local" "source ~/.tmux.local"
+    # Load different configs based on hostname
+    if-shell '[ "$(hostname)" = "workstation" ]' \
+      'source ~/.tmux.work.conf' \
+      'source ~/.tmux.home.conf'
     
-    # Short form
-    if "test -f ~/.tmux.local" "source ~/.tmux.local"
-    ```
-  </Tab>
-
-  <Tab title="With Else Clause">
-    ```bash
-    # Execute command based on condition
-    if-shell "test -f ~/.tmux.local" {
-        source ~/.tmux.local
-        display "Loaded local config"
-    } {
-        display "No local config found"
-    }
-    ```
-  </Tab>
-
-  <Tab title="Format Conditions">
-    ```bash
-    # Use -F for format-based conditions
-    if-shell -F '#{==:#{host},myhost}' {
-        set -g status-bg red
-    } {
-        set -g status-bg blue
-    }
+    # Load OS-specific config
+    if-shell 'uname | grep -q Darwin' \
+      'source ~/.tmux.macos.conf'
     
-    # Check if pane is zoomed
-    if-shell -F '#{window_zoomed_flag}' {
-        resize-pane -Z
-    }
+    if-shell 'uname | grep -q Linux' \
+      'source ~/.tmux.linux.conf'
     ```
   </Tab>
-
-  <Tab title="With Target">
+  <Tab title="Feature Detection">
     ```bash
-    # Execute for specific target
-    if-shell -t 0 "pgrep vim" {
-        display "vim is running in pane 0"
-    }
+    # Enable true color if supported
+    if-shell '[[ $COLORTERM = truecolor ]]' \
+      'set-option -ga terminal-overrides ",*256col*:Tc"'
+    
+    # Check tmux version
+    if-shell '[ "$(tmux -V | cut -d" " -f2)" -ge "3.2" ]' \
+      'set-option -g extended-keys on'
+    
+    # Check for clipboard command
+    if-shell 'command -v xclip' \
+      'set-option -g @clipboard xclip' \
+      'set-option -g @clipboard pbcopy'
+    ```
+  </Tab>
+  <Tab title="Dynamic Status">
+    ```bash
+    # Show different status based on session
+    if-shell -F '#{==:#{session_name},work}' \
+      'set-option -g status-style bg=blue' \
+      'set-option -g status-style bg=green'
+    
+    # Alert if too many panes
+    if-shell -F '#{>:#{window_panes},4}' \
+      'set-option -w window-status-style bg=red'
     ```
   </Tab>
 </Tabs>
 
-## Format Strings
+### Nested if-shell
 
-### Conditional Formats
-
-<CodeGroup>
-
-```bash Equality Check
-# Check if values are equal
-#{==:#{session_name},mysession}
-
-# Use in if-shell
-if-shell -F '#{==:#{host},laptop}' {
-    # Laptop-specific config
-}
-```
-
-```bash Comparison
-# Greater than
-#{>:#{window_panes},1}
-
-# Less than
-#{<:#{pane_width},80}
-
-# Greater or equal
-#{>=:#{window_windows},5}
-```
-
-```bash Logical Operators
-# OR
-#{||:#{pane_in_mode},#{window_zoomed_flag}}
-
-# AND
-#{&&:#{window_active},#{pane_synchronized}}
-
-# NOT (using ==:0)
-#{==:#{window_zoomed_flag},0}
-```
-
-```bash Ternary Operator
-# If-then-else in format
-#{?window_zoomed_flag,ZOOMED,NORMAL}
-
-# Nested conditions
-#{?#{==:#{pane_current_command},vim},VIM,#{?#{==:#{pane_current_command},bash},BASH,OTHER}}
-```
-
-</CodeGroup>
-
-### String Manipulation
-
-<Accordion title="Format Functions">
+You can nest `if-shell` commands:
 
 ```bash
-# Length
-#{l:#{session_name}}
-
-# Substring (start:length)
-#{=10:#{pane_title}}        # First 10 chars
-#{=-10:#{pane_title}}       # Last 10 chars
-
-# Pad
-#{p10:#{window_index}}      # Pad to 10 chars
-
-# Replace
-#{s/old/new/:#{window_name}}     # Replace first
-#{s/old/new/g:#{window_name}}    # Replace all
-
-# Uppercase/Lowercase  
-#{u:#{session_name}}        # Uppercase
-#{U:#{session_name}}        # Uppercase first char
-#{l:#{session_name}}        # Lowercase
-
-# Time formatting
-#{t:#{window_activity}}     # Format as time
-#{t/f:#{window_activity}}   # Custom format
-
-# Shell quoting
-#{q:#{pane_title}}          # Shell quote
+if-shell 'tmux run "true"' \
+  'if-shell "test -f ~/.tmux.conf" "set -s @done yes"'
 ```
 
+<Warning>
+Be careful with nested if-shell commands as they can become difficult to read and debug. Consider using format-based conditionals with `-F` instead.
+</Warning>
+
+## The run-shell Command
+
+The `run-shell` command executes shell commands in the background without creating a window.
+
+### Basic Syntax
+
+```bash
+run-shell [-bCE] [-c start-directory] [-d delay] [-t target-pane] shell-command
+```
+
+### Simple Execution
+
+```bash
+# Run command in background
+run-shell "sleep 5 && tmux display 'Done'"
+
+# Run immediately (don't wait for prompt)
+run-shell -b "curl -s https://api.example.com/notify"
+```
+
+### Output Display
+
+By default, command output is shown in view mode:
+
+```bash
+# Output displayed in current pane
+run-shell "ls -la"
+
+# Output displayed in specific pane
+run-shell -t %2 "df -h"
+
+# Redirect stderr to stdout
+run-shell -E "command-that-may-error 2>&1"
+```
+
+### Running tmux Commands
+
+Use `-C` to run tmux commands instead of shell commands:
+
+```bash
+# Run tmux command
+run-shell -C "display-message 'Hello from run-shell'"
+
+# Chain tmux commands
+run-shell -C "split-window ; send-keys 'htop' Enter"
+```
+
+### Delayed Execution
+
+```bash
+# Wait before executing
+run-shell -d 5 "tmux display 'Delayed message'"
+
+# Useful for startup sequences
+run-shell -d 1 "tmux select-window -t :0"
+run-shell -d 2 "tmux split-window -h"
+run-shell -d 3 "tmux send-keys 'vim' Enter"
+```
+
+### Working Directory
+
+```bash
+# Run in specific directory
+run-shell -c /var/log "tail -n 20 syslog | tmux load-buffer -"
+
+# Use current pane directory
+run-shell -c '#{pane_current_path}' "git status"
+```
+
+### Practical Examples
+
+<Accordion title="Background Tasks">
+  ```bash
+  # Update status bar periodically
+  bind-key U run-shell -b \
+    'while true; do \
+       tmux set-option -g status-right "$(date)"; \
+       sleep 60; \
+     done'
+  
+  # Fetch and display data
+  bind-key W run-shell -b \
+    'weather=$(curl -s "wttr.in?format=%c+%t"); \
+     tmux set-option -g @weather "$weather"'
+  ```
 </Accordion>
 
-## Automation Patterns
+<Accordion title="Error Logging">
+  ```bash
+  # Log errors to file
+  set-hook -g command-error \
+    'run-shell "echo \'Command failed\' >> /tmp/tmux-errors.log"'
+  
+  # Display and log
+  set-hook -g command-error \
+    'run-shell -E "echo \'Error: #{error}\' | tee -a ~/tmux.log"'
+  ```
+</Accordion>
+
+<Accordion title="Session Snapshots">
+  ```bash
+  # Save session layout
+  bind-key S run-shell \
+    'tmux list-windows -F "#{window_index}:#{window_name}" > ~/.tmux-snapshot'
+  
+  # Capture all panes
+  bind-key C run-shell \
+    'for pane in $(tmux list-panes -F "#{pane_id}"); do \
+       tmux capture-pane -p -t $pane > ~/pane-${pane}.txt; \
+     done'
+  ```
+</Accordion>
+
+## The display-message Command
+
+The `display-message` command shows messages and evaluates formats.
+
+### Basic Display
+
+```bash
+# Show message in status line
+tmux display-message "Hello, tmux!"
+tmux display "Simpler syntax"
+
+# Show for specific duration (milliseconds)
+tmux display -d 5000 "This message stays for 5 seconds"
+
+# Show until keypress
+tmux display -d 0 "Press any key to continue"
+
+# Print to stdout instead
+tmux display -p "Output to terminal"
+```
+
+### Format Expansion
+
+Display formatted information:
+
+```bash
+# Show current session info
+tmux display "Session: #{session_name}, Windows: #{session_windows}"
+
+# Show pane info  
+tmux display "Pane #{pane_index}: #{pane_current_command}"
+
+# Multiple variables
+tmux display "#{session_name}:#{window_index}.#{pane_index}"
+
+# Print format to stdout
+tmux display -p '#{pane_current_path}'
+```
+
+### Script Integration
+
+<Tabs>
+  <Tab title="Get Values">
+    ```bash
+    # Get current path
+    path=$(tmux display -p '#{pane_current_path}')
+    cd "$path"
+    
+    # Get session name
+    session=$(tmux display -p '#{session_name}')
+    echo "Current session: $session"
+    
+    # Get window list
+    windows=$(tmux display -p '#{session_windows}')
+    ```
+  </Tab>
+  <Tab title="Conditional Display">
+    ```bash
+    # Show only if condition met
+    tmux display -p \
+      '#{?window_zoomed_flag,ZOOMED,normal}'
+    
+    # Complex conditional
+    tmux display -p \
+      '#{?#{>:#{window_panes},1},multi-pane,single-pane}'
+    ```
+  </Tab>
+  <Tab title="Formatted Output">
+    ```bash
+    # List all sessions with details
+    tmux display -p \
+      '#{T:session_name}: #{session_windows} windows, #{session_attached} clients'
+    
+    # Window list
+    for i in $(seq 0 9); do
+      tmux display -p -t :$i \
+        'Window #{window_index}: #{window_name}' 2>/dev/null
+    done
+    ```
+  </Tab>
+</Tabs>
+
+### Verbose Mode and Debugging
+
+```bash
+# Show format parsing details
+tmux display -v "Session: #{session_name}"
+
+# List all format variables
+tmux display -a
+
+# Literal output (no format expansion)
+tmux display -l "Literal: #{not_a_variable}"
+```
+
+### Forwarding Input
+
+```bash
+# Forward stdin to empty pane
+tmux display-message -I -t %3
+# Now type or pipe input
+echo "hello" | tmux display-message -I -t %3
+```
+
+## The source-file Command
+
+The `source-file` command loads and executes tmux commands from files.
+
+### Basic Usage
+
+```bash
+# Load configuration file
+tmux source-file ~/.tmux.conf
+tmux source ~/.tmux.conf  # Short form
+
+# Load multiple files
+tmux source-file ~/.tmux.conf ~/.tmux.local.conf
+
+# Silent loading (no error if file doesn't exist)
+tmux source-file -q ~/.tmux.optional.conf
+```
+
+### Format Expansion
+
+```bash
+# Expand format in file path
+tmux source-file -F "~/.tmux/#{host}.conf"
+
+# Load config based on session
+tmux source-file -F "~/.tmux/#{session_name}.conf"
+```
+
+### Parse Without Executing
+
+```bash
+# Check syntax without running commands
+tmux source-file -n ~/.tmux.conf
+
+# Show parsed commands
+tmux source-file -nv ~/.tmux.conf
+```
+
+### Organized Configuration
+
+Split configuration into multiple files:
+
+```bash
+# ~/.tmux.conf
+source-file ~/.tmux/options.conf
+source-file ~/.tmux/bindings.conf
+source-file ~/.tmux/status.conf
+source-file -q ~/.tmux/local.conf
+```
+
+<Accordion title="Example: options.conf">
+  ```bash
+  # General options
+  set-option -g default-terminal "screen-256color"
+  set-option -g history-limit 10000
+  set-option -g mouse on
+  set-option -g base-index 1
+  set-option -w pane-base-index 1
+  ```
+</Accordion>
+
+<Accordion title="Example: bindings.conf">
+  ```bash
+  # Key bindings
+  unbind C-b
+  set-option -g prefix C-a
+  bind-key C-a send-prefix
+  
+  bind | split-window -h
+  bind - split-window -v
+  
+  bind r source-file ~/.tmux.conf \; display "Reloaded!"
+  ```
+</Accordion>
+
+<Accordion title="Example: status.conf">
+  ```bash
+  # Status line configuration
+  set-option -g status-position bottom
+  set-option -g status-style bg=black,fg=white
+  set-option -g status-left "[#S] "
+  set-option -g status-right "%H:%M %d-%b-%y"
+  ```
+</Accordion>
+
+### Conditional Loading
+
+```bash
+# Load host-specific config
+if-shell '[ -f ~/.tmux.$(hostname).conf ]' \
+  'source-file ~/.tmux.$(hostname).conf'
+
+# Load based on tmux version
+if-shell '[ "$(tmux -V | cut -d" " -f2)" -ge "3.0" ]' \
+  'source-file ~/.tmux/tmux3.conf' \
+  'source-file ~/.tmux/tmux2.conf'
+```
+
+## Advanced Scripting Patterns
+
+### Command Sequences
+
+Chain multiple commands:
+
+```bash
+# Semicolon separator
+tmux new-window ; split-window -h ; split-window -v
+
+# Using \; in shell
+tmux new-window \; split-window -h \; split-window -v
+
+# With bind-key
+bind-key S split-window -h \; split-window -v
+
+# Error handling (stop on error)
+tmux new-window ; invalid-command ; display "This won't run"
+```
+
+### Using Formats in Scripts
+
+```bash
+# Get information for scripting
+pane_path=$(tmux display -p '#{pane_current_path}')
+pane_cmd=$(tmux display -p '#{pane_current_command}')
+session=$(tmux display -p '#{session_name}')
+
+# Conditional based on format
+if tmux display -p '#{window_zoomed_flag}' | grep -q 1; then
+  echo "Window is zoomed"
+fi
+
+# Iterate over panes
+for pane in $(tmux list-panes -F '#{pane_id}'); do
+  cmd=$(tmux display -p -t $pane '#{pane_current_command}')
+  echo "Pane $pane running: $cmd"
+done
+```
 
 ### Session Management Scripts
 
 <Steps>
 
-<Step title="Create Project Session">
+### Session Creation Script
+
 ```bash
 #!/bin/bash
-# save as: ~/bin/tmux-project
+# create-dev-session.sh
 
-SESSION="myproject"
+SESSION="dev"
 
 # Check if session exists
 tmux has-session -t $SESSION 2>/dev/null
 
 if [ $? != 0 ]; then
-    # Create new session detached
-    tmux new-session -d -s $SESSION -n editor
-    
-    # Window 1: Editor
-    tmux send-keys -t $SESSION:editor "cd ~/projects/myproject" C-m
-    tmux send-keys -t $SESSION:editor "vim" C-m
-    
-    # Window 2: Server
-    tmux new-window -t $SESSION -n server
-    tmux send-keys -t $SESSION:server "cd ~/projects/myproject" C-m
-    tmux send-keys -t $SESSION:server "npm run dev" C-m
-    
-    # Window 3: Shell
-    tmux new-window -t $SESSION -n shell
-    tmux send-keys -t $SESSION:shell "cd ~/projects/myproject" C-m
-    
-    # Window 4: Git
-    tmux new-window -t $SESSION -n git
-    tmux send-keys -t $SESSION:git "cd ~/projects/myproject" C-m
-    tmux send-keys -t $SESSION:git "git status" C-m
-    
-    # Select first window
-    tmux select-window -t $SESSION:editor
+  # Create new session
+  tmux new-session -d -s $SESSION -n editor
+  
+  # Setup editor window
+  tmux send-keys -t $SESSION:editor 'cd ~/projects' C-m
+  tmux send-keys -t $SESSION:editor 'vim' C-m
+  
+  # Create console window
+  tmux new-window -t $SESSION -n console
+  tmux split-window -t $SESSION:console -h
+  
+  # Create server window
+  tmux new-window -t $SESSION -n server
+  tmux send-keys -t $SESSION:server 'npm start' C-m
+  
+  # Select first window
+  tmux select-window -t $SESSION:editor
 fi
 
 # Attach to session
 tmux attach-session -t $SESSION
 ```
-</Step>
 
-<Step title="Multi-Pane Layout">
+### Layout Save/Restore
+
+```bash
+# Save layout
+tmux_save_layout() {
+  local file="$HOME/.tmux-layout-$(date +%s)"
+  
+  tmux list-windows -F \
+    "#{window_index}:#{window_name}:#{window_layout}" > "$file"
+  
+  tmux list-panes -F \
+    "#{window_index}.#{pane_index}:#{pane_current_path}:#{pane_current_command}" \
+    >> "$file"
+  
+  echo "Layout saved to $file"
+}
+
+# Restore layout
+tmux_restore_layout() {
+  local file="$1"
+  
+  # Read window layouts
+  while IFS=: read -r idx name layout; do
+    tmux new-window -n "$name"
+    tmux select-layout -t :$idx "$layout"
+  done < <(grep -v '\.' "$file")
+}
+```
+
+</Steps>
+
+### Error Handling
+
+```bash
+# Capture command errors
+if ! tmux select-window -t :99 2>/dev/null; then
+  echo "Window 99 doesn't exist"
+  tmux new-window -t :99
+fi
+
+# Use hooks for error logging
+set-hook -g command-error \
+  'run-shell "echo #{error} >> ~/.tmux-errors.log"'
+
+# Check exit status
+tmux if-shell "test $? -eq 0" \
+  "display 'Success'" \
+  "display 'Failed'"
+```
+
+## Environment Variables in Scripts
+
+tmux provides useful environment variables:
+
+```bash
+# Available in panes
+echo $TMUX              # Socket and session info
+echo $TMUX_PANE         # Current pane ID
+echo $TERM              # Terminal type
+
+# Use in scripts
+if [ -n "$TMUX" ]; then
+  echo "Running inside tmux"
+  pane_id="$TMUX_PANE"
+fi
+```
+
+### Setting Environment Variables
+
+```bash
+# Set for session
+tmux set-environment -t mysession MYVAR value
+
+# Global environment
+tmux set-environment -g GLOBALVAR value
+
+# Hidden variable (not passed to new processes)
+tmux set-environment -h SECRETVAR value
+
+# Use in formats
+tmux display -p '#{MYVAR}'
+```
+
+## Complete Scripting Example
+
+A comprehensive project setup script:
+
 ```bash
 #!/bin/bash
-# Create development layout
+# project-session.sh - Create a development session
 
-SESSION="dev"
-tmux new-session -d -s $SESSION
+PROJECT_NAME="${1:-myproject}"
+PROJECT_DIR="${2:-$HOME/projects/$PROJECT_NAME}"
+SESSION="$PROJECT_NAME"
 
-# Split into 4 panes
-tmux split-window -h -t $SESSION
-tmux split-window -v -t $SESSION:0.0
-tmux split-window -v -t $SESSION:0.2
+# Check if session already exists
+if tmux has-session -t "$SESSION" 2>/dev/null; then
+  echo "Session $SESSION already exists. Attaching..."
+  tmux attach-session -t "$SESSION"
+  exit 0
+fi
 
-# Set pane sizes
-tmux resize-pane -t $SESSION:0.0 -x 80
-tmux resize-pane -t $SESSION:0.1 -x 80
+# Create session
+tmux new-session -d -s "$SESSION" -n editor -c "$PROJECT_DIR"
 
-# Start commands in each pane
-tmux send-keys -t $SESSION:0.0 "vim" C-m
-tmux send-keys -t $SESSION:0.1 "git status" C-m
-tmux send-keys -t $SESSION:0.2 "npm run dev" C-m
-tmux send-keys -t $SESSION:0.3 "tail -f logs/app.log" C-m
+# Setup editor window
+tmux send-keys -t "$SESSION:editor" 'vim .' C-m
+
+# Create git window
+tmux new-window -t "$SESSION" -n git -c "$PROJECT_DIR"
+tmux split-window -t "$SESSION:git" -h -c "$PROJECT_DIR"
+tmux send-keys -t "$SESSION:git.0" 'git status' C-m
+tmux send-keys -t "$SESSION:git.1" 'git log --oneline -10' C-m
+
+# Create server window
+tmux new-window -t "$SESSION" -n server -c "$PROJECT_DIR"
+tmux split-window -t "$SESSION:server" -v -c "$PROJECT_DIR"
+tmux send-keys -t "$SESSION:server.0" 'npm run dev' C-m
+tmux send-keys -t "$SESSION:server.1" 'npm run test -- --watch' C-m
+
+# Create monitoring window
+tmux new-window -t "$SESSION" -n monitor
+tmux send-keys -t "$SESSION:monitor" 'htop' C-m
+
+# Return to editor
+tmux select-window -t "$SESSION:editor"
+
+# Set session-specific options
+tmux set-option -t "$SESSION" status-left "[$PROJECT_NAME] "
+tmux set-option -t "$SESSION" @project_dir "$PROJECT_DIR"
+
+# Display info
+tmux display -t "$SESSION" "Project session $PROJECT_NAME created"
 
 # Attach
-tmux attach -t $SESSION
-```
-</Step>
-
-</Steps>
-
-### Conditional Configuration
-
-<CodeGroup>
-
-```bash Platform Detection
-# Linux-specific config
-if-shell "uname | grep -q Linux" {
-    set -g status-bg green
-    bind C-c run "xclip -selection clipboard"
-}
-
-# macOS-specific config
-if-shell "uname | grep -q Darwin" {
-    set -g status-bg blue
-    bind C-c run "pbcopy"
-}
-
-# BSD-specific config
-if-shell "uname | grep -q BSD" {
-    set -g status-bg yellow
-}
+tmux attach-session -t "$SESSION"
 ```
 
-```bash Environment Detection
-# Check if inside tmux
-if-shell '[ -n "$TMUX" ]' {
-    set -g status-bg red
-}
-
-# Check SSH connection
-if-shell '[ -n "$SSH_CONNECTION" ]' {
-    set -g status-bg magenta
-    set -g status-left "[SSH] #S "
-}
-
-# Check if file exists
-if-shell 'test -f ~/.tmux.local.conf' {
-    source-file ~/.tmux.local.conf
-}
-```
-
-```bash Version Detection
-# Different config for tmux versions
-if-shell '[ $(tmux -V | cut -d" " -f2 | tr -d ".") -ge 32 ]' {
-    # tmux 3.2+
-    set -g allow-passthrough on
-} {
-    # Older versions
-    display "tmux version < 3.2"
-}
-```
-
-</CodeGroup>
-
-### Dynamic Status Line
-
-From `status.c:194-200`, status updates periodically:
-
-<CodeGroup>
-
-```bash System Monitoring
-# CPU and memory in status line
-set -g status-right "CPU: #(top -bn1 | grep 'Cpu' | awk '{print $2}')% | "
-set -ag status-right "Mem: #(free -h | awk '/Mem:/ {print $3"/"$2}') | "
-set -ag status-right "%H:%M"
-
-set -g status-interval 5
-```
-
-```bash Git Status
-# Show git branch in status
-set -g status-right "#(cd #{pane_current_path}; git rev-parse --abbrev-ref HEAD 2>/dev/null) | %H:%M"
-```
-
-```bash Custom Script
-# Use external script
-set -g status-right "#(~/.tmux/status.sh)"
-
-# ~/.tmux/status.sh:
-#!/bin/bash
-LOAD=$(uptime | awk '{print $(NF-2)}' | tr -d ',')
-MEM=$(free -h | awk '/Mem:/ {print $3}')
-echo "⚡$LOAD 🧠$MEM"
-```
-
-```bash Conditional Display
-# Show different info based on condition
-set -g status-right "#{?#{==:#{host},laptop},💻,🖥️} #H | %H:%M"
-```
-
-</CodeGroup>
-
-## Hooks
-
-### Available Hooks
-
-<Tabs>
-  <Tab title="Session Hooks">
-    ```bash
-    # After new session created
-    set-hook -g after-new-session {
-        display "Welcome to tmux!"
-    }
-    
-    # After session renamed
-    set-hook -g after-rename-session {
-        display "Session renamed to #{session_name}"
-    }
-    
-    # Before session destroyed
-    set-hook -g session-closed {
-        run "echo 'Session closed' >> ~/tmux.log"
-    }
-    ```
-  </Tab>
-
-  <Tab title="Window Hooks">
-    ```bash
-    # After window created
-    set-hook -g after-new-window {
-        display "New window: #{window_index}"
-    }
-    
-    # Before window closes
-    set-hook -g window-unlinked {
-        run "notify-send 'Window closed'"
-    }
-    
-    # After window renamed
-    set-hook -g after-rename-window {
-        run "echo 'Window renamed' >> ~/tmux.log"
-    }
-    ```
-  </Tab>
-
-  <Tab title="Pane Hooks">
-    ```bash
-    # After pane created  
-    set-hook -g after-split-window {
-        select-layout tiled
-    }
-    
-    # Before pane dies
-    set-hook -g pane-died {
-        display "Pane #{pane_id} exited"
-    }
-    
-    # When pane focus changes
-    set-hook -g after-select-pane {
-        run "~/.tmux/focus-changed.sh #{pane_id}"
-    }
-    ```
-  </Tab>
-
-  <Tab title="Client Hooks">
-    ```bash
-    # Client attached
-    set-hook -g client-attached {
-        display "Welcome #{client_name}"
-    }
-    
-    # Client detached
-    set-hook -g client-detached {
-        run "echo 'Client detached' >> ~/tmux.log"
-    }
-    
-    # Client session changed
-    set-hook -g client-session-changed {
-        refresh-client -S
-    }
-    ```
-  </Tab>
-</Tabs>
-
-### Hook Examples
-
-<CodeGroup>
-
-```bash Auto-Layout
-# Automatically arrange panes
-set-hook -g after-split-window {
-    select-layout tiled
-}
-
-set-hook -g pane-exited {
-    select-layout tiled
-}
-```
-
-```bash Auto-Rename
-# Auto-rename window based on command
-set-hook -g after-select-pane {
-    if-shell -F '#{==:#{pane_current_command},vim}' {
-        rename-window "VIM"
-    } {
-        if-shell -F '#{==:#{pane_current_command},ssh}' {
-            rename-window "SSH"
-        } {
-            automatic-rename on
-        }
-    }
-}
-```
-
-```bash Logging
-# Log all session activity
-set-hook -g after-new-session {
-    run "echo '[$(date)] New session: #{session_name}' >> ~/tmux-activity.log"
-}
-
-set-hook -g session-closed {
-    run "echo '[$(date)] Session closed: #{session_name}' >> ~/tmux-activity.log"
-}
-```
-
-```bash Notifications
-# Desktop notifications
-set-hook -g pane-died {
-    run "notify-send 'tmux' 'Process in pane #{pane_id} exited'"
-}
-
-set-hook -g alert-bell {
-    run "notify-send 'tmux' 'Bell in window #{window_index}'"
-}
-```
-
-</CodeGroup>
-
-## Advanced Scripting
-
-### Command Sequences
+Use it:
 
 ```bash
-# Multiple commands with different behavior
-
-# Sequential (stop on error)
-new-window \; split-window \; select-layout even-horizontal
-
-# Continue on error (use ;)
-kill-window -t 1 ; kill-window -t 2 ; new-window
-
-# Conditional sequence
-if-shell "test -f ~/.tmux.local" {
-    source ~/.tmux.local
-    display "Loaded local config"
-} {
-    display "No local config"
-}
+./project-session.sh myapp ~/dev/myapp
 ```
-
-### Variable Expansion
-
-<CodeGroup>
-
-```bash Environment Variables
-# Access environment
-set -g status-right "User: $USER | Host: $HOSTNAME"
-
-# With formats
-set -g status-right "#{E:USER}@#{host}"
-
-# Set environment
-setenv -g MY_VAR value
-run "echo $MY_VAR"
-```
-
-```bash Format Variables
-# Store in option
-set -g @custom_var "value"
-
-# Access later
-set -g status-right "Custom: #{@custom_var}"
-
-# User options (@ prefix)
-set -g @theme "dark"
-if-shell -F '#{==:#{@theme},dark}' {
-    set -g status-bg black
-}
-```
-
-```bash Command Substitution
-# Run command and use output
-set -g status-right "#(date +%Y-%m-%d) %H:%M"
-
-# Complex command
-set -g status-right "#(ps aux | wc -l) processes"
-
-# With format
-set -g status-right "Dir: #(basename #{pane_current_path})"
-```
-
-</CodeGroup>
-
-### External Scripts Integration
-
-<Steps>
-
-<Step title="Script Template">
-```bash
-#!/bin/bash
-# ~/.tmux/scripts/helper.sh
-
-# Get tmux info
-SESSION=$(tmux display-message -p '#S')
-WINDOW=$(tmux display-message -p '#I')
-PANE=$(tmux display-message -p '#P')
-
-echo "Session: $SESSION, Window: $WINDOW, Pane: $PANE"
-
-# Execute tmux commands
-tmux display-message "Script executed"
-```
-</Step>
-
-<Step title="Call from tmux">
-```bash
-# In tmux.conf
-bind-key S run-shell "~/.tmux/scripts/helper.sh"
-
-# With arguments
-bind-key T run-shell "~/.tmux/scripts/helper.sh #{session_name}"
-```
-</Step>
-
-<Step title="Return Status">
-```bash
-#!/bin/bash
-# Script with status check
-
-if [ -f ~/.tmux.local.conf ]; then
-    tmux source-file ~/.tmux.local.conf
-    tmux display "Local config loaded"
-    exit 0
-else
-    tmux display "No local config found"
-    exit 1
-fi
-```
-</Step>
-
-</Steps>
-
-## Practical Automation
-
-### Session Switcher
-
-```bash
-# Bind to fuzzy session switcher
-bind-key s run-shell "tmux list-sessions -F '#{session_name}' | \
-    fzf-tmux -p | \
-    xargs tmux switch-client -t"
-
-# Or with preview
-bind-key s run-shell "tmux list-sessions -F '#{session_name}' | \
-    fzf-tmux -p --preview 'tmux capture-pane -t {} -p' | \
-    xargs tmux switch-client -t"
-```
-
-### Window Manager
-
-```bash
-# Kill all windows except current
-bind-key X confirm-before -p "Kill all other windows? (y/n)" \
-    "run-shell 'tmux list-windows | \
-    grep -v active | \
-    cut -d: -f1 | \
-    xargs -I {} tmux kill-window -t {}'"
-
-# Reorder windows
-bind-key O run-shell "tmux move-window -r"
-```
-
-### Backup and Restore
-
-<CodeGroup>
-
-```bash Save Layout
-#!/bin/bash
-# ~/.tmux/scripts/save-layout.sh
-
-SESSION=$(tmux display-message -p '#S')
-LAYOUT_FILE=~/.tmux/layouts/${SESSION}.layout
-
-mkdir -p ~/.tmux/layouts
-
-# Save window layouts
-tmux list-windows -t $SESSION -F '#{window_index} #{window_layout}' > $LAYOUT_FILE
-
-echo "Layout saved for session $SESSION"
-```
-
-```bash Restore Layout
-#!/bin/bash
-# ~/.tmux/scripts/restore-layout.sh
-
-SESSION=$1
-LAYOUT_FILE=~/.tmux/layouts/${SESSION}.layout
-
-if [ -f $LAYOUT_FILE ]; then
-    while read window_index layout; do
-        tmux select-layout -t ${SESSION}:${window_index} "$layout"
-    done < $LAYOUT_FILE
-    echo "Layout restored for session $SESSION"
-else
-    echo "No layout file found for $SESSION"
-fi
-```
-
-</CodeGroup>
-
-### Workspace Manager
-
-```bash
-#!/bin/bash
-# ~/.tmux/scripts/workspace.sh
-# Manage project workspaces
-
-WORKSPACE=$1
-WORKSPACE_DIR=~/.tmux/workspaces
-
-case "$WORKSPACE" in
-    save)
-        SESSION=$(tmux display-message -p '#S')
-        FILE="$WORKSPACE_DIR/${SESSION}.sh"
-        mkdir -p $WORKSPACE_DIR
-        
-        # Generate recreation script
-        echo "#!/bin/bash" > $FILE
-        echo "tmux new-session -d -s $SESSION" >> $FILE
-        
-        tmux list-windows -t $SESSION -F '#{window_index} #{window_name} #{pane_current_path}' | \
-        while read idx name path; do
-            echo "tmux new-window -t ${SESSION}:${idx} -n '$name' -c '$path'" >> $FILE
-        done
-        
-        chmod +x $FILE
-        echo "Workspace saved: $FILE"
-        ;;
-    
-    load)
-        SESSION=$2
-        FILE="$WORKSPACE_DIR/${SESSION}.sh"
-        
-        if [ -f $FILE ]; then
-            $FILE
-            tmux attach -t $SESSION
-        else
-            echo "Workspace not found: $SESSION"
-        fi
-        ;;
-    
-    list)
-        ls -1 $WORKSPACE_DIR/*.sh 2>/dev/null | xargs -n1 basename | sed 's/.sh$//'
-        ;;
-    
-    *)
-        echo "Usage: workspace {save|load SESSION|list}"
-        exit 1
-        ;;
-esac
-```
-
-## Debugging Scripts
-
-### Show Errors
-
-```bash
-# Display error messages
-set -g display-time 4000
-
-# Show command output
-run-shell -b "command 2>&1 | head -20"
-
-# Log to file
-run-shell "command >> ~/tmux-debug.log 2>&1"
-```
-
-### Test Commands
-
-```bash
-# Test if-shell conditions
-tmux if-shell -F '#{==:#{host},myhost}' \
-    "display 'Match'" \
-    "display 'No match'"
-
-# Test format strings
-tmux display-message -p '#{session_name}'
-tmux display-message -p '#{?window_zoomed_flag,yes,no}'
-```
-
-## Performance Tips
-
-<Tip>
-**Script Performance:**
-
-1. **Minimize status-interval** for frequently-run scripts
-2. **Cache expensive operations** rather than recomputing
-3. **Use formats instead of shell** when possible
-4. **Background long-running commands** with `run -b`
-5. **Limit output** from status bar commands
-
-```bash
-# Good: Native format
-set -g status-right '#{session_windows} windows'
-
-# Slower: Shell command every interval
-set -g status-right '#(tmux list-windows | wc -l) windows'
-
-# Cache expensive data
-run-shell -b "expensive_command > /tmp/tmux-cache"
-set -g status-right '#(cat /tmp/tmux-cache)'
-```
-</Tip>
-
-## See Also
-
-- [Configuration](/guides/configuration) - Configuration file format
-- [Key Bindings](/guides/key-bindings) - Bind scripts to keys
-- [Status Line](/guides/status-line) - Dynamic status updates

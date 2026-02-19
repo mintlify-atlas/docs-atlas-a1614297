@@ -1,0 +1,488 @@
+---
+title: 'Mouse Support'
+description: 'Comprehensive guide to mouse support and tracking modes in tmux'
+---
+
+## Overview
+
+tmux provides extensive mouse support for interacting with windows, panes, and copy mode. When enabled, the mouse can select panes, resize borders, select windows, and interact with scrollbars.
+
+## Enabling Mouse Support
+
+### Basic Configuration
+
+```bash ~/.tmux.conf
+# Enable all mouse features
+set -g mouse on
+```
+
+This single option enables:
+- Pane selection by clicking
+- Pane resizing by dragging borders
+- Window selection from status line
+- Scrolling in panes and copy mode
+- Text selection and copying
+- Scrollbar interaction (if enabled)
+
+### Terminal Requirements
+
+From `tty-features.c:75-83`, mouse support requires the terminal feature:
+
+```c
+static const char *const tty_feature_mouse_capabilities[] = {
+    "kmous=\\E[M",
+    NULL
+};
+static const struct tty_feature tty_feature_mouse = {
+    "mouse",
+    tty_feature_mouse_capabilities,
+    0
+};
+```
+
+Most modern terminals support this automatically.
+
+## Mouse Event Types
+
+### Standard Mouse Sequences
+
+From `tty-keys.c:1173-1183`, tmux handles multiple mouse protocols:
+
+<Tabs>
+<Tab title="Standard Mode">
+Original xterm mouse tracking:
+
+```
+\033[M followed by three characters:
+- Button (32 + button number)
+- X position (32 + x coordinate, 1-based)
+- Y position (32 + y coordinate, 1-based)
+```
+
+Limited to 223x223 terminal size.
+</Tab>
+
+<Tab title="SGR Extended Mode">
+Extended SGR mouse mode (preferred):
+
+```
+\033[< followed by numbers separated by semicolons:
+\033[<b;x;y[Mm]
+```
+
+From `tty-keys.c:1227-1274`:
+- `b`: Button number
+- `x`, `y`: 0-based coordinates
+- `M`: Button press/scroll
+- `m`: Button release
+
+Supports much larger terminal sizes and disambiguates press/release.
+</Tab>
+
+<Tab title="UTF-8 Mode">
+Extended coordinate encoding using UTF-8.
+
+Not widely supported or recommended.
+</Tab>
+</Tabs>
+
+### Mouse Button Codes
+
+From `tty-keys.c:1286-1299`, tmux tracks:
+
+```c
+// Fill mouse event
+m->lx = tty->mouse_last_x;  // Last X position
+m->x = x;                    // Current X position  
+m->ly = tty->mouse_last_y;  // Last Y position
+m->y = y;                    // Current Y position
+m->lb = tty->mouse_last_b;  // Last button state
+m->b = b;                    // Current button (0-2 = buttons, 64-65 = wheel)
+m->sgr_type = sgr_type;     // 'M' = press, 'm' = release
+m->sgr_b = sgr_b;           // SGR button code
+
+// Update last mouse state
+tty->mouse_last_x = x;
+tty->mouse_last_y = y;
+tty->mouse_last_b = b;
+```
+
+Button mapping:
+- `0`: Left button
+- `1`: Middle button
+- `2`: Right button
+- `64`: Wheel up
+- `65`: Wheel down
+- Additional bits for Shift, Meta, Ctrl modifiers
+
+## Mouse Operations
+
+### Pane Selection
+
+From `server-client.c:692-900`, clicking in a pane:
+
+<Steps>
+<Step title="Detect Click Location">
+```c
+enum mouse_where {
+    NOWHERE,
+    PANE,
+    BORDER,
+    SCROLLBAR
+};
+
+where = server_client_check_mouse_in_pane(wp, px, py, &x, &y);
+```
+
+Determines if click is in pane content, border, or scrollbar.
+</Step>
+
+<Step title="Handle Click Type">
+- **Single click**: Select pane
+- **Double click**: Enter copy mode and select word
+- **Triple click**: Enter copy mode and select line
+- **Drag**: Enter copy mode and select text
+</Step>
+
+<Step title="Update Focus">
+```c
+server_client_check_focus(c);
+server_client_check_resize(c);
+```
+
+Update focus and potentially resize window.
+</Step>
+</Steps>
+
+### Pane Resizing
+
+Dragging pane borders:
+
+```c
+// From server-client.c:805-825
+if (where == BORDER) {
+    log_debug("mouse on pane %%%u border", wp->id);
+    
+    // Check if within range for current pane
+    if (m->x == wp->xoff + wp->sx - 1 ||
+        m->y == wp->yoff + wp->sy - 1) {
+        // Handle border drag
+    }
+}
+```
+
+When dragging:
+1. Mouse down on border starts drag
+2. Mouse move adjusts pane size
+3. Mouse up completes resize
+
+From `layout.c:646-669`, resize updates the layout tree.
+
+### Window Selection
+
+Clicking on window names in status line:
+
+```bash
+# Default bindings from key-bindings.c:425-427
+bind -n MouseDown1Status { select-window -t= }
+bind -n MouseDrag1Status { }
+bind -n MouseUp1Status { }
+```
+
+From `server-client.c:818-838`, range detection identifies which window was clicked.
+
+### Scrolling
+
+<Tabs>
+<Tab title="Pane Scrolling">
+Wheel events in pane:
+
+```bash
+# Default bindings from key-bindings.c:432-435  
+bind -n WheelUpPane {
+    if -F '#{||:#{pane_in_mode},#{mouse_any_flag}}' {
+        send -M
+    } {
+        if -F '#{||:#{?alternate_on,0,1},#{mouse_any_flag}}' {
+            send -N5 -t= Up
+        } {
+            copy-mode -e; send -M
+        }
+    }
+}
+```
+
+Behavior:
+- If in copy mode or mouse mode is on in pane: send wheel event to application
+- Otherwise: scroll 5 lines or enter copy mode
+</Tab>
+
+<Tab title="Status Line Scrolling">
+```bash
+# From key-bindings.c:441-442
+bind -n WheelUpStatus { previous-window }
+bind -n WheelDownStatus { next-window }
+```
+
+Cycle through windows.
+</Tab>
+
+<Tab title="Scrollbar Scrolling">
+From `window-copy.c:1497-1507`, clicking in scrollbar:
+
+```c
+static enum window_copy_cmd_action
+window_copy_cmd_scroll_to_mouse(struct window_copy_cmd_state *cs) {
+    struct window_mode_entry    *wme = cs->wme;
+    struct window_copy_mode_data *data = wme->data;
+    struct window_pane          *wp = wme->wp;
+    struct client               *c = cs->c;
+    struct mouse_event          *m = cs->m;
+    int                          scroll_exit;
+
+    window_copy_scroll(wp, c->tty.mouse_slider_mpos, m->y, scroll_exit);
+    return (WINDOW_COPY_CMD_NOTHING);
+}
+```
+
+Directly scrolls to position based on click location in scrollbar.
+</Tab>
+</Tabs>
+
+## Copy Mode Mouse Support
+
+### Text Selection
+
+From `window-copy.c:5858-5909`, mouse drag in copy mode:
+
+```c
+void window_copy_start_drag(struct client *c, struct mouse_event *m) {
+    struct window_pane *wp;
+    u_int x, y;
+
+    wp = cmd_mouse_pane(m, NULL, NULL);
+    if (wp == NULL)
+        return;
+        
+    if (cmd_mouse_at(wp, m, &x, &y, 1) != 0)
+        return;
+
+    c->tty.mouse_drag_update = window_copy_drag_update;
+    c->tty.mouse_drag_release = window_copy_drag_release;
+    
+    // Start selection
+    window_copy_update_selection(wme, 1, 0);
+}
+```
+
+<Steps>
+<Step title="Start Drag">
+Mouse down in pane enters copy mode and starts selection.
+</Step>
+
+<Step title="Update Selection">
+```c
+void window_copy_drag_update(struct client *c, struct mouse_event *m) {
+    // Update selection as mouse moves
+    window_copy_update_cursor(wme, x, y);
+    window_copy_update_selection(wme, 1, 0);
+    window_copy_redraw_screen(wme);
+}
+```
+</Step>
+
+<Step title="Complete Selection">
+```c
+void window_copy_drag_release(struct client *c, struct mouse_event *m) {
+    // Finish selection on mouse up
+    window_copy_clear_selection(wme);
+    window_copy_copy_selection(wme, "MouseDragEnd");
+}
+```
+</Step>
+</Steps>
+
+### Mouse Bindings in Copy Mode
+
+Default bindings from `key-bindings.c:528-532` and `640-644`:
+
+```bash Copy Mode
+# Emacs-style copy mode
+bind -Tcopy-mode MouseDragEnd1Pane { send -X copy-pipe-and-cancel }
+bind -Tcopy-mode MouseDown1Pane { select-pane }
+bind -Tcopy-mode DoubleClick1Pane { select-pane; send -X select-word; run -d0.3; send -X copy-pipe-and-cancel }
+bind -Tcopy-mode TripleClick1Pane { select-pane; send -X select-line; run -d0.3; send -X copy-pipe-and-cancel }
+
+# Vi-style copy mode  
+bind -Tcopy-mode-vi MouseDragEnd1Pane { send -X copy-pipe-and-cancel }
+bind -Tcopy-mode-vi MouseDown1Pane { select-pane }
+bind -Tcopy-mode-vi DoubleClick1Pane { select-pane; send -X select-word; run -d0.3; send -X copy-pipe-and-cancel }
+bind -Tcopy-mode-vi TripleClick1Pane { select-pane; send -X select-line; run -d0.3; send -X copy-pipe-and-cancel }
+```
+
+## Mouse Mode Detection
+
+From `server-client.c:852-863`, tmux tracks whether the running application has enabled mouse support:
+
+```c
+if (c->tty.mouse_scrolling_flag) {
+    // Terminal is scrolling, send wheel events to application
+}
+```
+
+When `mouse_any_flag` is set, the application (like vim or less) is handling mouse events, so tmux passes them through.
+
+## Advanced Mouse Configuration
+
+### Custom Mouse Bindings
+
+```bash ~/.tmux.conf
+# Middle-click paste
+bind -n MouseDown2Pane run "tmux set-buffer \"$(xclip -o -sel primary)\"; tmux paste-buffer"
+
+# Right-click menu
+bind -n MouseDown3Pane display-menu -T "#[align=centre]Pane Menu" -x M -y M \
+    "Split Horizontal" h "split-window -h" \
+    "Split Vertical" v "split-window -v" \
+    "Kill Pane" k "kill-pane" \
+    "Swap Up" u "swap-pane -U" \
+    "Swap Down" d "swap-pane -D"
+
+# Ctrl+Click to open new window
+bind -n C-MouseDown1Pane new-window -c "#{pane_current_path}"
+```
+
+### Disable Specific Mouse Actions
+
+```bash
+# Disable mouse but keep other features
+set -g mouse on
+
+# Unbind specific mouse actions
+unbind -n MouseDown1Pane
+unbind -n MouseDrag1Border
+unbind -n WheelUpPane
+```
+
+### Mouse Without Scrolling
+
+```bash
+# Enable mouse for selection but disable wheel scrolling
+set -g mouse on
+
+unbind -n WheelUpPane
+unbind -n WheelDownPane
+```
+
+## Scrollbar Integration
+
+When pane scrollbars are enabled:
+
+```bash
+# Enable scrollbars
+set -g pane-scrollbars on
+set -g pane-scrollbars-position right
+```
+
+From `server-client.c:886-898`, mouse events in scrollbar area:
+
+```c
+if (where == SCROLLBAR) {
+    log_debug("mouse on pane %%%u scrollbar", wp->id);
+    // Handle scrollbar interaction
+}
+```
+
+Scrollbar mouse support includes:
+- Clicking to scroll to position
+- Dragging slider
+- Wheel events in scrollbar area
+
+## Troubleshooting
+
+<AccordionGroup>
+<Accordion title="Mouse not working in terminal" icon="mouse-pointer">
+Verify terminal supports mouse:
+
+```bash
+# Check if terminal has mouse capability
+tmux info | grep -i mouse
+
+# Enable explicitly
+set -g terminal-features "*:mouse"
+```
+
+From `tty-features.c:475-485`, modern terminals should include mouse in their default feature set.
+</Accordion>
+
+<Accordion title="Mouse events not reaching application" icon="terminal">
+Check `mouse_any_flag`:
+
+```bash
+# See if application has enabled mouse mode
+tmux display '#{mouse_any_flag}'
+```
+
+If application needs mouse events, it should request them via terminal escape sequences.
+</Accordion>
+
+<Accordion title="Drag selection not working" icon="hand-pointer">
+From `tty.c:382-384`, ensure drag tracking is initialized:
+
+```c
+tty->mouse_drag_flag = 0;
+tty->mouse_drag_update = NULL;
+tty->mouse_drag_release = NULL;
+```
+
+Reset tmux client if drag state is stuck:
+```bash
+tmux refresh-client
+```
+</Accordion>
+
+<Accordion title="Mouse coordinates off by one" icon="bullseye">
+From `tty-keys.c:1264-1267`, SGR mode uses 0-based coordinates:
+
+```c
+if (x < 1 || y < 1)
+    return (-2);
+x--;
+y--;
+```
+
+Standard mode uses 1-based. Coordinate system differences can cause confusion.
+</Accordion>
+</AccordionGroup>
+
+## Performance Considerations
+
+<Warning>
+Mouse support has minor performance implications:
+</Warning>
+
+- Every mouse event requires processing and potential layout updates
+- Rapid scrolling generates many events
+- Mouse dragging for selection triggers frequent redraws
+
+From `server-client.c:715-716`:
+
+```c
+log_debug("%s mouse %02x at %u,%u (last %u,%u) (%d)", c->name, m->b,
+    m->x, m->y, m->lx, m->ly, c->tty.mouse_drag_flag);
+```
+
+Enable verbose logging to see mouse event frequency.
+
+## Related Options
+
+- [`mouse`](/options/global#mouse) - Master mouse enable option
+- [`pane-scrollbars`](/options/window#pane-scrollbars) - Visual scrollbar display
+- [`mode-keys`](/options/window#mode-keys) - Affects mouse behavior in copy mode
+- [`set-clipboard`](/options/global#set-clipboard) - Integration with mouse selection
+
+## Related Commands
+
+- [`send-keys -M`](/commands/send-keys) - Send mouse event to pane
+- [`display-menu`](/commands/display-menu) - Show context menu at mouse position
+- [`copy-mode`](/commands/copy-mode) - Enter copy mode with mouse

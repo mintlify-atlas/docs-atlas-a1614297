@@ -1,0 +1,663 @@
+---
+title: 'Pane Management'
+description: 'Splitting, resizing, swapping, breaking and joining panes in tmux'
+---
+
+## Understanding Panes
+
+A **pane** is a rectangular section within a tmux window. Each pane contains a separate pseudo terminal and can run its own program independently. Panes allow you to view and interact with multiple programs simultaneously within a single window.
+
+<Note>
+Panes are numbered starting from 0 in the order they are created. Each pane has a unique pane ID (like %0, %1) that persists for its lifetime.
+</Note>
+
+## Splitting Panes
+
+### Basic Splitting
+
+The most common way to create panes is by splitting existing ones:
+
+<Tabs>
+  <Tab title="Horizontal Split">
+    ```bash
+    C-b "  # Split into top and bottom panes
+    ```
+    
+    Creates two panes stacked vertically (horizontal split line).
+  </Tab>
+  <Tab title="Vertical Split">
+    ```bash
+    C-b %  # Split into left and right panes
+    ```
+    
+    Creates two panes side by side (vertical split line).
+  </Tab>
+</Tabs>
+
+### Split-Window Command
+
+More control over splitting:
+
+```bash
+# Split vertically (default)
+tmux split-window
+tmux splitw
+
+# Split horizontally
+tmux split-window -h
+tmux splitw -h
+
+# Split in reverse direction (before current pane)
+tmux split-window -b
+tmux split-window -hb  # Horizontal, before
+
+# Specify pane size
+tmux split-window -l 10     # 10 lines
+tmux split-window -h -l 40  # 40 columns
+tmux split-window -l 30%    # 30% of window
+
+# Full width/height split
+tmux split-window -hf  # Full height
+tmux split-window -f   # Full width
+```
+
+### Creating Panes with Commands
+
+```bash
+# Run a command in new pane
+tmux split-window htop
+tmux split-window -h 'tail -f /var/log/syslog'
+
+# Start in specific directory
+tmux split-window -c /var/log
+
+# Set environment variable
+tmux split-window -e EDITOR=vim
+
+# Create empty pane (no command)
+tmux split-window ''
+
+# Forward stdin to empty pane
+make 2>&1 | tmux split-window -dI &
+```
+
+<Tip>
+The `-d` flag creates a pane without switching to it, useful in scripts.
+</Tip>
+
+## Navigating Panes
+
+### Quick Navigation
+
+| Keys | Action |
+|------|--------|
+| `C-b o` | Select next pane in order |
+| `C-b ;` | Move to previously active pane |
+| `C-b Up` | Move to pane above |
+| `C-b Down` | Move to pane below |
+| `C-b Left` | Move to pane on left |
+| `C-b Right` | Move to pane on right |
+| `C-b q` | Display pane numbers |
+| `C-b q 0-9` | Display pane numbers, then select |
+
+### Select-Pane Command
+
+```bash
+# Select pane by ID
+tmux select-pane -t %2
+
+# Navigate directionally
+tmux select-pane -U  # Up
+tmux select-pane -D  # Down
+tmux select-pane -L  # Left
+tmux select-pane -R  # Right
+
+# Select last active pane
+tmux select-pane -l
+
+# Select pane using special tokens
+tmux select-pane -t '{top}'         # Top pane
+tmux select-pane -t '{bottom}'      # Bottom pane
+tmux select-pane -t '{left}'        # Leftmost pane
+tmux select-pane -t '{right}'       # Rightmost pane
+tmux select-pane -t '{top-left}'    # Top-left pane
+tmux select-pane -t '{bottom-right}' # Bottom-right pane
+tmux select-pane -t '{up-of}'       # Pane above active
+tmux select-pane -t '{down-of}'     # Pane below active
+tmux select-pane -t '{left-of}'     # Pane left of active
+tmux select-pane -t '{right-of}'    # Pane right of active
+```
+
+## Resizing Panes
+
+### Interactive Resizing
+
+<Steps>
+
+### Arrow Keys (Fine)
+
+```bash
+C-b C-Up      # Resize up by 1 cell
+C-b C-Down    # Resize down by 1 cell
+C-b C-Left    # Resize left by 1 cell
+C-b C-Right   # Resize right by 1 cell
+```
+
+### Alt+Arrow Keys (Coarse)
+
+```bash
+C-b M-Up      # Resize up by 5 cells
+C-b M-Down    # Resize down by 5 cells
+C-b M-Left    # Resize left by 5 cells
+C-b M-Right   # Resize right by 5 cells
+```
+
+</Steps>
+
+### Resize-Pane Command
+
+```bash
+# Resize by specific amount
+tmux resize-pane -U 5   # Up 5 lines
+tmux resize-pane -D 10  # Down 10 lines
+tmux resize-pane -L 20  # Left 20 columns
+tmux resize-pane -R 15  # Right 15 columns
+
+# Resize to absolute size
+tmux resize-pane -x 80  # Set width to 80 columns
+tmux resize-pane -y 24  # Set height to 24 lines
+
+# Use percentage
+tmux resize-pane -x 50%  # Half window width
+tmux resize-pane -y 30%  # 30% of window height
+
+# Target specific pane
+tmux resize-pane -t %3 -R 10
+```
+
+### Zoom Pane
+
+Temporarily make a pane fill the entire window:
+
+```bash
+C-b z  # Toggle zoom on current pane
+
+tmux resize-pane -Z  # Command form
+```
+
+<Note>
+Zoomed panes are marked with a `Z` flag in the status line. Press `C-b z` again to unzoom.
+</Note>
+
+## Swapping and Moving Panes
+
+### Swapping Panes
+
+Exchange two panes:
+
+```bash
+C-b {  # Swap with previous pane
+C-b }  # Swap with next pane
+
+# Command form
+tmux swap-pane -U  # Swap with previous
+tmux swap-pane -D  # Swap with next
+
+# Swap specific panes
+tmux swap-pane -s %1 -t %3
+
+# Swap without changing active pane
+tmux swap-pane -d -t %2
+
+# Use marked pane as source
+tmux select-pane -m     # Mark pane
+tmux swap-pane          # Swap with marked
+```
+
+### Rotating Panes
+
+Rotate all panes in the window:
+
+```bash
+C-b C-o  # Rotate panes forwards
+C-b M-o  # Rotate panes backwards
+
+tmux rotate-window     # Rotate down/right
+tmux rotate-window -U  # Rotate up/left
+```
+
+### Breaking Panes Out
+
+Turn a pane into its own window:
+
+```bash
+C-b !  # Break pane into new window
+
+# Command with options
+tmux break-pane
+
+# Create window at specific index
+tmux break-pane -t :3
+
+# Give new window a name
+tmux break-pane -n logs
+
+# Insert before (-b) or after (-a)
+tmux break-pane -a -t :2
+
+# Don't switch to new window
+tmux break-pane -d
+```
+
+### Joining Panes
+
+Move a pane from one window to another:
+
+```bash
+# Join pane from another window
+tmux join-pane -s :2.0  # Join pane 0 from window 2
+
+# Specify destination
+tmux join-pane -s :1 -t :3.1  # Join to specific pane
+
+# Split direction
+tmux join-pane -h -s :2  # Join horizontally
+tmux join-pane -v -s :2  # Join vertically (default)
+
+# Join before destination
+tmux join-pane -b -s :2
+
+# Specify size
+tmux join-pane -l 30% -s :2
+
+# Use marked pane
+tmux select-pane -m     # Mark source pane
+tmux join-pane          # Join marked pane
+```
+
+<Tip>
+Marking panes is useful for moving panes between windows without typing IDs. Mark with `C-b m`, clear mark with `C-b M`.
+</Tip>
+
+## Killing Panes
+
+### Interactive Kill
+
+```bash
+C-b x  # Kill current pane (prompts for confirmation)
+```
+
+### Command Line Kill
+
+```bash
+# Kill current pane
+tmux kill-pane
+
+# Kill specific pane
+tmux kill-pane -t %3
+
+# Kill all panes except current
+tmux kill-pane -a
+tmux killp -a -t %2  # All except pane %2
+```
+
+## Pane Layouts
+
+### Preset Layouts
+
+Quickly arrange panes:
+
+```bash
+C-b Space    # Cycle to next layout
+C-b M-1      # even-horizontal
+C-b M-2      # even-vertical  
+C-b M-3      # main-horizontal
+C-b M-4      # main-horizontal-mirrored
+C-b M-5      # main-vertical
+C-b M-6      # main-vertical-mirrored
+C-b M-7      # tiled
+
+# Command form
+tmux select-layout even-horizontal
+tmux select-layout main-vertical
+
+# Next/previous layout
+tmux next-layout
+tmux previous-layout
+```
+
+### Layout Descriptions
+
+<Accordion title="even-horizontal">
+  Panes spread evenly from left to right across the window.
+</Accordion>
+
+<Accordion title="even-vertical">
+  Panes spread evenly from top to bottom.
+</Accordion>
+
+<Accordion title="main-horizontal">
+  Large pane at top, remaining panes spread left to right at bottom. Control main pane height with `main-pane-height` option.
+</Accordion>
+
+<Accordion title="main-vertical">
+  Large pane on left, remaining panes spread top to bottom on right. Control main pane width with `main-pane-width` option.
+</Accordion>
+
+<Accordion title="tiled">
+  Panes spread evenly in both rows and columns.
+</Accordion>
+
+### Custom Layouts
+
+```bash
+# Save current layout
+tmux display-message -p '#{window_layout}'
+# Output: bb62,159x48,0,0{79x48,0,0,79x48,80,0}
+
+# Restore saved layout
+tmux select-layout 'bb62,159x48,0,0{79x48,0,0,79x48,80,0}'
+
+# Undo layout change
+tmux select-layout -o
+
+# Spread panes evenly
+tmux select-layout -E
+```
+
+## Pane Synchronization
+
+Send input to multiple panes simultaneously:
+
+```bash
+# Enable synchronization for current window
+tmux set-option -w synchronize-panes on
+
+# Disable
+tmux set-option -w synchronize-panes off
+
+# Toggle with key binding
+bind-key S set-option -w synchronize-panes
+```
+
+<Warning>
+When synchronize-panes is on, all input goes to every pane in the window. This only affects panes that are not in any special mode (like copy mode).
+</Warning>
+
+## Pane Information and Display
+
+### Display Panes
+
+```bash
+C-b q     # Show pane numbers briefly
+C-b q 0-9 # Show numbers and switch to pane
+
+# Display panes command
+tmux display-panes
+tmux display-panes -d 5000  # Show for 5 seconds
+tmux display-panes -d 0     # Show until keypress
+```
+
+### List Panes
+
+```bash
+# List panes in current window
+tmux list-panes
+tmux lsp
+
+# List panes in specific window
+tmux list-panes -t :2
+
+# List all panes in session
+tmux list-panes -s
+
+# List all panes on server
+tmux list-panes -a
+
+# Custom format
+tmux list-panes -F "Pane #{pane_index}: #{pane_title}"
+
+# Filter panes
+tmux list-panes -f '#{==:#{pane_active},1}'
+
+# Sort panes
+tmux list-panes -O index   # By index
+tmux list-panes -O size    # By area
+tmux list-panes -O creation # By creation time
+```
+
+### Pane Format Variables
+
+Useful format variables for panes:
+
+```bash
+# #{pane_id}              - Unique pane ID (%0, %1, etc.)
+# #{pane_index}           - Pane index in window
+# #{pane_current_command} - Current command
+# #{pane_current_path}    - Current working directory
+# #{pane_title}           - Pane title
+# #{pane_pid}             - PID of pane process
+# #{pane_active}          - 1 if pane is active
+# #{pane_width}           - Pane width
+# #{pane_height}          - Pane height
+# #{pane_left}            - Left position
+# #{pane_top}             - Top position
+# #{pane_in_mode}         - 1 if pane is in mode
+# #{pane_synchronized}    - 1 if synchronized
+```
+
+## Pane Titles and Borders
+
+### Setting Pane Titles
+
+```bash
+# Set pane title
+tmux select-pane -T "Database Console"
+
+# From shell with escape sequence
+printf '\033]2;My Title\033\\'
+```
+
+### Pane Border Styles
+
+```bash
+# Pane border style
+set-option -g pane-border-style fg=blue
+
+# Active pane border
+set-option -g pane-active-border-style fg=green,bold
+
+# Display pane numbers/indicators
+set-option -g display-panes-colour blue
+set-option -g display-panes-active-colour red
+set-option -g display-panes-time 2000
+```
+
+### Pane Border Status
+
+Show information in pane borders:
+
+```bash
+# Enable border status
+set-option -g pane-border-status top
+set-option -g pane-border-status bottom
+set-option -g pane-border-status off
+
+# Format for border status
+set-option -g pane-border-format " #{pane_index} #{pane_current_command} "
+set-option -g pane-border-format " [ #T ] #{pane_current_path} "
+```
+
+## Marking Panes
+
+Mark a pane as the default target for operations:
+
+```bash
+C-b m  # Mark current pane
+C-b M  # Clear marked pane
+
+# Commands that use marked pane
+tmux join-pane    # Join marked pane to current window
+tmux swap-pane    # Swap with marked pane
+tmux swap-window  # Swap window containing marked pane
+
+# Target marked pane explicitly
+tmux select-pane -t '{marked}'
+```
+
+<Note>
+Only one pane can be marked at a time. Marking a new pane clears the previous mark.
+</Note>
+
+## Enabling and Disabling Panes
+
+Control pane input:
+
+```bash
+# Disable input to pane (read-only)
+tmux select-pane -d
+
+# Enable input to pane
+tmux select-pane -e
+
+# Toggle with last-pane
+tmux last-pane -e  # Enable input
+tmux last-pane -d  # Disable input
+```
+
+## Advanced Pane Management
+
+### Capture Pane Content
+
+```bash
+# Capture visible content
+tmux capture-pane
+
+# Capture to stdout
+tmux capture-pane -p
+
+# Capture with history
+tmux capture-pane -S -1000  # Last 1000 lines
+
+# Capture specific range
+tmux capture-pane -S 0 -E 50  # Lines 0-50
+
+# Save to file
+tmux capture-pane -p > output.txt
+
+# Include escape sequences (colors/attributes)
+tmux capture-pane -ep
+
+# Save to buffer
+tmux capture-pane -b mybuffer
+```
+
+### Pipe Pane Output
+
+Redirect pane output to a command:
+
+```bash
+# Pipe to file
+tmux pipe-pane -o 'cat >>~/output.log'
+
+# Pipe with format expansion
+tmux pipe-pane -o 'cat >>~/tmux-#S-#I-#P.log'
+
+# Toggle with -o
+bind-key C-p pipe-pane -o 'cat >>~/output.#I-#P'
+
+# Pipe input to pane
+tmux pipe-pane -I 'command-that-generates-input'
+
+# Stop piping
+tmux pipe-pane
+```
+
+### Respawn Pane
+
+Restart a pane that has exited:
+
+```bash
+# Respawn with original command
+tmux respawn-pane
+
+# Respawn with new command
+tmux respawn-pane 'htop'
+
+# Kill existing process first
+tmux respawn-pane -k
+
+# Change directory
+tmux respawn-pane -c /var/log
+```
+
+## Practical Examples
+
+### Development Layout
+
+```bash
+#!/bin/bash
+# Create a development layout
+
+tmux split-window -h -p 30
+tmux select-pane -t 0
+tmux split-window -v -p 15
+
+# Pane 0: Editor (top-left, 70% width, 85% height)
+# Pane 1: Terminal (bottom-left, 70% width, 15% height)  
+# Pane 2: Logs (right, 30% width, full height)
+
+tmux select-pane -t 0
+tmux send-keys 'vim' C-m
+
+tmux select-pane -t 2
+tmux send-keys 'tail -f log/development.log' C-m
+```
+
+### Monitoring Dashboard
+
+```bash
+# Create 2x2 grid
+tmux split-window -h
+tmux split-window -v
+tmux select-pane -t 0
+tmux split-window -v
+
+# Top-left: CPU
+tmux send-keys -t 0 'htop' C-m
+
+# Bottom-left: Disk
+tmux send-keys -t 1 'watch df -h' C-m
+
+# Top-right: Network
+tmux send-keys -t 2 'iftop' C-m
+
+# Bottom-right: Logs
+tmux send-keys -t 3 'tail -f /var/log/syslog' C-m
+```
+
+### Custom Key Bindings
+
+```bash
+# Better split commands
+bind | split-window -h -c "#{pane_current_path}"
+bind - split-window -v -c "#{pane_current_path}"
+
+# Quick pane selection
+bind -n M-Left select-pane -L
+bind -n M-Right select-pane -R
+bind -n M-Up select-pane -U
+bind -n M-Down select-pane -D
+
+# Pane resizing
+bind -r H resize-pane -L 5
+bind -r J resize-pane -D 5
+bind -r K resize-pane -U 5
+bind -r L resize-pane -R 5
+
+# Break pane to new window
+bind B break-pane -d
+
+# Join pane from other window
+bind j command-prompt -p "join pane from:" "join-pane -s '%%'"
+```

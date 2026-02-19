@@ -1,302 +1,225 @@
 ---
-title: "Sessions"
-description: "Understanding tmux sessions - lifecycle, management, and commands"
+title: Sessions
+description: Understanding tmux sessions and the client-server architecture
 ---
 
-## What is a Session?
+## Overview
 
-A tmux **session** is a single collection of pseudo terminals under the management of tmux. Each session has one or more windows linked to it and maintains its own environment, options, and state.
+A session in tmux is a single collection of pseudo terminals under the management of the tmux server. Sessions are the highest-level organizational unit in tmux and provide the foundation for tmux's persistence model.
 
-<Info>
-Sessions are persistent and will survive accidental disconnection (such as SSH connection timeout) or intentional detaching. You can reattach to them later using `tmux attach`.
-</Info>
+<Note>
+Each session is persistent and will survive accidental disconnection (such as SSH connection timeout) or intentional detaching.
+</Note>
 
-## Session Architecture
+## Client-Server Architecture
 
-From the source code (session.c:109-158), sessions are implemented as structures with:
+Tmux operates using a client-server model where:
 
-- **Unique ID**: Each session has a numeric ID prefixed with `$` (e.g., `$0`, `$1`)
-- **Name**: A user-friendly name for identification
-- **Windows Tree**: An RB tree (`RB_INIT(&s->windows)`) containing all windows
-- **Current Window**: Pointer to the active window (`s->curw`)
-- **Window Stack**: A stack of last-used windows (`TAILQ_INIT(&s->lastw)`)
-- **Reference Count**: Tracks how many clients are attached
-- **Activity Tracking**: Creation time and last activity timestamps
-- **Working Directory**: Default directory for new windows
+- **Server**: A single server process manages all sessions
+- **Clients**: Multiple clients can connect to the server and attach to sessions
+- **Socket**: The server and clients communicate through a socket in `/tmp`
 
-```c
-// From session.c:111-127
-struct session *
-session_create(const char *prefix, const char *name, const char *cwd,
-    struct environ *env, struct options *oo, struct termios *tio)
-{
-    struct session *s;
-    s = xcalloc(1, sizeof *s);
-    s->references = 1;
-    s->cwd = xstrdup(cwd);
-    TAILQ_INIT(&s->lastw);
-    RB_INIT(&s->windows);
-    s->environ = env;
-    s->options = oo;
-    // ...
-}
+Any number of tmux instances may connect to the same session, and any number of windows may be present in the same session. Once all sessions are killed, tmux exits.
+
+```bash
+# Start a new session
+$ tmux new-session
+
+# Reattach to an existing session
+$ tmux attach
+
+# List all sessions
+$ tmux list-sessions
 ```
 
 ## Session Lifecycle
 
 ### Creating Sessions
 
-Sessions are created with `session_create()` and assigned:
-- A unique session ID
-- A name (auto-generated if not specified)
-- Initial environment and options
-- Creation and activity timestamps
+From `session.c:109-158`, when a session is created:
 
-<Tabs>
-  <Tab title="Command">
-    ```bash
-    # Create a new session
-    tmux new-session -s mysession
-    
-    # Create with specific name and command
-    tmux new -s dev -n editor vim
-    
-    # Create detached session
-    tmux new -d -s background
-    ```
-  </Tab>
-  <Tab title="Source Reference">
-    From session.c:109-158, `session_create()` function handles:
-    - Memory allocation
-    - ID assignment (`s->id = next_session_id++`)
-    - Name generation or validation
-    - Initialization of window structures
-    - Environment setup
-  </Tab>
-</Tabs>
+1. A unique session ID is assigned (prefixed with `$`)
+2. The session is added to the global sessions tree
+3. Creation time and activity time are recorded
+4. A session working directory is set
 
-### Finding Sessions
+```bash
+# Create a named session
+$ tmux new-session -s my-session
 
-The source provides multiple ways to locate sessions (session.c:70-107):
-
-```c
-// Find by name
-struct session *session_find(const char *name);
-
-// Find by ID string (e.g., "$0")
-struct session *session_find_by_id_str(const char *s);
-
-// Find by numeric ID
-struct session *session_find_by_id(u_int id);
+# Create session with specific window name
+$ tmux new-session -s dev -n editor
 ```
 
-<Note>
-Session names cannot contain `:` or `.` characters - they are replaced with `_` during name sanitization (session.c:232-248).
-</Note>
+### Session Identification
 
-### Attaching and Detaching
+Sessions can be identified by:
 
-Sessions use reference counting to track attached clients:
+- **Session ID**: Prefixed with `$` (e.g., `$0`, `$1`)
+- **Session name**: Exact name or glob pattern
+- **Prefix match**: Partial name matching the start of a session name
 
-```c
-// session.c:160-177
-void session_add_ref(struct session *s, const char *from) {
-    s->references++;
-}
+From the man page (tmux.1:753-770):
 
-void session_remove_ref(struct session *s, const char *from) {
-    s->references--;
-    if (s->references == 0)
-        event_once(-1, EV_TIMEOUT, session_free, s, NULL);
-}
+<CodeGroup>
+```bash Session by ID
+$ tmux attach -t \$0
 ```
 
-<Tip>
-When you detach from a session, it continues running in the background. The session is only destroyed when all references are removed.
-</Tip>
-
-### Session Destruction
-
-From session.c:196-230, `session_destroy()` performs cleanup:
-
-1. Removes session from global sessions tree
-2. Sends `session-closed` notification
-3. Removes from any session group
-4. Destroys all window links
-5. Cleans up last-window stack
-6. Decrements reference count
-
-```c
-void session_destroy(struct session *s, int notify, const char *from) {
-    RB_REMOVE(sessions, &sessions, s);
-    if (notify)
-        notify_session("session-closed", s);
-    // Clean up windows, groups, etc.
-    session_remove_ref(s, __func__);
-}
+```bash Session by name
+$ tmux attach -t mysession
 ```
 
-## Window Management
+```bash Session by prefix
+$ tmux attach -t mys  # Matches 'mysession'
+```
+</CodeGroup>
 
-Sessions manage windows through winlinks (session.c:340-377):
+## Detaching and Attaching
 
-### Attaching Windows
+The key feature of sessions is their persistence:
 
-```c
-struct winlink *
-session_attach(struct session *s, struct window *w, int idx, char **cause)
+```bash
+# Detach from current session (within tmux)
+Prefix d
+
+# Or use command
+$ tmux detach-client
+
+# List available sessions
+$ tmux list-sessions
+
+# Attach to most recent session
+$ tmux attach
+
+# Attach to specific session
+$ tmux attach -t session-name
 ```
 
-- Links a window at a specific index
-- Notifies with `window-linked` event
-- Synchronizes with session group if applicable
+From `session.c:196-230`, when a session is destroyed:
 
-### Detaching Windows
-
-```c
-int session_detach(struct session *s, struct winlink *wl)
-```
-
-- Adjusts current window if necessary
-- Clears alert flags
-- Sends `window-unlinked` notification
-- Returns 1 if session is now empty
-
-## Navigating Windows
-
-The source provides several navigation functions:
-
-<Accordion title="Window Navigation Functions">
-
-**Next Window** (session.c:417-435)
-```c
-int session_next(struct session *s, int alert)
-```
-Moves to the next window, optionally skipping to next alert.
-
-**Previous Window** (session.c:448-466)
-```c
-int session_previous(struct session *s, int alert)
-```
-Moves to the previous window.
-
-**Select by Index** (session.c:468-476)
-```c
-int session_select(struct session *s, int idx)
-```
-Jumps directly to a window by index.
-
-**Last Window** (session.c:478-491)
-```c
-int session_last(struct session *s)
-```
-Switches to the previously active window.
-
-</Accordion>
+1. All windows are unlinked from the session
+2. The session is removed from the global sessions tree
+3. A `session-closed` notification is sent
+4. Resources are freed when reference count reaches zero
 
 ## Session Groups
 
-Sessions can be grouped together to share windows (session.c:519-645):
+Sessions can be grouped together to share windows. From the man page (tmux.1:1344-1370):
 
-<Info>
-Sessions in the same group share windows - new windows are linked to all sessions in the group, and closing a window removes it from all sessions.
-</Info>
+<Warning>
+Sessions in the same group share the same set of windows - new windows are linked to all sessions in the group and any windows closed are removed from all sessions.
+</Warning>
 
-### Key Functions
+The current and previous window and any session options remain independent, and any session in a group may be killed without affecting the others.
 
-```c
-// Find group containing a session
-struct session_group *session_group_contains(struct session *target);
+```bash
+# Create a new session in the same group
+$ tmux new-session -t existing-session -s new-session
 
-// Create new group
-struct session_group *session_group_new(const char *name);
-
-// Add session to group
-void session_group_add(struct session_group *sg, struct session *s);
+# Create a new named group
+$ tmux new-session -s session1 -t mygroup
+$ tmux new-session -s session2 -t mygroup
 ```
 
-### Synchronization
+## Session Management
 
-Groups synchronize windows bidirectionally:
-- `session_group_synchronize_to()` - sync session to group
-- `session_group_synchronize_from()` - sync group from session
+From `session.c`, key session operations include:
 
-From session.c:647-708, synchronization:
-1. Destroys all winlinks in target session
-2. Recreates them from the source
-3. Updates current window pointer
-4. Rebuilds last-window stack
-5. Preserves alert flags
+### Switching Windows
 
-## Activity Tracking
+```c
+// From session.c:417-435
+int session_next(struct session *s, int alert)
+{
+    struct winlink *wl;
+    
+    if (s->curw == NULL)
+        return (-1);
+    
+    wl = winlink_next(s->curw);
+    if (wl == NULL)
+        wl = RB_MIN(winlinks, &s->windows);
+    
+    return (session_set_current(s, wl));
+}
+```
 
-Sessions track activity for locking and monitoring (session.c:266-292):
+Key bindings for window navigation:
+
+- `Prefix n` - Next window
+- `Prefix p` - Previous window  
+- `Prefix l` - Last (previously selected) window
+- `Prefix 0-9` - Select window by number
+
+### Activity Tracking
+
+From `session.c:266-292`, sessions track activity time for lock-after-time functionality:
 
 ```c
 void session_update_activity(struct session *s, struct timeval *from)
+{
+    if (from == NULL)
+        gettimeofday(&s->activity_time, NULL);
+    else
+        memcpy(&s->activity_time, from, sizeof s->activity_time);
+    
+    // Auto-lock based on lock-after-time option
+    if (s->attached != 0) {
+        timerclear(&tv);
+        tv.tv_sec = options_get_number(s->options, "lock-after-time");
+        if (tv.tv_sec != 0)
+            evtimer_add(&s->lock_timer, &tv);
+    }
+}
 ```
 
-- Updates `activity_time` timestamp
-- Resets lock timer based on `lock-after-time` option
-- Logs activity for debugging
+## Session Options
 
-<Tip>
-Use `#{session_activity}` and `#{session_created}` format variables to display session timing information in status lines.
-</Tip>
+Sessions have their own option hierarchy that inherits from global options:
 
-## Common Session Commands
+```bash
+# Set session option
+$ tmux set-option -t my-session status-position top
 
-| Command | Description | Source Reference |
-|---------|-------------|------------------|
-| `new-session` | Create new session | tmux.1:1268 |
-| `attach-session` | Attach to existing session | tmux.1:1040 |
-| `detach-client` | Detach from session | tmux.1:1138 |
-| `kill-session` | Destroy session | tmux.1:1173 |
-| `list-sessions` | Show all sessions | tmux.1:1228 |
-| `rename-session` | Change session name | tmux.1:1534 |
-| `switch-client` | Switch to different session | tmux.1:1647 |
+# Set global session option
+$ tmux set-option -g status-interval 5
 
-## Session Identification
+# Show session options
+$ tmux show-options -t my-session
+```
 
-From tmux.1:753-785, sessions can be identified by:
+## Renaming Sessions
 
-1. **Session ID**: `$0`, `$1`, etc.
-2. **Exact name**: Full session name
-3. **Name prefix**: Start of session name (e.g., `myse` matches `mysession`)
-4. **Glob pattern**: Wildcard matching against name
+From `session.c:232-248`, session names are sanitized:
 
-<Note>
-Prefix session name with `=` for exact matching only (e.g., `=mysess` won't match `mysession`).
-</Note>
+```bash
+# Rename current session (within tmux)
+Prefix $
+
+# Or use command
+$ tmux rename-session -t old-name new-name
+```
+
+<Info>
+Session names cannot contain `:` or `.` characters - they are automatically replaced with `_`.
+</Info>
 
 ## Best Practices
 
-<Accordion title="Session Management Tips">
+1. **Name your sessions**: Use descriptive names for easier management
+2. **Use session groups**: For pair programming or shared environments
+3. **Leverage persistence**: Detach instead of closing terminal windows
+4. **Session scripts**: Automate session creation with shell scripts
+5. **Monitor activity**: Use `list-sessions` to see recent activity times
 
-**Naming Conventions**
-- Use descriptive names for easy identification
-- Avoid special characters (`:` and `.` are replaced)
-- Use consistent naming schemes (e.g., `work-project`, `dev-backend`)
-
-**Session Groups**
-- Group related sessions to share window layouts
-- Remember that closing a window affects all sessions in the group
-- Current window and options remain independent per session
-
-**Resource Management**
-- Sessions persist until explicitly killed
-- Detached sessions continue consuming resources
-- Use `kill-session -a` to kill all sessions except the current one
-
-**Activity Monitoring**
-- Set `lock-after-time` for automatic session locking
-- Monitor `session_activity` for idle detection
-- Use session groups for synchronized work environments
-
-</Accordion>
-
-## See Also
-
-- [Windows](/concepts/windows) - Understanding window management
-- [Panes](/concepts/panes) - Working with panes
-- [Client-Server Architecture](/concepts/client-server) - How sessions fit in the architecture
+```bash
+# Example session startup script
+#!/bin/bash
+tmux new-session -d -s dev -n editor
+tmux send-keys -t dev:editor 'vim' C-m
+tmux new-window -t dev -n shell
+tmux new-window -t dev -n server
+tmux send-keys -t dev:server 'npm run dev' C-m
+tmux attach -t dev
+```

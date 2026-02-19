@@ -1,0 +1,651 @@
+---
+title: 'Control Mode'
+description: 'Using tmux -C for programmatic control and automation'
+---
+
+## Introduction to Control Mode
+
+tmux's **control mode** provides a textual interface for programmatic interaction with tmux. It allows applications to communicate with tmux using a simple, text-based protocol instead of terminal escape sequences.
+
+<Note>
+Control mode is designed for applications that need to programmatically control tmux, such as terminal multiplexer frontends, testing tools, or automation scripts.
+</Note>
+
+## Starting Control Mode
+
+### Basic Invocation
+
+Start tmux in control mode with the `-C` flag:
+
+```bash
+# Start in control mode
+tmux -C
+
+# Attach to existing session in control mode
+tmux -C attach-session -t mysession
+
+# Create new session in control mode
+tmux -C new-session -s mysession
+```
+
+### Disable Echo
+
+Use `-CC` to disable echo:
+
+```bash
+# Start with echo disabled
+tmux -CC
+tmux -CC attach-session -t mysession
+```
+
+This prevents tmux from echoing back commands, useful for programmatic clients.
+
+## Protocol Overview
+
+In control mode, communication happens through:
+- **Input**: Commands sent to tmux on stdin, one per line
+- **Output**: Responses and notifications on stdout
+
+### Command Structure
+
+Send tmux commands as text:
+
+```bash
+# Each command is a single line
+list-windows
+new-window -n mywin
+split-window -h
+```
+
+### Response Format
+
+Each command produces a response block:
+
+```
+%begin <timestamp> <command-number> <flags>
+<output>
+%end <timestamp> <command-number> <flags>
+```
+
+Or on error:
+
+```
+%begin <timestamp> <command-number> <flags>
+<error message>
+%error <timestamp> <command-number> <flags>
+```
+
+### Example Session
+
+```bash
+$ tmux -C new-session -d
+%begin 1700000000 1 0
+%end 1700000000 1 0
+
+list-windows
+%begin 1700000001 2 0
+0: ksh* (1 panes) [80x24] [layout b25f,80x24,0,0,2] @2 (active)
+%end 1700000001 2 0
+```
+
+## Notifications
+
+Control mode sends notifications for events. Notifications never occur inside output blocks.
+
+### Common Notifications
+
+<Tabs>
+  <Tab title="Session Events">
+    ```
+    %sessions-changed
+      - A session was created or destroyed
+    
+    %session-changed <session-id> <name>
+      - Client attached to different session
+    
+    %session-renamed <name>
+      - Current session was renamed
+    
+    %session-window-changed <session-id> <window-id>
+      - Session's active window changed
+    ```
+  </Tab>
+  <Tab title="Window Events">
+    ```
+    %window-add <window-id>
+      - Window linked to current session
+    
+    %window-close <window-id>
+      - Window closed
+    
+    %window-renamed <window-id> <name>
+      - Window renamed
+    
+    %window-pane-changed <window-id> <pane-id>
+      - Active pane in window changed
+    
+    %layout-change <window-id> <layout> <visible-layout> <flags>
+      - Window layout changed
+    ```
+  </Tab>
+  <Tab title="Pane Events">
+    ```
+    %output <pane-id> <value>
+      - Pane produced output
+      - Value is octal-escaped
+    
+    %extended-output <pane-id> <age> ... : <value>
+      - Extended output with age info
+    
+    %pane-mode-changed <pane-id>
+      - Pane changed mode
+    
+    %pause <pane-id>
+      - Pane was paused
+    
+    %continue <pane-id>
+      - Pane was continued
+    ```
+  </Tab>
+  <Tab title="Client Events">
+    ```
+    %client-detached <client>
+      - Client detached
+    
+    %client-session-changed <client> <session-id> <name>
+      - Client attached to different session
+    
+    %exit [reason]
+      - Client is exiting
+    ```
+  </Tab>
+</Tabs>
+
+### Buffer and Subscription Events
+
+```
+%paste-buffer-changed <name>
+  - Paste buffer was changed
+
+%paste-buffer-deleted <name>
+  - Paste buffer was deleted
+
+%subscription-changed <name> <session-id> <window-id> <window-index> <pane-id> ... : <value>
+  - Subscription value changed
+```
+
+## Client Control
+
+### Setting Client Size
+
+Control the size of windows/panes visible to the control mode client:
+
+```bash
+# Set client size
+refresh-client -C 80x24
+
+# Set size for specific window
+refresh-client -C @0:100x50
+
+# Example in control mode
+echo "refresh-client -C 120x40" | tmux -C
+```
+
+### Client Flags
+
+Control mode clients can have special flags:
+
+```bash
+# Start with flags
+tmux -C attach-session -f active-pane,read-only
+
+# Set flags with refresh-client
+refresh-client -f ignore-size
+refresh-client -f !ignore-size  # Remove flag
+```
+
+Available flags:
+- `active-pane` - Client has independent active pane
+- `ignore-size` - Client doesn't affect window size
+- `no-detach-on-destroy` - Don't detach when session destroyed
+- `no-output` - Client doesn't receive pane output
+- `pause-after=seconds` - Pause output when behind
+- `read-only` - Client is read-only
+- `wait-exit` - Wait for empty line before exiting
+
+## Output Control
+
+### Pane Output Actions
+
+Control pane output flow:
+
+```bash
+# Turn off output from pane
+refresh-client -A %0:off
+
+# Turn on output
+refresh-client -A %0:on
+
+# Pause output
+refresh-client -A %0:pause
+
+# Continue output
+refresh-client -A %0:continue
+
+# Multiple panes
+refresh-client -A %0:off -A %1:off
+```
+
+### The pause-after Flag
+
+Automatically pause panes when output is behind:
+
+```bash
+# Pause panes if 5 seconds behind
+tmux -C attach-session -f pause-after=5
+
+# Client receives:
+%pause %0
+# ... after output catches up:
+%continue %0
+```
+
+<Warning>
+Without the `pause-after` flag, control mode clients that can't keep up will be disconnected with a "too far behind" error after 300 seconds.
+</Warning>
+
+## Subscriptions
+
+Subscribe to format changes to receive notifications:
+
+```bash
+# Subscribe to a format
+refresh-client -B mysub:%0:#{pane_current_path}
+
+# Multiple subscriptions
+refresh-client -B status::#{session_name}
+refresh-client -B panes:%*:#{pane_current_command}
+
+# Remove subscription
+refresh-client -B mysub
+```
+
+### Subscription Types
+
+The subscription `what` field can be:
+- Empty - Check attached session
+- `%0`, `%1` - Specific pane ID
+- `%*` - All panes in attached session
+- `@0`, `@1` - Specific window ID
+- `@*` - All windows in attached session
+
+### Subscription Notifications
+
+When subscribed format changes:
+
+```
+%subscription-changed <name> <session-id> <window-id> <window-index> <pane-id> ... : <value>
+```
+
+Example:
+```
+%subscription-changed mysub 0 @1 1 %2 : /home/user/project
+```
+
+## Reading Pane Content
+
+### Output Notification
+
+By default, pane output is sent via `%output` notifications:
+
+```
+%output %0 hello\012world\012
+```
+
+Non-printable characters are octal-escaped (`\nnn`).
+
+### Extended Output
+
+With `pause-after` flag, output uses extended format:
+
+```
+%extended-output %0 1234 : hello\012world\012
+```
+
+The number (1234) is the age in milliseconds that tmux buffered the output.
+
+### Capturing Pane Content
+
+Capture pane content programmatically:
+
+```bash
+# Capture visible content
+capture-pane -p -t %0
+
+# Capture with history
+capture-pane -p -S -1000 -t %0
+
+# Capture to buffer
+capture-pane -b mybuf -t %0
+show-buffer -b mybuf
+```
+
+## Sending Input to Panes
+
+Send keystrokes or text to panes:
+
+```bash
+# Send keys
+send-keys -t %0 "ls -la" C-m
+
+# Send literal text
+send-keys -l -t %0 "literal text"
+
+# Send to multiple panes
+send-keys -t %0 "echo test" C-m
+send-keys -t %1 "echo test" C-m
+```
+
+## Practical Examples
+
+### Simple Control Mode Client
+
+```python
+#!/usr/bin/env python3
+import subprocess
+import sys
+
+class TmuxControl:
+    def __init__(self):
+        self.proc = subprocess.Popen(
+            ['tmux', '-CC', 'new-session'],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            bufsize=1
+        )
+    
+    def send_command(self, cmd):
+        """Send a command to tmux."""
+        self.proc.stdin.write(cmd + '\n')
+        self.proc.stdin.flush()
+    
+    def read_response(self):
+        """Read until %end or %error."""
+        lines = []
+        while True:
+            line = self.proc.stdout.readline().strip()
+            if line.startswith('%end') or line.startswith('%error'):
+                break
+            if not line.startswith('%begin'):
+                lines.append(line)
+        return lines
+    
+    def list_windows(self):
+        """Get list of windows."""
+        self.send_command('list-windows -F "#{window_id}:#{window_name}"')
+        return self.read_response()
+
+# Usage
+tmux = TmuxControl()
+windows = tmux.list_windows()
+for window in windows:
+    print(f"Window: {window}")
+```
+
+### Monitoring Client
+
+```python
+#!/usr/bin/env python3
+import subprocess
+import re
+
+class TmuxMonitor:
+    def __init__(self, session):
+        self.proc = subprocess.Popen(
+            ['tmux', '-CC', 'attach-session', '-t', session],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            text=True,
+            bufsize=1
+        )
+    
+    def monitor(self):
+        """Monitor tmux notifications."""
+        while True:
+            line = self.proc.stdout.readline().strip()
+            
+            if line.startswith('%output'):
+                match = re.match(r'%output (%\d+) (.+)', line)
+                if match:
+                    pane_id = match.group(1)
+                    output = match.group(2)
+                    # Decode octal escapes
+                    output = self.decode_octal(output)
+                    print(f"Pane {pane_id}: {output}")
+            
+            elif line.startswith('%window-add'):
+                window_id = line.split()[1]
+                print(f"New window: {window_id}")
+            
+            elif line.startswith('%session-changed'):
+                session_id, name = line.split()[1:]
+                print(f"Session changed to: {name}")
+    
+    def decode_octal(self, s):
+        """Decode octal escape sequences."""
+        def replace(match):
+            return chr(int(match.group(1), 8))
+        return re.sub(r'\\(\d{3})', replace, s)
+
+# Usage
+monitor = TmuxMonitor('mysession')
+monitor.monitor()
+```
+
+### Automated Testing
+
+```bash
+#!/bin/bash
+# test-tmux-app.sh - Test tmux-based application
+
+set -e
+
+TMUX_SOCKET="test-$$"
+
+# Start tmux in control mode
+exec 3< <(tmux -L "$TMUX_SOCKET" -CC new-session)
+exec 4> >(tmux -L "$TMUX_SOCKET" -CC attach-session)
+
+# Read responses
+read_response() {
+    while IFS= read -r line <&3; do
+        echo "$line"
+        [[ $line =~ ^%(end|error) ]] && break
+    done
+}
+
+# Send command
+send_command() {
+    echo "$1" >&4
+    sleep 0.1
+}
+
+# Test sequence
+echo "Creating windows..."
+send_command "new-window -n test1"
+read_response
+
+send_command "new-window -n test2"
+read_response
+
+echo "Listing windows..."
+send_command "list-windows"
+read_response
+
+echo "Sending commands..."
+send_command "send-keys -t test1 'echo Hello' C-m"
+read_response
+
+echo "Capturing output..."
+send_command "capture-pane -p -t test1"
+read_response | grep -q "Hello" && echo "Test passed!"
+
+# Cleanup
+send_command "kill-server"
+exec 3<&-
+exec 4>&-
+```
+
+### Session Manager
+
+```python
+#!/usr/bin/env python3
+import subprocess
+import json
+
+class TmuxSessionManager:
+    def __init__(self):
+        self.proc = subprocess.Popen(
+            ['tmux', '-CC'],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            text=True,
+            bufsize=1
+        )
+    
+    def execute(self, cmd):
+        """Execute command and return output."""
+        self.proc.stdin.write(cmd + '\n')
+        self.proc.stdin.flush()
+        
+        output = []
+        while True:
+            line = self.proc.stdout.readline().strip()
+            if line.startswith('%end') or line.startswith('%error'):
+                break
+            if not line.startswith('%begin'):
+                output.append(line)
+        
+        return output
+    
+    def get_sessions(self):
+        """Get all sessions with details."""
+        result = self.execute(
+            'list-sessions -F "#{session_id}|#{session_name}|#{session_windows}"'
+        )
+        
+        sessions = []
+        for line in result:
+            sid, name, windows = line.split('|')
+            sessions.append({
+                'id': sid,
+                'name': name,
+                'windows': int(windows)
+            })
+        
+        return sessions
+    
+    def create_session(self, name, layout):
+        """Create session from layout definition."""
+        # Create session
+        self.execute(f'new-session -d -s {name}')
+        
+        # Create windows
+        for window in layout['windows']:
+            self.execute(
+                f"new-window -t {name} -n {window['name']}"
+            )
+            
+            # Split panes
+            for pane in window.get('panes', [])[1:]:
+                split = 'split-window -h' if pane['horizontal'] else 'split-window'
+                self.execute(f"{split} -t {name}:{window['name']}")
+            
+            # Send commands
+            for i, pane in enumerate(window.get('panes', [])):
+                if 'command' in pane:
+                    self.execute(
+                        f"send-keys -t {name}:{window['name']}.{i} "
+                        f"'{pane['command']}' C-m"
+                    )
+        
+        return True
+
+# Usage
+manager = TmuxSessionManager()
+
+# Define layout
+layout = {
+    'windows': [
+        {
+            'name': 'editor',
+            'panes': [
+                {'command': 'vim'}
+            ]
+        },
+        {
+            'name': 'console',
+            'panes': [
+                {'command': 'bash'},
+                {'command': 'htop', 'horizontal': True}
+            ]
+        }
+    ]
+}
+
+# Create session
+manager.create_session('myproject', layout)
+
+# List sessions
+sessions = manager.get_sessions()
+for session in sessions:
+    print(f"{session['name']}: {session['windows']} windows")
+```
+
+## Advanced Control Mode Usage
+
+### Event-Driven Architecture
+
+```python
+import subprocess
+import select
+import re
+
+class TmuxEventLoop:
+    def __init__(self):
+        self.proc = subprocess.Popen(
+            ['tmux', '-CC', 'new-session'],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            text=True
+        )
+        self.handlers = {}
+    
+    def on(self, event_pattern, handler):
+        """Register event handler."""
+        self.handlers[event_pattern] = handler
+    
+    def run(self):
+        """Run event loop."""
+        while True:
+            line = self.proc.stdout.readline().strip()
+            
+            for pattern, handler in self.handlers.items():
+                if re.match(pattern, line):
+                    handler(line)
+
+# Usage
+loop = TmuxEventLoop()
+
+loop.on(r'%output', lambda line: print(f"Output: {line}"))
+loop.on(r'%window-add', lambda line: print(f"New window: {line}"))
+loop.on(r'%exit', lambda line: exit(0))
+
+loop.run()
+```
+
+<Tip>
+Control mode is perfect for building tmux frontends, testing frameworks, and automation tools that need precise control over tmux sessions.
+</Tip>

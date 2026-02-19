@@ -1,0 +1,353 @@
+---
+title: Key Binding Commands
+description: Commands for binding, unbinding, and listing key bindings in tmux
+---
+
+## Overview
+
+tmux allows commands to be bound to most keys, with or without a prefix key. When specifying keys, most represent themselves (e.g., `A` to `Z`). Special modifiers and keys are also supported.
+
+## Key Notation
+
+### Modifiers
+
+- **Ctrl keys**: Prefix with `C-` or `^` (e.g., `C-b` or `^b`)
+- **Shift keys**: Prefix with `S-` (e.g., `S-Up`)
+- **Alt/Meta keys**: Prefix with `M-` (e.g., `M-1`)
+
+### Special Key Names
+
+The following special key names are accepted:
+
+- `Up`, `Down`, `Left`, `Right`
+- `BSpace` (Backspace)
+- `BTab` (Back Tab)
+- `DC` (Delete)
+- `End`
+- `Enter`
+- `Escape`
+- `F1` to `F12`
+- `Home`
+- `IC` (Insert)
+- `NPage`, `PageDown`, `PgDn`
+- `PPage`, `PageUp`, `PgUp`
+- `Space`
+- `Tab`
+
+### Binding Special Characters
+
+To bind `"` or `'` keys, quotation marks are necessary:
+
+```bash
+bind-key '"' split-window
+bind-key "'" new-window
+```
+
+### The Any Key
+
+A command bound to the `Any` key will execute for all keys which do not have a more specific binding.
+
+## Key Tables
+
+Keys are bound in key tables:
+
+- **prefix**: Default table for keys pressed after the prefix key (default `C-b`)
+- **root**: Table for keys pressed without the prefix key
+- **copy-mode**: Emacs-style key bindings in copy mode
+- **copy-mode-vi**: Vi-style key bindings in copy mode
+- **Custom tables**: Can be created and switched to with `switch-client -T`
+
+## bind-key
+
+Alias: `bind`
+
+```bash
+bind-key [-nr] [-N note] [-T key-table] key [command [argument ...]]
+```
+
+Bind a key to a command.
+
+<ParamField path="-n" type="flag">
+  Alias for `-T root`. Bind the key in the root table (without prefix).
+</ParamField>
+
+<ParamField path="-r" type="flag">
+  Indicate this key may repeat. See the `initial-repeat-time` and `repeat-time` options.
+</ParamField>
+
+<ParamField path="-N" type="string">
+  Attach a note to the key (shown with `list-keys -N`). Pass an empty string to clear an existing note.
+</ParamField>
+
+<ParamField path="-T" type="string">
+  Specify the key table to bind the key in. Default is `prefix`.
+</ParamField>
+
+<ParamField path="key" type="string" required>
+  The key to bind.
+</ParamField>
+
+<ParamField path="command" type="string">
+  The tmux command to execute when the key is pressed.
+</ParamField>
+
+### Using -r and -N Without Command
+
+The `-r` and `-N` flags can be used without a command to alter an existing binding.
+
+### Examples
+
+```bash
+# Bind C-b c to create a new window in the prefix table
+bind-key c new-window
+
+# Bind F2 to create a new window without prefix (in root table)
+bind-key -n F2 new-window
+
+# Bind a repeating key for resizing panes
+bind-key -r H resize-pane -L 5
+
+# Bind with a note
+bind-key -N "Create new window" c new-window
+
+# Bind in a custom key table
+bind-key -T mytable x display-message "Key x in mytable"
+```
+
+## unbind-key
+
+Alias: `unbind`
+
+```bash
+unbind-key [-anq] [-T key-table] key
+```
+
+Remove a key binding.
+
+<ParamField path="-a" type="flag">
+  Remove all key bindings in the key table (cannot be used with a key argument).
+</ParamField>
+
+<ParamField path="-n" type="flag">
+  Alias for `-T root`. Unbind the key from the root table.
+</ParamField>
+
+<ParamField path="-q" type="flag">
+  Do not report an error if the key is not bound.
+</ParamField>
+
+<ParamField path="-T" type="string">
+  Specify the key table. Default is `prefix`.
+</ParamField>
+
+<ParamField path="key" type="string" required>
+  The key to unbind (unless `-a` is used).
+</ParamField>
+
+### Examples
+
+```bash
+# Unbind the c key from the prefix table
+unbind-key c
+
+# Unbind F2 from the root table
+unbind-key -n F2
+
+# Remove all bindings from the prefix table
+unbind-key -a
+
+# Unbind without error if not bound
+unbind-key -q x
+```
+
+## list-keys
+
+Alias: `lsk`
+
+```bash
+list-keys [-1aN] [-P prefix-string] [-T key-table] [key]
+```
+
+List key bindings.
+
+### Default Form
+
+Lists keys as `bind-key` commands. All key tables are listed by default.
+
+<ParamField path="-1" type="flag">
+  List only the first matching key.
+</ParamField>
+
+<ParamField path="-a" type="flag">
+  With `-N`, list the command for keys that do not have a note rather than skipping them.
+</ParamField>
+
+<ParamField path="-N" type="flag">
+  List only keys with attached notes. Shows only the key and note for each key. Only keys in the `root` and `prefix` tables are listed by default.
+</ParamField>
+
+<ParamField path="-P" type="string">
+  Specify a prefix to print before each key.
+</ParamField>
+
+<ParamField path="-T" type="string">
+  List only keys in the specified key table.
+</ParamField>
+
+<ParamField path="key" type="string">
+  List bindings for the specified key only.
+</ParamField>
+
+### Examples
+
+```bash
+# List all key bindings
+list-keys
+
+# List bindings in the prefix table only
+list-keys -T prefix
+
+# List keys with notes
+list-keys -N
+
+# List bindings for the c key
+list-keys c
+
+# List first matching key for x
+list-keys -1 x
+
+# List keys in copy-mode-vi table
+list-keys -T copy-mode-vi
+```
+
+## send-keys
+
+Alias: `send`
+
+```bash
+send-keys [-FHKlMRX] [-c target-client] [-N repeat-count] [-t target-pane] [key ...]
+```
+
+Send a key or keys to a window or client.
+
+<ParamField path="-F" type="flag">
+  Expand formats in arguments.
+</ParamField>
+
+<ParamField path="-H" type="flag">
+  Expect each key to be a hexadecimal number for an ASCII character.
+</ParamField>
+
+<ParamField path="-K" type="flag">
+  Send keys to the target client instead of the target pane, so they are looked up in the client's key table.
+</ParamField>
+
+<ParamField path="-l" type="flag">
+  Disable key name lookup and process the keys as literal UTF-8 characters.
+</ParamField>
+
+<ParamField path="-M" type="flag">
+  Pass through a mouse event (only valid if bound to a mouse key binding).
+</ParamField>
+
+<ParamField path="-R" type="flag">
+  Reset the terminal state.
+</ParamField>
+
+<ParamField path="-X" type="flag">
+  Send keys to copy mode. The keys are interpreted as copy mode commands.
+</ParamField>
+
+<ParamField path="-c" type="string">
+  The target client to send keys to (with `-K`).
+</ParamField>
+
+<ParamField path="-N" type="number">
+  Repeat count for the key.
+</ParamField>
+
+<ParamField path="-t" type="string">
+  The target pane to send keys to.
+</ParamField>
+
+<ParamField path="key" type="string">
+  Key name (e.g., `C-a`, `NPage`) or literal string. If no keys are given and the command is bound to a key, that key is used.
+</ParamField>
+
+### Examples
+
+```bash
+# Send Ctrl-c to the current pane
+send-keys C-c
+
+# Type a literal string
+send-keys -l "Hello, World!"
+
+# Send Enter key
+send-keys Enter
+
+# Send keys to a specific pane
+send-keys -t 1 "ls -la" Enter
+
+# Send copy mode command
+send-keys -X begin-selection
+
+# Send multiple keys
+send-keys C-a C-k
+```
+
+## Repeating Keys
+
+Keys bound with the `-r` flag may repeat. After the first press, if the same key is pressed again within the `repeat-time` interval (default 500ms), the command is executed again without requiring the prefix key.
+
+### Related Options
+
+<ParamField path="initial-repeat-time" type="number">
+  Time in milliseconds for which the prefix indicator is shown after the prefix key is pressed (default 500).
+</ParamField>
+
+<ParamField path="repeat-time" type="number">
+  Time in milliseconds for which a key bound with `-r` may repeat (default 500).
+</ParamField>
+
+### Example
+
+```bash
+# Bind repeating resize commands
+bind-key -r C-Up resize-pane -U 1
+bind-key -r C-Down resize-pane -D 1
+bind-key -r C-Left resize-pane -L 1
+bind-key -r C-Right resize-pane -R 1
+
+# After pressing C-b C-Up, you can press C-Up repeatedly
+# within 500ms without needing to press C-b again
+```
+
+## Key Binding Best Practices
+
+### Avoid Conflicting with Shell Keys
+
+Be careful not to bind commonly used shell keys in the root table, as this will affect normal terminal usage.
+
+### Use Descriptive Notes
+
+Add notes to key bindings to document their purpose:
+
+```bash
+bind-key -N "Split window horizontally" | split-window -h
+bind-key -N "Split window vertically" - split-window -v
+```
+
+### Organize Custom Key Tables
+
+For complex configurations, create custom key tables:
+
+```bash
+# Create a resize mode
+bind-key r switch-client -T resize
+bind-key -T resize h resize-pane -L 5
+bind-key -T resize j resize-pane -D 5
+bind-key -T resize k resize-pane -U 5
+bind-key -T resize l resize-pane -R 5
+bind-key -T resize q switch-client -T prefix
+```

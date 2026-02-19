@@ -1,454 +1,322 @@
 ---
-title: "Installation"
-description: "Install tmux on your platform and configure dependencies"
+title: "Installing tmux"
+description: "Install tmux on Linux, macOS, BSD, or build from source with detailed platform-specific instructions."
 ---
 
 ## Dependencies
 
-Before installing tmux, you need to install its dependencies:
+Before installing tmux, ensure you have the required dependencies:
 
 <CardGroup cols={2}>
   <Card title="libevent 2.x" icon="link">
-    Event notification library for asynchronous I/O
+    Event notification library required for tmux operation.
+    Available at: https://github.com/libevent/libevent/releases/latest
   </Card>
   <Card title="ncurses" icon="terminal">
-    Terminal handling library for text-based user interfaces
+    Terminal control library for managing screen output.
+    Available at: https://invisible-mirror.net/archives/ncurses/
   </Card>
 </CardGroup>
 
-Additional build requirements:
-- C compiler (gcc or clang)
-- make
-- pkg-config
-- yacc or bison
+<Info>
+  To build tmux from source, you'll also need: a C compiler (gcc or clang), make, pkg-config, and yacc (or bison).
+</Info>
 
-<Note>
-For building from source, you'll also need autoconf, automake, and pkg-config.
-</Note>
+## Package Manager Installation
 
-## Installation by Platform
+The easiest way to install tmux is through your system's package manager.
 
-<Tabs>
-  <Tab title="Linux">
-    ### Debian/Ubuntu
+<CodeGroup>
 
-    ```bash
-    sudo apt update
-    sudo apt install tmux
-    ```
+```bash Ubuntu/Debian
+sudo apt update
+sudo apt install tmux
+```
 
-    ### Fedora/RHEL/CentOS
+```bash Fedora/RHEL/CentOS
+sudo dnf install tmux
 
-    ```bash
-    sudo dnf install tmux
-    ```
+# On older systems use yum:
+sudo yum install tmux
+```
 
-    Or on older systems:
+```bash Arch Linux
+sudo pacman -S tmux
+```
 
-    ```bash
-    sudo yum install tmux
-    ```
+```bash macOS (Homebrew)
+brew install tmux
+```
 
-    ### Arch Linux
+```bash macOS (MacPorts)
+sudo port install tmux
+```
 
-    ```bash
-    sudo pacman -S tmux
-    ```
+```bash FreeBSD
+pkg install tmux
+```
 
-    ### Alpine Linux
+```bash OpenBSD
+pkg_add tmux
+```
 
-    ```bash
-    apk add tmux
-    ```
+```bash NetBSD
+pkgin install tmux
+```
 
-    ### From Source on Linux
+```bash Solaris
+pkg install terminal/tmux
+```
 
-    First, install dependencies:
+</CodeGroup>
 
-    ```bash
-    # Debian/Ubuntu
-    sudo apt install libevent-dev ncurses-dev build-essential bison pkg-config
+<Tip>
+  After installation, verify tmux is installed correctly by running `tmux -V` to check the version.
+</Tip>
 
-    # Fedora/RHEL
-    sudo dnf install libevent-devel ncurses-devel gcc make bison
+## Building from Source (Release)
 
-    # Arch
-    sudo pacman -S libevent ncurses base-devel
-    ```
+To build and install tmux from a release tarball:
 
-    Then build tmux:
-
-    ```bash
-    git clone https://github.com/tmux/tmux.git
-    cd tmux
-    sh autogen.sh
-    ./configure && make
-    sudo make install
-    ```
-  </Tab>
-
-  <Tab title="macOS">
-    ### Homebrew (Recommended)
-
-    ```bash
-    brew install tmux
-    ```
-
-    ### MacPorts
-
-    ```bash
-    sudo port install tmux
-    ```
-
-    ### From Source on macOS
-
-    First, install dependencies:
-
-    ```bash
-    brew install libevent ncurses
-    ```
-
-    Then build tmux:
-
-    ```bash
-    git clone https://github.com/tmux/tmux.git
-    cd tmux
-    sh autogen.sh
-    ./configure && make
-    sudo make install
-    ```
-
-    <Warning>
-    On macOS, it's highly recommended to build with utf8proc support for proper Unicode handling, especially for emoji and wide characters. Use `./configure --enable-utf8proc` or install via Homebrew which includes this by default.
-    </Warning>
-  </Tab>
-
-  <Tab title="BSD">
-    ### OpenBSD
-
-    tmux is included in the base system. To install the latest version:
-
-    ```bash
-    pkg_add tmux
-    ```
-
-    ### FreeBSD
-
-    ```bash
-    pkg install tmux
-    ```
-
-    Or from ports:
-
-    ```bash
-    cd /usr/ports/sysutils/tmux
-    make install clean
-    ```
-
-    ### NetBSD
-
-    ```bash
-    pkgin install tmux
-    ```
-
-    Or from pkgsrc:
-
-    ```bash
-    cd /usr/pkgsrc/misc/tmux
-    make install
-    ```
-  </Tab>
-
-  <Tab title="Other">
-    ### Solaris
-
-    ```bash
-    pkg install terminal/tmux
-    ```
-
-    ### Cygwin (Windows)
-
-    Install via the Cygwin setup program. Search for "tmux" in the package list.
-
-    ### Haiku
-
-    ```bash
-    pkgman install tmux
-    ```
-
-    ### From Release Tarball
-
-    Download the latest release from [GitHub Releases](https://github.com/tmux/tmux/releases):
-
+<Steps>
+  <Step title="Download the release">
+    Download the latest release tarball from the official repository:
     ```bash
     wget https://github.com/tmux/tmux/releases/download/VERSION/tmux-VERSION.tar.gz
     tar -xzf tmux-VERSION.tar.gz
     cd tmux-VERSION
+    ```
+    Replace `VERSION` with the desired version number.
+  </Step>
+
+  <Step title="Configure and build">
+    Run the configure script and build tmux:
+    ```bash
     ./configure && make
-    sudo make install
     ```
-  </Tab>
-</Tabs>
-
-## Building from Source
-
-<Steps>
-  <Step title="Clone the Repository">
-    ```bash
-    git clone https://github.com/tmux/tmux.git
-    cd tmux
-    ```
+    
+    The configure script will check for required dependencies and configure the build for your system.
   </Step>
 
-  <Step title="Generate Build Files">
+  <Step title="Install">
+    Install tmux system-wide (requires root privileges):
     ```bash
-    sh autogen.sh
-    ```
-
-    This requires autoconf, automake, and pkg-config.
-  </Step>
-
-  <Step title="Configure Build Options">
-    ```bash
-    ./configure
-    ```
-
-    Common configuration options:
-    - `--enable-utf8proc` - Better Unicode support (recommended for macOS)
-    - `--enable-sixel` - Enable SIXEL graphics support
-    - `--enable-systemd` - Enable systemd integration on Linux
-    - `--enable-utempter` - Update utmp(5) using utempter library
-    - `--prefix=/usr/local` - Installation prefix (default)
-
-    Example with options:
-
-    ```bash
-    ./configure --enable-utf8proc --enable-sixel
-    ```
-  </Step>
-
-  <Step title="Compile and Install">
-    ```bash
-    make
     sudo make install
     ```
   </Step>
 </Steps>
 
-## Optional Features
+<Accordion title="Optional: Enable utempter support">
+  tmux can use the utempter library to update utmp(5), if it is installed. This allows tmux to properly register terminal sessions.
+  
+  To enable this feature, run configure with the `--enable-utempter` flag:
+  ```bash
+  ./configure --enable-utempter && make
+  sudo make install
+  ```
+</Accordion>
 
-### UTF-8 Support (utf8proc)
+## Building from Git (Development)
 
-For improved Unicode character width detection, especially important on macOS:
+To get and build the latest development version from version control:
 
-```bash
-# Install utf8proc
-# macOS
-brew install utf8proc
+<Warning>
+  Building from Git requires additional tools: autoconf, automake, and pkg-config. The development version may contain unstable features.
+</Warning>
 
-# Debian/Ubuntu
-sudo apt install libutf8proc-dev
+<Steps>
+  <Step title="Clone the repository">
+    ```bash
+    git clone https://github.com/tmux/tmux.git
+    cd tmux
+    ```
+  </Step>
 
-# Then build tmux with:
-./configure --enable-utf8proc
-make
-sudo make install
-```
+  <Step title="Generate configure script">
+    Run the autogen script to generate the configure script:
+    ```bash
+    sh autogen.sh
+    ```
+  </Step>
 
-### SIXEL Graphics Support
+  <Step title="Configure and build">
+    ```bash
+    ./configure && make
+    ```
+  </Step>
 
-To display inline images in tmux:
+  <Step title="Install">
+    ```bash
+    sudo make install
+    ```
+  </Step>
+</Steps>
 
-```bash
-./configure --enable-sixel
-make
-sudo make install
-```
+## Platform-Specific Notes
 
-<Note>
-Your terminal emulator must also support SIXEL graphics for this to work.
-</Note>
+<AccordionGroup>
+  <Accordion title="Linux">
+    On most Linux distributions, both libevent and ncurses are available through the package manager:
+    
+    **Ubuntu/Debian:**
+    ```bash
+    sudo apt install libevent-dev libncurses-dev
+    ```
+    
+    **Fedora/RHEL:**
+    ```bash
+    sudo dnf install libevent-devel ncurses-devel
+    ```
+  </Accordion>
 
-### systemd Integration
+  <Accordion title="macOS">
+    On macOS, use Homebrew or MacPorts to install dependencies:
+    
+    **Homebrew:**
+    ```bash
+    brew install libevent ncurses
+    ```
+    
+    **MacPorts:**
+    ```bash
+    sudo port install libevent ncurses
+    ```
+    
+    Xcode Command Line Tools provide the C compiler and other build tools:
+    ```bash
+    xcode-select --install
+    ```
+  </Accordion>
 
-On Linux systems with systemd, enable socket activation:
+  <Accordion title="BSD Systems">
+    On FreeBSD, OpenBSD, and NetBSD, tmux is available in the base system or ports:
+    
+    **FreeBSD:**
+    ```bash
+    # Binary package
+    pkg install tmux
+    
+    # Or from ports
+    cd /usr/ports/sysutils/tmux && make install clean
+    ```
+    
+    **OpenBSD:**
+    tmux is included in the base system on recent OpenBSD versions.
+  </Accordion>
 
-```bash
-./configure --enable-systemd
-make
-sudo make install
-```
+  <Accordion title="Solaris">
+    On Solaris 11 and later:
+    ```bash
+    pkg install terminal/tmux
+    ```
+    
+    For older versions, you may need to build from source after installing dependencies.
+  </Accordion>
+</AccordionGroup>
 
-### utempter Support
+## Verify Installation
 
-To properly update utmp(5) entries:
+After installation, verify that tmux is working correctly:
 
-```bash
-# Install utempter
-# Debian/Ubuntu
-sudo apt install libutempter-dev
+<Steps>
+  <Step title="Check version">
+    ```bash
+    tmux -V
+    ```
+    This should display the tmux version number.
+  </Step>
 
-# Fedora/RHEL
-sudo dnf install libutempter-devel
+  <Step title="Start tmux">
+    ```bash
+    tmux
+    ```
+    This should start a new tmux session with a command prompt and a status bar at the bottom.
+  </Step>
 
-# Build tmux with:
-./configure --enable-utempter
-make
-sudo make install
-```
-
-## Verifying Installation
-
-After installation, verify tmux is working:
-
-```bash
-# Check version
-tmux -V
-
-# Start a new session
-tmux
-
-# You should see tmux running with a status bar at the bottom
-```
-
-<Tip>
-The default prefix key is `Ctrl-b`. Press `Ctrl-b` then `?` to see a list of all key bindings.
-</Tip>
-
-## Post-Installation Setup
-
-### Configuration File Location
-
-tmux looks for configuration files in these locations (in order):
-
-1. `/etc/tmux.conf` - System-wide configuration
-2. `~/.tmux.conf` - User configuration (traditional)
-3. `$XDG_CONFIG_HOME/tmux/tmux.conf` - XDG Base Directory specification
-
-<Note>
-On macOS, `/etc/tmux.conf` may be at `/usr/local/etc/tmux.conf` depending on your installation method.
-</Note>
-
-### First-Time Configuration
-
-Create a basic configuration file:
-
-```bash
-# Create config file
-touch ~/.tmux.conf
-
-# Or with XDG
-mkdir -p ~/.config/tmux
-touch ~/.config/tmux/tmux.conf
-```
-
-Add some basic settings:
-
-```bash tmux.conf
-# Enable mouse support
-set -g mouse on
-
-# Increase scrollback buffer
-set -g history-limit 10000
-
-# Start windows and panes at 1, not 0
-set -g base-index 1
-setw -g pane-base-index 1
-
-# Enable 256 colors
-set -g default-terminal "screen-256color"
-```
-
-### Reload Configuration
-
-After editing your config file:
-
-```bash
-# Inside tmux, press Ctrl-b : then type:
-source-file ~/.tmux.conf
-
-# Or from the command line:
-tmux source-file ~/.tmux.conf
-```
+  <Step title="Exit tmux">
+    Type `exit` or press `Ctrl-d` to close the pane and exit tmux.
+  </Step>
+</Steps>
 
 ## Troubleshooting
 
-<Accordion title="tmux: command not found">
-Make sure tmux is installed and in your PATH. Check with:
+<AccordionGroup>
+  <Accordion title="configure: error: libevent not found">
+    Install libevent development files:
+    
+    **Ubuntu/Debian:**
+    ```bash
+    sudo apt install libevent-dev
+    ```
+    
+    **Fedora/RHEL:**
+    ```bash
+    sudo dnf install libevent-devel
+    ```
+    
+    **macOS:**
+    ```bash
+    brew install libevent
+    ```
+  </Accordion>
 
-```bash
-which tmux
-echo $PATH
-```
+  <Accordion title="configure: error: curses not found">
+    Install ncurses development files:
+    
+    **Ubuntu/Debian:**
+    ```bash
+    sudo apt install libncurses-dev
+    ```
+    
+    **Fedora/RHEL:**
+    ```bash
+    sudo dnf install ncurses-devel
+    ```
+    
+    **macOS:**
+    ```bash
+    brew install ncurses
+    ```
+  </Accordion>
 
-If installed from source, ensure `/usr/local/bin` is in your PATH.
-</Accordion>
+  <Accordion title="yacc: command not found">
+    Install bison or yacc:
+    
+    **Ubuntu/Debian:**
+    ```bash
+    sudo apt install bison
+    ```
+    
+    **Fedora/RHEL:**
+    ```bash
+    sudo dnf install bison
+    ```
+    
+    **macOS:**
+    ```bash
+    brew install bison
+    ```
+  </Accordion>
 
-<Accordion title="Terminal colors look wrong">
-Set the `TERM` environment variable and tmux's `default-terminal`:
-
-```bash
-# In ~/.bashrc or ~/.zshrc
-export TERM=xterm-256color
-
-# In ~/.tmux.conf
-set -g default-terminal "screen-256color"
-```
-
-For true color (RGB) support:
-
-```bash tmux.conf
-set-option -sa terminal-features ",xterm*:RGB"
-```
-</Accordion>
-
-<Accordion title="Unicode characters display incorrectly">
-On macOS especially, build with utf8proc support:
-
-```bash
-./configure --enable-utf8proc
-make
-sudo make install
-```
-
-Also ensure your locale is set correctly:
-
-```bash
-echo $LANG
-# Should show something like: en_US.UTF-8
-```
-</Accordion>
-
-<Accordion title="Permission denied on socket">
-Check socket directory permissions:
-
-```bash
-ls -ld /tmp/tmux-$(id -u)
-
-# Should be drwx------ (700) and owned by you
-```
-
-If missing or incorrect, remove and restart tmux:
-
-```bash
-rm -rf /tmp/tmux-$(id -u)
-tmux
-```
-</Accordion>
+  <Accordion title="Permission denied when installing">
+    Ensure you're using sudo for the install step:
+    ```bash
+    sudo make install
+    ```
+    
+    Or install to a user directory:
+    ```bash
+    ./configure --prefix=$HOME/.local
+    make
+    make install
+    ```
+    
+    Then add `$HOME/.local/bin` to your PATH.
+  </Accordion>
+</AccordionGroup>
 
 ## Next Steps
 
-<CardGroup cols={2}>
-  <Card title="Quickstart" icon="rocket" href="/quickstart">
-    Learn the basics in 5 minutes
-  </Card>
-  <Card title="Configuration" icon="gear" href="/guides/configuration">
-    Customize tmux to your needs
-  </Card>
-  <Card title="Key Bindings" icon="keyboard" href="/guides/key-bindings">
-    Master keyboard shortcuts
-  </Card>
-  <Card title="Concepts" icon="book" href="/concepts/sessions">
-    Understand sessions, windows, and panes
-  </Card>
-</CardGroup>
+<Card title="Quick Start Guide" icon="rocket" href="/quickstart">
+  Now that tmux is installed, learn how to use it with our quick start guide.
+</Card>

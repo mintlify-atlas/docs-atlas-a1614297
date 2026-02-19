@@ -1,0 +1,548 @@
+---
+title: 'Window Layouts'
+description: 'Understanding and customizing tmux window layout algorithms'
+---
+
+## Overview
+
+tmux uses a tree-based layout system to arrange panes within windows. Each layout consists of cells that can be either container nodes (holding other cells) or leaf nodes (containing window panes).
+
+## Layout Architecture
+
+From `layout.c:26-34`:
+
+> The window layout is a tree of cells each of which can be one of: a left-right container for a list of cells, a top-bottom container for a list of cells, or a container for a window pane.
+>
+> Each window has a pointer to the root of its layout tree (containing its panes), every pane has a pointer back to the cell containing it, and each cell a pointer to its parent cell.
+
+### Cell Structure
+
+Each layout cell contains:
+
+- **Type**: `LAYOUT_WINDOWPANE`, `LAYOUT_LEFTRIGHT`, or `LAYOUT_TOPBOTTOM`
+- **Geometry**: Position (`xoff`, `yoff`) and size (`sx`, `sy`)
+- **Parent pointer**: Link to containing cell
+- **Children list**: For container cells (left-right or top-bottom)
+- **Window pane reference**: For leaf cells
+
+### Layout Types
+
+<Tabs>
+<Tab title="LAYOUT_WINDOWPANE">
+A leaf cell containing a single pane.
+
+```c
+// From layout.c:177-185
+void layout_make_leaf(struct layout_cell *lc, struct window_pane *wp) {
+    lc->type = LAYOUT_WINDOWPANE;
+    TAILQ_INIT(&lc->cells);
+    wp->layout_cell = lc;
+    lc->wp = wp;
+}
+```
+</Tab>
+
+<Tab title="LAYOUT_LEFTRIGHT">
+A container cell with horizontally arranged children.
+
+Children are placed side-by-side, separated by single-column borders.
+</Tab>
+
+<Tab title="LAYOUT_TOPBOTTOM">
+A container cell with vertically arranged children.
+
+Children are stacked vertically, separated by single-row borders.
+</Tab>
+</Tabs>
+
+## Predefined Layouts
+
+tmux includes seven built-in layout algorithms (from `layout-set.c:39-50`):
+
+<CardGroup cols={2}>
+<Card title="even-horizontal" icon="grip-lines">
+Distributes panes evenly in a single row.
+
+```bash
+tmux select-layout even-horizontal
+```
+
+All panes have equal width. Implemented in `layout_set_even_h()` at `layout-set.c:181-184`.
+</Card>
+
+<Card title="even-vertical" icon="grip-lines-vertical">
+Distributes panes evenly in a single column.
+
+```bash
+tmux select-layout even-vertical
+```
+
+All panes have equal height. Implemented in `layout_set_even_v()` at `layout-set.c:187-190`.
+</Card>
+
+<Card title="main-horizontal" icon="rectangle-wide">
+One large pane on top, others in a row below.
+
+```bash
+tmux select-layout main-horizontal
+```
+
+From `layout-set.c:193-288`. Controlled by:
+- `main-pane-height`: Height of main pane (default 24 lines)
+- `other-pane-height`: Height of other panes
+</Card>
+
+<Card title="main-vertical" icon="rectangle-vertical">
+One large pane on the left, others in a column on the right.
+
+```bash
+tmux select-layout main-vertical  
+```
+
+From `layout-set.c:389-484`. Controlled by:
+- `main-pane-width`: Width of main pane (default 80 columns)
+- `other-pane-width`: Width of other panes
+</Card>
+
+<Card title="main-horizontal-mirrored" icon="rectangle-wide">
+Like main-horizontal, but main pane is on bottom.
+
+```bash
+tmux select-layout main-horizontal-mirrored
+```
+
+Implemented at `layout-set.c:291-386`.
+</Card>
+
+<Card title="main-vertical-mirrored" icon="rectangle-vertical">
+Like main-vertical, but main pane is on right.
+
+```bash
+tmux select-layout main-vertical-mirrored
+```
+
+Implemented at `layout-set.c:487-582`.
+</Card>
+
+<Card title="tiled" icon="grid">
+Arranges panes in a grid pattern.
+
+```bash
+tmux select-layout tiled
+```
+
+From `layout-set.c:585-696`. Dynamically calculates optimal rows and columns.
+
+Controlled by `tiled-layout-max-columns` option (default 0 = unlimited).
+</Card>
+</CardGroup>
+
+## Layout Commands
+
+### Cycle Through Layouts
+
+```bash
+# Next layout
+tmux next-layout
+# Shortcut: Prefix + Space
+
+# Previous layout  
+tmux previous-layout
+# Shortcut: Prefix + M-o (default not bound)
+```
+
+From `layout-set.c:87-124`, tmux cycles through all predefined layouts.
+
+### Select Specific Layout
+
+```bash
+# By name
+tmux select-layout even-vertical
+
+# By number (0-6)
+tmux select-layout -n 2
+```
+
+### Spread Panes Evenly
+
+```bash
+# Equalize pane sizes within current layout
+tmux select-layout -E
+```
+
+Implemented in `layout_spread_cell()` at `layout.c:1100-1159`:
+
+```c
+// Calculate equal size for each pane
+each = (size - (number - 1)) / number;
+
+// Distribute remainder among panes
+remainder = size - (number * (each + 1)) + 1;
+```
+
+## Custom Layouts
+
+### Layout String Format
+
+From `layout-custom.c:59-116`, layouts can be saved and restored using a compact string representation:
+
+```
+CHECKSUM,LAYOUT_TREE
+```
+
+Example layout string:
+```
+2e3a,80x24,0,0{40x24,0,0,0,39x24,41,0,1}
+```
+
+Breakdown:
+- `2e3a` - Checksum (4 hex digits)
+- `80x24,0,0` - Root cell: 80 cols x 24 rows at position 0,0
+- `{...}` - Left-right split
+- `40x24,0,0,0` - Left pane: 40x24 at 0,0, pane ID 0
+- `39x24,41,0,1` - Right pane: 39x24 at x=41, y=0, pane ID 1
+
+### Parse Custom Layout
+
+From `layout-custom.c:283-370`, the parser constructs a layout tree:
+
+<Steps>
+<Step title="Parse Dimensions">
+```c
+// From layout-custom.c:292-293
+sscanf(*layout, "%ux%u,%u,%u", &sx, &sy, &xoff, &yoff)
+```
+
+Reads size and position of each cell.
+</Step>
+
+<Step title="Identify Container Type">
+```c
+// From layout-custom.c:327-341
+switch (**layout) {
+case ',':
+case '}':
+case ']':
+case '\0':
+    return (lc);        // Leaf cell
+case '{':
+    lc->type = LAYOUT_LEFTRIGHT;
+    break;
+case '[':
+    lc->type = LAYOUT_TOPBOTTOM;
+    break;
+}
+```
+</Step>
+
+<Step title="Recursively Parse Children">
+Container cells are parsed recursively until all child cells are constructed.
+</Step>
+</Steps>
+
+### Save and Restore Layouts
+
+```bash
+# Save current layout to variable
+tmux set -w @layout "$(tmux display -p '#{window_layout}')"
+
+# Restore layout
+tmux select-layout "$(tmux show -wv @layout)"
+```
+
+### Layout Scripts
+
+Create a complex layout programmatically:
+
+```bash ~/bin/dev-layout.sh
+#!/bin/sh
+# Create development layout
+
+tmux split-window -h -p 30  # 30% right split for logs
+tmux split-window -v -p 25  # Bottom right for tests  
+tmux select-pane -t 0       # Return to main pane
+tmux split-window -v -p 20  # Bottom left for commands
+
+# Save this layout
+tmux set -w @dev-layout "$(tmux display -p '#{window_layout}')"
+```
+
+## Layout Algorithms
+
+### Resize Algorithm
+
+From `layout.c:417-463`, resizing adjusts cells evenly:
+
+```c
+void layout_resize_adjust(struct window *w, struct layout_cell *lc,
+    enum layout_type type, int change) {
+    // Adjust the cell size
+    if (type == LAYOUT_LEFTRIGHT)
+        lc->sx += change;
+    else
+        lc->sy += change;
+        
+    // If this is a leaf cell, done
+    if (type == LAYOUT_WINDOWPANE)
+        return;
+        
+    // Child cell runs in different direction - resize all children
+    if (lc->type != type) {
+        TAILQ_FOREACH(lcchild, &lc->cells, entry)
+            layout_resize_adjust(w, lcchild, type, change);
+        return;
+    }
+    
+    // Child cell runs same direction - adjust each child equally
+    while (change != 0) {
+        TAILQ_FOREACH(lcchild, &lc->cells, entry) {
+            if (change == 0)
+                break;
+            if (change > 0) {
+                layout_resize_adjust(w, lcchild, type, 1);
+                change--;
+            } else if (layout_resize_check(w, lcchild, type) > 0) {
+                layout_resize_adjust(w, lcchild, type, -1);
+                change++;
+            }
+        }
+    }
+}
+```
+
+### Minimum Size Checking
+
+From `layout.c:365-415`, tmux ensures panes never shrink below minimum:
+
+- `PANE_MINIMUM`: Minimum pane size (typically 1 cell)
+- Additional space for pane borders
+- Space for pane status lines (if enabled)
+- Space for scrollbars (if enabled)
+
+### Split Algorithm
+
+From `layout.c:907-1080`, splitting a pane:
+
+<Steps>
+<Step title="Check Space">
+Verify there's enough room for two panes plus border:
+
+```c
+// From layout.c:937-956
+switch (type) {
+case LAYOUT_LEFTRIGHT:
+    if (scrollbars)
+        minimum = PANE_MINIMUM * 2 + sb_style->width + sb_style->pad;
+    else
+        minimum = PANE_MINIMUM * 2 + 1;
+    if (sx < minimum)
+        return (NULL);
+    break;
+case LAYOUT_TOPBOTTOM:
+    if (layout_add_horizontal_border(wp->window, lc, status))
+        minimum = PANE_MINIMUM * 2 + 2;
+    else
+        minimum = PANE_MINIMUM * 2 + 1;
+    if (sy < minimum)
+        return (NULL);
+    break;
+}
+```
+</Step>
+
+<Step title="Calculate Sizes">
+Determine size of each resulting pane:
+
+```c
+// From layout.c:966-977  
+if (size < 0)
+    size2 = ((saved_size + 1) / 2) - 1;  // Middle split
+else if (flags & SPAWN_BEFORE)
+    size2 = saved_size - size - 1;        // Size is for top/left
+else
+    size2 = size;                          // Size is for bottom/right
+```
+</Step>
+
+<Step title="Create Cell Structure">
+Insert new cell into layout tree:
+
+- If parent exists and is same type: insert as sibling
+- Otherwise: create new parent container
+</Step>
+
+<Step title="Update Layout">
+Recalculate offsets and pane sizes:
+
+```c
+layout_fix_offsets(w);
+layout_fix_panes(w, NULL);
+```
+</Step>
+</Steps>
+
+## Layout Options
+
+### Main Pane Dimensions
+
+```bash
+# Set main pane height (for main-horizontal layouts)
+set -g main-pane-height 30
+
+# Set main pane width (for main-vertical layouts)  
+set -g main-pane-width 100
+
+# Set other pane dimensions
+set -g other-pane-height 10
+set -g other-pane-width 50
+```
+
+From `layout-set.c:213-237`, these accept percentages:
+
+```bash
+# 60% of window height for main pane
+set -g main-pane-height 60%
+```
+
+### Tiled Layout Configuration
+
+```bash
+# Maximum columns in tiled layout (0 = unlimited)
+set -g tiled-layout-max-columns 4
+```
+
+From `layout-set.c:601-610`, this controls the grid dimensions:
+
+```c
+// Get maximum columns from window option
+max_columns = options_get_number(oo, "tiled-layout-max-columns");
+
+// Calculate rows and columns
+rows = columns = 1;
+while (rows * columns < n) {
+    rows++;
+    if (rows * columns < n &&
+        (max_columns == 0 || columns < max_columns))
+        columns++;
+}
+```
+
+## Advanced Techniques
+
+### Preserve Layouts Across Sessions
+
+```bash ~/.tmux.conf
+# Save layout on window close
+set-hook -g window-layout-changed 'run "tmux display -p \"#{window_layout}\" > ~/.tmux-layout"'
+
+# Restore layout
+bind R source-file ~/.tmux-layout \; select-layout
+```
+
+### Dynamic Layout Adjustment
+
+```bash
+# Increase main pane size by 5 cells
+tmux resize-pane -t 0 -x +5
+
+# Set pane to absolute size
+tmux resize-pane -t 0 -x 80 -y 24
+
+# Maximize pane temporarily
+tmux resize-pane -Z
+```
+
+From `layout.c:586-616`, resize to absolute size:
+
+```c
+void layout_resize_pane_to(struct window_pane *wp, enum layout_type type,
+    u_int new_size) {
+    // Find next parent of the same type
+    lcparent = lc->parent;
+    while (lcparent != NULL && lcparent->type != type) {
+        lc = lcparent;
+        lcparent = lc->parent;
+    }
+    
+    // Work out the size adjustment
+    if (type == LAYOUT_LEFTRIGHT)
+        size = lc->sx;
+    else
+        size = lc->sy;
+        
+    if (lc == TAILQ_LAST(&lcparent->cells, layout_cells))
+        change = size - new_size;
+    else
+        change = new_size - size;
+        
+    // Resize the pane
+    layout_resize_pane(wp, type, change, 1);
+}
+```
+
+### Layout Rotation
+
+```bash
+# Rotate panes forward
+tmux rotate-window
+
+# Rotate panes backward
+tmux rotate-window -D
+```
+
+This maintains the layout structure but shifts which pane occupies each position.
+
+## Troubleshooting
+
+<Warning>
+Common layout issues:
+</Warning>
+
+<AccordionGroup>
+<Accordion title="Panes won't resize below minimum" icon="triangle-exclamation">
+Tmux enforces `PANE_MINIMUM` (usually 1x1). Check:
+
+```bash
+# Current pane size
+tmux display '#{pane_width}x#{pane_height}'
+
+# Available space
+tmux display '#{window_width}x#{window_height}'
+```
+</Accordion>
+
+<Accordion title="Layout string invalid" icon="triangle-exclamation">
+From `layout-custom.c:165-173`, checksums must match:
+
+```c
+if (sscanf(layout, "%hx,", &csum) != 1) {
+    *cause = xstrdup("invalid layout");
+    return (-1);
+}
+layout += 5;
+if (csum != layout_checksum(layout)) {
+    *cause = xstrdup("invalid layout");  
+    return (-1);
+}
+```
+
+Regenerate the checksum if manually editing.
+</Accordion>
+
+<Accordion title="Pane borders not aligning" icon="triangle-exclamation">
+From `layout.c:229-239`, offsets are recalculated:
+
+```bash
+# Force layout recalculation
+tmux refresh-client
+```
+</Accordion>
+</AccordionGroup>
+
+## Related Commands
+
+- [`split-window`](/commands/split-window) - Create new pane
+- [`resize-pane`](/commands/resize-pane) - Adjust pane size
+- [`swap-pane`](/commands/swap-pane) - Exchange pane positions
+- [`break-pane`](/commands/break-pane) - Convert pane to window
+- [`join-pane`](/commands/join-pane) - Merge window into pane

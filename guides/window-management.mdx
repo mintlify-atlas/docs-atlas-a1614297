@@ -1,0 +1,552 @@
+---
+title: 'Window Management'
+description: 'Creating, switching, moving, and renaming windows in tmux'
+---
+
+## Understanding Windows
+
+In tmux, a **window** is a single screen within a session. Each window occupies the entire terminal and can contain one or more panes. Windows are the primary organizational unit for grouping related tasks.
+
+<Note>
+Think of windows like tabs in a web browser - they're separate workspaces within the same session.
+</Note>
+
+## Creating Windows
+
+### Basic Window Creation
+
+The simplest way to create a window is with the `c` key:
+
+```bash
+C-b c  # Create a new window
+```
+
+From the command line:
+
+```bash
+tmux new-window
+tmux neww  # Short form
+```
+
+### Creating Named Windows
+
+Giving windows descriptive names makes navigation easier:
+
+<Tabs>
+  <Tab title="Key Binding">
+    After creating a window with `C-b c`, rename it with `C-b ,`
+  </Tab>
+  <Tab title="Command Line">
+    ```bash
+    tmux new-window -n editor
+    tmux neww -n logs
+    ```
+  </Tab>
+  <Tab title="Command Prompt">
+    Press `C-b :` then:
+    ```bash
+    :new-window -n database
+    ```
+  </Tab>
+</Tabs>
+
+### Creating Windows with Commands
+
+Start a window running a specific command:
+
+```bash
+# Create window running vim
+tmux new-window vim ~/.tmux.conf
+
+# Create window running htop
+tmux new-window -n monitor htop
+
+# Multiple arguments
+tmux new-window -n serve python -m http.server 8000
+```
+
+<Tip>
+When the command exits, the window closes by default. Use the `remain-on-exit` option to change this behavior.
+</Tip>
+
+### Window Creation Options
+
+```bash
+# Create window at specific index
+tmux new-window -t 5 -n config
+
+# Create window before current (-b) or after (-a)
+tmux new-window -a -n next
+tmux new-window -b -n previous
+
+# Create window without making it current
+tmux new-window -d -n background
+
+# Start in specific directory
+tmux new-window -c /var/log -n logs
+
+# Set environment variable
+tmux new-window -e EDITOR=vim
+
+# Print info about new window
+tmux new-window -P -F "#{session_name}:#{window_index}"
+```
+
+## Window Selection and Navigation
+
+### Quick Selection
+
+The fastest way to switch windows:
+
+| Keys | Action |
+|------|--------|
+| `C-b 0` to `C-b 9` | Select window 0-9 |
+| `C-b n` | Next window |
+| `C-b p` | Previous window |
+| `C-b l` | Last (previously selected) window |
+
+### Interactive Selection
+
+<Steps>
+
+### Choose Window (C-b w)
+
+Press `C-b w` to open an interactive tree view of all sessions and windows.
+
+Navigate with:
+- **Up/Down** - Select window
+- **Enter** - Switch to selected window
+- **q** - Exit without switching
+
+### Prompt for Index (C-b ')
+
+Press `C-b '` to type a window number directly:
+
+```
+(goto-window) 3
+```
+
+### Search Windows (C-b f)
+
+Press `C-b f` to search for text across all windows:
+
+```
+(find-window) database
+```
+
+</Steps>
+
+### Programmatic Selection
+
+```bash
+# Select by index
+tmux select-window -t 2
+tmux selectw -t :3
+
+# Select by name
+tmux select-window -t editor
+
+# Navigate relatively
+tmux select-window -t :+1   # Next window
+tmux select-window -t :-2   # Two windows back
+
+# Special targets
+tmux select-window -t :{start}  # First window
+tmux select-window -t :{end}    # Last window
+tmux select-window -t :{last}   # Previously selected
+```
+
+## Window Naming
+
+### Manual Naming
+
+Rename the current window:
+
+```bash
+C-b ,  # Prompts for new name
+```
+
+Or from the command line:
+
+```bash
+tmux rename-window newname
+tmux renamew -t 2 logs
+```
+
+### Automatic Naming
+
+By default, tmux automatically renames windows based on the active command. Control this with options:
+
+```bash
+# Disable automatic renaming
+set-option -w automatic-rename off
+
+# Allow programs to rename windows via escape sequences
+set-option -w allow-rename on
+
+# Customize the automatic name format
+set-option -w automatic-rename-format '#{b:pane_current_path}'
+```
+
+### Setting Names via Escape Sequences
+
+Programs can set the window name:
+
+```bash
+# From your shell
+printf '\033kMyWindowName\033\\'
+
+# In a script
+echo -ne "\033k${WINDOW_NAME}\033\\"
+```
+
+## Moving and Reordering Windows
+
+### Moving Windows Between Indexes
+
+<Tabs>
+  <Tab title="Interactive">
+    Press `C-b .` then type the destination index:
+    ```
+    (move-window) 5
+    ```
+  </Tab>
+  <Tab title="Command">
+    ```bash
+    # Move current window to index 5
+    tmux move-window -t 5
+    
+    # Move window 3 to index 7
+    tmux move-window -s 3 -t 7
+    
+    # Insert before (-b) or after (-a) target
+    tmux move-window -a -t 3
+    tmux move-window -b -t 3
+    ```
+  </Tab>
+</Tabs>
+
+### Swapping Windows
+
+Exchange two windows:
+
+```bash
+# Swap current window with window 3
+tmux swap-window -t 3
+
+# Swap windows 1 and 5
+tmux swap-window -s 1 -t 5
+
+# Don't make swapped window current
+tmux swap-window -d -t 2
+```
+
+### Renumbering Windows
+
+Renumber all windows sequentially:
+
+```bash
+# Renumber all windows starting from base-index
+tmux move-window -r
+
+# Enable automatic renumbering when a window closes
+set-option -g renumber-windows on
+```
+
+<Note>
+Renumbering respects the `base-index` option. If `base-index` is 1, windows will be numbered 1, 2, 3, etc.
+</Note>
+
+## Linking Windows
+
+Windows can be linked to multiple sessions, allowing them to appear in more than one place.
+
+### Creating Links
+
+```bash
+# Link window from another session
+tmux link-window -s work:1 -t dev:3
+
+# Link to next available index
+tmux link-window -s work:editor
+
+# Kill existing window at target first
+tmux link-window -k -s work:1 -t 2
+```
+
+### Session Groups
+
+Create sessions that share windows:
+
+```bash
+# Create session in same group as existing session
+tmux new-session -t work -s work2
+
+# Windows are shared, but each session maintains its own:
+# - Current window
+# - Previous window  
+# - Session options
+```
+
+### Unlinking Windows
+
+```bash
+# Unlink window from current session
+tmux unlink-window -t 3
+
+# Kill window if it's only linked to one session
+tmux unlink-window -k -t 3
+```
+
+<Warning>
+A window must be linked to at least one session. You cannot unlink a window from its only session unless you use the `-k` flag, which will destroy the window.
+</Warning>
+
+## Killing Windows
+
+### Interactive Kill
+
+```bash
+C-b &  # Kill current window (prompts for confirmation)
+```
+
+### Command Line Kill
+
+```bash
+# Kill current window
+tmux kill-window
+
+# Kill specific window
+tmux kill-window -t 3
+tmux killw -t editor
+
+# Kill all windows except specified
+tmux kill-window -a -t 2  # Kill all but window 2
+```
+
+## Window Information
+
+### Listing Windows
+
+```bash
+# List windows in current session
+tmux list-windows
+tmux lsw
+
+# List windows in specific session
+tmux list-windows -t work
+
+# Custom format
+tmux list-windows -F "#{window_index}: #{window_name}"
+
+# Filter windows
+tmux list-windows -f '#{==:#{window_active},1}'
+
+# Sort windows
+tmux list-windows -O name  # By name
+tmux list-windows -O creation  # By creation time
+```
+
+### Displaying Window Info
+
+```bash
+C-b i  # Display information about current window
+```
+
+### Window Formats
+
+Useful format variables for windows:
+
+```bash
+# Example custom format
+tmux list-windows -F \
+  "Window #{window_index}: #{window_name} [#{window_panes} panes]"
+
+# Available variables include:
+# #{window_id}              - Unique window ID (@1, @2, etc.)
+# #{window_index}           - Window index (0, 1, 2, etc.)
+# #{window_name}            - Window name
+# #{window_active}          - 1 if window is active
+# #{window_activity}        - Time of last activity
+# #{window_bell_flag}       - 1 if bell has occurred
+# #{window_flags}           - Window flags (*, -, #, etc.)
+# #{window_layout}          - Window layout description
+# #{window_panes}           - Number of panes
+# #{window_width}           - Window width
+# #{window_height}          - Window height
+```
+
+## Window Options
+
+Configure window behavior with options:
+
+```bash
+# Set for all windows globally
+set-option -g -w <option> <value>
+
+# Set for current window
+set-option -w <option> <value>
+
+# Set for specific window
+set-option -w -t :3 <option> <value>
+```
+
+### Common Window Options
+
+<Accordion title="Automatic Naming">
+  ```bash
+  # Enable/disable automatic window renaming
+  set-option -w automatic-rename on
+  
+  # Format for automatic name
+  set-option -w automatic-rename-format '#{b:pane_current_path}'
+  
+  # Allow programs to rename windows
+  set-option -w allow-rename on
+  ```
+</Accordion>
+
+<Accordion title="Window Size">
+  ```bash
+  # Window sizing behavior
+  set-option -w window-size latest        # Size to latest client
+  set-option -w window-size largest       # Size to largest client
+  set-option -w window-size smallest      # Size to smallest client
+  set-option -w window-size manual        # Manual sizing
+  
+  # Enable aggressive resize
+  set-option -w aggressive-resize on
+  ```
+</Accordion>
+
+<Accordion title="Activity Monitoring">
+  ```bash
+  # Monitor for activity
+  set-option -w monitor-activity on
+  
+  # Monitor for silence (in seconds)
+  set-option -w monitor-silence 30
+  
+  # Monitor for bell
+  set-option -w monitor-bell on
+  ```
+</Accordion>
+
+<Accordion title="Mode Keys">
+  ```bash
+  # Set vi or emacs key bindings for copy mode
+  set-option -w mode-keys vi
+  set-option -w mode-keys emacs
+  ```
+</Accordion>
+
+## Advanced Window Management
+
+### Find Window Command
+
+Search for windows containing specific text:
+
+```bash
+# Search in names, titles, and visible content
+tmux find-window database
+tmux findw error
+
+# Search only names
+tmux find-window -N mywindow
+
+# Search only titles  
+tmux find-window -T "Error Log"
+
+# Search only visible content
+tmux find-window -C "connection failed"
+
+# Case-insensitive search
+tmux find-window -i DATABASE
+
+# Use regular expression
+tmux find-window -r '^Error:'
+```
+
+### Window Layouts
+
+Quickly arrange panes in preset layouts:
+
+```bash
+C-b Space       # Cycle to next layout
+C-b M-1         # even-horizontal
+C-b M-2         # even-vertical
+C-b M-3         # main-horizontal
+C-b M-4         # main-horizontal-mirrored
+C-b M-5         # main-vertical
+C-b M-6         # main-vertical-mirrored
+C-b M-7         # tiled
+```
+
+Save and restore custom layouts:
+
+```bash
+# Save current layout
+tmux display-message -p '#{window_layout}'
+# Output: bb62,159x48,0,0{79x48,0,0,79x48,80,0}
+
+# Restore saved layout
+tmux select-layout 'bb62,159x48,0,0{79x48,0,0,79x48,80,0}'
+```
+
+### Window Status Customization
+
+Customize how windows appear in the status line:
+
+```bash
+# Format for inactive windows
+set-option -g window-status-format '#I:#W#F'
+
+# Format for active window
+set-option -g window-status-current-format '#I:#W#F'
+
+# Window status style
+set-option -g window-status-style fg=white,bg=default
+set-option -g window-status-current-style fg=black,bg=green,bold
+
+# Activity/bell styles
+set-option -g window-status-activity-style fg=yellow
+set-option -g window-status-bell-style fg=red,bold
+```
+
+## Practical Examples
+
+### Development Workspace Setup
+
+```bash
+#!/bin/bash
+# Create a development environment
+
+tmux new-session -d -s dev -n editor
+tmux send-keys -t dev:editor 'vim' C-m
+
+tmux new-window -t dev -n console
+tmux new-window -t dev -n server
+tmux send-keys -t dev:server 'npm start' C-m
+
+tmux new-window -t dev -n git
+tmux split-window -t dev:git -h
+tmux send-keys -t dev:git.0 'git status' C-m
+tmux send-keys -t dev:git.1 'git log --oneline' C-m
+
+tmux select-window -t dev:editor
+tmux attach -t dev
+```
+
+### Multiple Project Sessions
+
+```bash
+# Switch between project windows easily
+bind-key -n M-1 select-window -t :1
+bind-key -n M-2 select-window -t :2
+bind-key -n M-3 select-window -t :3
+bind-key -n M-4 select-window -t :4
+
+# Move windows with Alt+Shift+Arrow
+bind-key -n M-S-Left swap-window -t -1\; select-window -t -1
+bind-key -n M-S-Right swap-window -t +1\; select-window -t +1
+```

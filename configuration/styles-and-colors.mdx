@@ -1,0 +1,487 @@
+---
+title: "Styles and Colors"
+description: "Configure colors, styles, and visual appearance in tmux"
+---
+
+tmux provides extensive color and styling capabilities for customizing the visual appearance of the status line, panes, borders, and more.
+
+## Color Support
+
+From colour.c:45-88, tmux supports multiple color systems:
+
+### Color Formats
+
+| Format | Example | Description |
+|--------|---------|-------------|
+| **Named** | `red`, `blue`, `green` | Basic 16-color names |
+| **Bright** | `brightred`, `brightblue` | Bright variants (90-97) |
+| **Indexed** | `colour0` through `colour255` | 256-color palette |
+| **RGB** | `#ff0000`, `#abc` | True color RGB values |
+| **Default** | `default` | Terminal default color |
+| **Terminal** | `terminal` | Current terminal color |
+
+### Basic Colors (0-15)
+
+From colour.c:144-181, these are the standard color names:
+
+```bash
+# Basic 8 colors (0-7)
+black, red, green, yellow, blue, magenta, cyan, white
+
+# Bright colors (90-97, or 8-15 in 256 mode)
+brightblack, brightred, brightgreen, brightyellow
+brightblue, brightmagenta, brightcyan, brightwhite
+
+# Special colors
+default      # Terminal default (8)
+terminal     # Current terminal setting (9)
+```
+
+### 256 Color Palette
+
+```bash
+# Use colour0 through colour255
+set -g status-bg colour235
+set -g status-fg colour254
+
+# Or use color (American spelling)
+set -g status-bg color235
+```
+
+The 256-color palette includes:
+- Colors 0-15: Standard terminal colors
+- Colors 16-231: 6×6×6 RGB cube
+- Colors 232-255: Grayscale ramp
+
+### RGB Colors
+
+From colour.c:234-242, RGB colors support hex notation:
+
+```bash
+# Full hex notation
+set -g status-bg "#1a1a1a"
+set -g pane-active-border-style "fg=#ff5500"
+
+# RGB notation
+set -g status-bg "rgb:ff/00/00"
+
+# Decimal notation
+set -g status-bg "255,0,0"
+```
+
+### X11 Color Names
+
+From colour.c:399-1006, tmux supports X11 color names:
+
+```bash
+set -g status-bg "DarkSlateGray"
+set -g status-fg "LightSteelBlue"
+set -g pane-active-border-style "fg=CornflowerBlue"
+```
+
+Examples: `AliceBlue`, `AntiqueWhite`, `DarkOliveGreen`, `MediumPurple`, `PaleVioletRed`
+
+### Grayscale
+
+From colour.c:989-1000, grayscale colors:
+
+```bash
+# Named grays (grey0-grey100 or gray0-gray100)
+set -g status-bg grey20
+set -g status-fg grey80
+
+# Equivalent to RGB with equal components
+set -g status-bg "#333333"  # grey20
+```
+
+## Style Syntax
+
+From style.c:59-252, styles are specified as comma-separated attributes:
+
+### Basic Style Format
+
+```bash
+# Format: attribute[,attribute,...]
+set -g status-style "fg=colour,bg=colour,attribute"
+```
+
+### Foreground and Background
+
+```bash
+# Foreground color
+fg=red
+fg=colour208
+fg=#ff5500
+
+# Background color  
+bg=black
+bg=colour235
+bg=#1a1a1a
+
+# Underscore/underline color (if supported)
+us=blue
+us=#0000ff
+```
+
+### Text Attributes
+
+From style.c:217-241, available text attributes:
+
+```bash
+# Single attributes
+bright      # Bold/bright text
+bold        # Bold text
+dim         # Dim/faint text
+underscore  # Underlined text
+underline   # Underlined text (alias)
+blink       # Blinking text
+reverse     # Reverse video
+hidden      # Hidden text
+italics     # Italic text
+strikethrough # Strikethrough text
+
+# Special attributes
+none        # No attributes
+noattr      # Clear all attributes
+default     # Use default style
+
+# Negate attributes (remove specific attribute)
+nobright, nobold, nodim, nounderscore, noblink
+noitalics, nostrikethrough, noreverse, nohidden
+```
+
+### Combined Styles
+
+```bash
+# Multiple attributes
+set -g status-style "fg=white,bg=black,bold"
+set -g window-status-current-style "fg=black,bg=green,bold,underscore"
+
+# Complex styles
+set -g pane-border-style "fg=colour240,bg=default,dim"
+```
+
+## Style Options
+
+### Status Line Styles
+
+```bash
+# Overall status line
+set -g status-style "bg=green,fg=black"
+
+# Status line sections
+set -g status-left-style "bg=blue,fg=white,bold"
+set -g status-right-style "bg=yellow,fg=black"
+```
+
+### Window Status Styles
+
+```bash
+# Default window style
+set -g window-status-style "fg=colour240"
+
+# Current/active window
+set -g window-status-current-style "bg=colour235,fg=colour15,bold"
+
+# Last visited window
+set -g window-status-last-style "fg=colour208"
+
+# Window with activity
+set -g window-status-activity-style "bg=colour235,fg=colour208"
+
+# Window with bell
+set -g window-status-bell-style "bg=colour235,fg=colour196,blink"
+```
+
+### Pane Styles
+
+```bash
+# Pane borders
+set -g pane-border-style "fg=colour240"
+set -g pane-active-border-style "fg=colour208"
+
+# From example_tmux.conf and options-table.c:1270-1276
+set -g pane-active-border-style "#{?pane_in_mode,fg=yellow,#{?synchronize-panes,fg=red,fg=green}}"
+
+# Pane content styles
+set -g window-style "bg=colour235"
+set -g window-active-style "bg=colour234"
+```
+
+### Message Styles
+
+```bash
+# Command prompt and messages
+set -g message-style "bg=yellow,fg=black"
+
+# Command mode (vi mode)
+set -g message-command-style "bg=black,fg=yellow"
+```
+
+### Mode Styles
+
+```bash
+# Copy mode and other modes
+set -g mode-style "bg=yellow,fg=black"
+
+# Copy mode specific
+set -g copy-mode-match-style "bg=cyan,fg=black"
+set -g copy-mode-current-match-style "bg=magenta,fg=black"
+set -g copy-mode-mark-style "bg=red,fg=black"
+```
+
+## Color Conversion
+
+From colour.c:298-396, tmux can convert between color formats:
+
+### RGB to 256 Color
+
+The `colour_find_rgb()` function converts RGB to closest 256-color:
+
+```c
+// Maps RGB to 6x6x6 color cube or 24-step grayscale
+// Colors 0x00, 0x5f, 0x87, 0xaf, 0xd7, 0xff for cube
+// Grayscale: 8, 18, 28... 238 for grays
+```
+
+### 256 to RGB
+
+From colour.c:299-370, the color table converts 256 colors to RGB:
+
+```bash
+# These are equivalent:
+colour1    # Maps to 0x800000 (RGB)
+red        # Standard red
+```
+
+### 256 to 16 Color
+
+From colour.c:372-396, tmux can map 256 colors to basic 16:
+
+```bash
+# For terminals that only support 16 colors
+# colour1 through colour255 map to 0-15
+```
+
+## Advanced Style Features
+
+From style.c:105-242, tmux supports advanced styling:
+
+### Alignment
+
+```bash
+# Text alignment in status line
+align=left
+align=centre
+align=right
+align=absolute-centre
+```
+
+### Range Coloring
+
+```bash
+# Color specific ranges
+range=left       # Status left section
+range=right      # Status right section  
+range=window|N   # Specific window index
+range=pane|%N    # Specific pane ID
+range=session|$N # Specific session ID
+```
+
+### Fill Color
+
+```bash
+# Fill color for unused space
+fill=colour235
+```
+
+### List Styling
+
+```bash
+# For window/pane lists
+list=on          # Enable list styling
+list=focus       # Focus item styling
+list=left-marker # Left marker
+list=right-marker # Right marker
+```
+
+### Style Stack
+
+```bash
+# Push/pop default styles
+push-default     # Save current default
+pop-default      # Restore saved default
+set-default      # Set new default
+```
+
+## Color Schemes
+
+### Dark Theme Example
+
+```bash
+# From example configuration patterns
+set -g status-style "bg=colour235,fg=colour15"
+set -g pane-border-style "fg=colour240"
+set -g pane-active-border-style "fg=colour208"
+set -g window-status-style "fg=colour240"
+set -g window-status-current-style "bg=colour238,fg=colour15,bold"
+set -g message-style "bg=colour238,fg=colour15"
+set -g mode-style "bg=colour238,fg=colour15"
+```
+
+### Light Theme Example
+
+```bash
+set -g status-style "bg=colour254,fg=colour235"
+set -g pane-border-style "fg=colour250"
+set -g pane-active-border-style "fg=colour33"
+set -g window-status-style "fg=colour240"
+set -g window-status-current-style "bg=colour231,fg=colour33,bold"
+set -g message-style "bg=colour231,fg=colour33"
+set -g mode-style "bg=colour231,fg=colour33"
+```
+
+### Solarized Dark
+
+```bash
+# Solarized dark colors
+set -g status-style "bg=#002b36,fg=#93a1a1"
+set -g pane-border-style "fg=#073642"
+set -g pane-active-border-style "fg=#268bd2"
+set -g window-status-style "fg=#586e75"
+set -g window-status-current-style "bg=#073642,fg=#268bd2,bold"
+set -g message-style "bg=#073642,fg=#268bd2"
+```
+
+### Nord Theme
+
+```bash
+# Nord color scheme
+set -g status-style "bg=#2e3440,fg=#d8dee9"
+set -g pane-border-style "fg=#3b4252"
+set -g pane-active-border-style "fg=#88c0d0"
+set -g window-status-style "fg=#4c566a"
+set -g window-status-current-style "bg=#3b4252,fg=#88c0d0,bold"
+set -g message-style "bg=#3b4252,fg=#88c0d0"
+```
+
+## Terminal Compatibility
+
+### Checking Color Support
+
+```bash
+# Set terminal features for RGB color
+set -sa terminal-features ",xterm-256color:RGB"
+
+# Override terminal capabilities
+set -sa terminal-overrides ",xterm-256color:Tc"
+
+# Set default terminal
+set -g default-terminal "tmux-256color"
+```
+
+### Terminal Feature Flags
+
+From options-table.c:524-534:
+
+```bash
+# Terminal features
+terminal-features "xterm*:clipboard:ccolour:cstyle:focus:title"
+
+# Features:
+# RGB - True color support
+# clipboard - Clipboard support
+# ccolour - Cursor color
+# cstyle - Cursor style  
+# focus - Focus events
+# title - Window title setting
+```
+
+## Cursor Styling
+
+From options-table.c:62-65 and 326-339:
+
+```bash
+# Cursor style (one of):
+set -g cursor-style default
+set -g cursor-style blinking-block
+set -g cursor-style block  
+set -g cursor-style blinking-underline
+set -g cursor-style underline
+set -g cursor-style blinking-bar
+set -g cursor-style bar
+
+# Cursor color
+set -g cursor-colour red
+set -g cursor-colour "#ff0000"
+
+# Prompt cursor
+set -g prompt-cursor-colour blue
+set -g prompt-cursor-style blinking-block
+```
+
+## Palette Override
+
+From colour.c:1125-1157, you can override the color palette:
+
+```bash
+# Override specific palette colors
+set -g pane-colours[1] "#ff0000"   # Override color 1
+set -g pane-colours[2] "#00ff00"   # Override color 2
+```
+
+## Display Panes Colors
+
+```bash
+# Colors for display-panes indicator
+set -g display-panes-colour blue           # Inactive panes
+set -g display-panes-active-colour red     # Active pane
+set -g display-panes-time 1000             # Display time (ms)
+```
+
+## Style Testing
+
+Test colors and styles:
+
+```bash
+# Show current styles
+show -g status-style
+show -w window-status-current-style
+
+# Test with temporary changes
+set -g status-style "bg=red,fg=white" \; \
+  display "Testing..." \; \
+  run "sleep 2" \; \
+  set -g status-style "bg=green,fg=black"
+```
+
+## Style Best Practices
+
+<Steps>
+  <Step title="Use consistent color palette">
+    Choose 4-6 colors and use them consistently throughout your configuration
+  </Step>
+  <Step title="Ensure readability">
+    Test foreground/background combinations for sufficient contrast
+  </Step>
+  <Step title="Consider terminal support">
+    Not all terminals support all features (RGB, italics, etc.)
+  </Step>
+  <Step title="Use semantic colors">
+    Use colors that convey meaning (red for errors, green for success)
+  </Step>
+  <Step title="Test in different lighting">
+    Verify your color scheme works in both bright and dim environments
+  </Step>
+</Steps>
+
+<Note>
+RGB color support requires a terminal that supports true color and proper `terminal-features` or `terminal-overrides` configuration.
+</Note>
+
+<Tip>
+Use format variables to create dynamic styles that change based on tmux state:
+```bash
+set -g pane-active-border-style "#{?pane_in_mode,fg=yellow,fg=green}"
+```
+</Tip>

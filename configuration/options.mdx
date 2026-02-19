@@ -1,0 +1,545 @@
+---
+title: "Options"
+description: "Configure tmux server, session, window, and pane options"
+---
+
+tmux options control behavior and appearance at different scopes. Options are organized into server, session, window, and pane levels.
+
+## Option Commands
+
+### set-option
+
+Set an option value:
+
+```bash
+set-option [-aFgopqsuw] [-t target] option [value]
+```
+
+**Aliases**: `set`
+
+**Flags**:
+- `-g`: Set global option (server-level)
+- `-w`: Set window option
+- `-s`: Set server option
+- `-p`: Set pane option
+- `-a`: Append to string options (array options)
+- `-u`: Unset option (revert to default)
+- `-F`: Expand formats in value
+- `-q`: Suppress errors
+
+**Examples**:
+
+```bash
+# Set server option
+set -s default-terminal "tmux-256color"
+
+# Set global session option
+set -g status-position top
+
+# Set window option
+set -w monitor-activity on
+
+# Append to array option
+set -ga terminal-overrides ",xterm-256color:Tc"
+```
+
+### show-options
+
+Display option values:
+
+```bash
+show-options [-AgHpqsvw] [-t target] [option]
+```
+
+**Aliases**: `show`
+
+**Flags**:
+- `-g`: Show global options
+- `-w`: Show window options
+- `-s`: Show server options  
+- `-A`: Show all options (including defaults)
+- `-v`: Show only the value
+- `-H`: Show option type and metadata
+
+## Option Scopes
+
+From options-table.c:25-32, tmux organizes options by scope:
+
+### Server Options
+
+Server options affect the entire tmux server. Set with `set -s` or `set-option -s`.
+
+**Key server options**:
+
+```bash
+# Backspace key code (default: 127)
+set -s backspace ^?
+
+# Maximum number of paste buffers
+set -s buffer-limit 50
+
+# Default terminal type
+set -s default-terminal "tmux-256color"
+
+# Editor for editing files
+set -s editor vim
+
+# Time to wait for escape key (milliseconds)
+set -s escape-time 10
+
+# Whether to exit when no sessions
+set -s exit-empty on
+
+# Whether to exit when no attached clients
+set -s exit-unattached off
+
+# Request extended keys from terminal
+set -s extended-keys on
+
+# Send focus events to applications
+set -s focus-events on
+
+# Command prompt history file
+set -s history-file ~/.tmux_history
+
+# Maximum server messages to keep
+set -s message-limit 1000
+
+# Set clipboard behavior
+set -s set-clipboard on
+
+# Terminal feature overrides
+set -sa terminal-overrides ",xterm*:RGB"
+
+# Terminal features (auto-detect supplements)
+set -sa terminal-features "xterm*:clipboard:ccolour:cstyle:focus:title"
+```
+
+From options-table.c:277-554, these are the master server option definitions.
+
+### Session Options
+
+Session options affect individual sessions. Set with `set -g` for global or `set -t session:` for specific sessions.
+
+**Key session options**:
+
+```bash
+# Action on activity alert (none/any/current/other)
+set -g activity-action other
+
+# Time to assume paste vs typing (milliseconds)
+set -g assume-paste-time 1
+
+# First window index
+set -g base-index 0
+
+# Action on bell (none/any/current/other)
+set -g bell-action any
+
+# Default command for new panes
+set -g default-command ""
+
+# Default shell
+set -g default-shell /bin/bash
+
+# Initial size of new sessions (WIDTHxHEIGHT)
+set -g default-size 80x24
+
+# Destroy unattached sessions
+set -g destroy-unattached off
+
+# What to do when session destroyed
+set -g detach-on-destroy on
+
+# Display panes time (milliseconds)
+set -g display-panes-time 1000
+
+# Display panes colors
+set -g display-panes-active-colour red
+set -g display-panes-colour blue
+
+# Status message display time (milliseconds)
+set -g display-time 750
+
+# Pane scrollback history limit (lines)
+set -g history-limit 2000
+
+# Default key table
+set -g key-table root
+
+# Lock after time (seconds, 0=never)
+set -g lock-after-time 0
+
+# Lock command
+set -g lock-command "lock -np"
+
+# Status line position (top/bottom)
+set -g status-position bottom
+
+# Status line visibility (off/on/2/3/4/5)
+set -g status on
+
+# Status update interval (seconds)
+set -g status-interval 15
+
+# Window list position (left/centre/right/absolute-centre)
+set -g status-justify left
+
+# Status line styling
+set -g status-style "bg=green,fg=black"
+set -g status-left "[#{session_name}] "
+set -g status-left-length 10
+set -g status-left-style default
+set -g status-right '"#{=21:pane_title}" %H:%M %d-%b-%y'
+set -g status-right-length 40
+set -g status-right-style default
+
+# Mouse support
+set -g mouse off
+
+# Prefix key
+set -g prefix C-b
+set -g prefix2 None
+
+# Renumber windows when one is closed
+set -g renumber-windows off
+
+# Repeat time for repeatable bindings (milliseconds)
+set -g repeat-time 500
+
+# Set terminal title
+set -g set-titles off
+set -g set-titles-string "#S:#I:#W - \"#T\" #{session_alerts}"
+
+# Visual bell/activity/silence alerts
+set -g visual-activity off
+set -g visual-bell off
+set -g visual-silence off
+```
+
+From options-table.c:556-1054, these are the session option definitions.
+
+### Window Options
+
+Window options affect individual windows. Set with `set -w` or `setw`.
+
+**Key window options**:
+
+```bash
+# Aggressive resize behavior
+set -w aggressive-resize off
+
+# Allow applications to use passthrough sequences
+set -w allow-passthrough off
+
+# Allow window renaming by applications
+set -w allow-rename off
+
+# Allow pane title setting by applications
+set -w allow-set-title on
+
+# Allow alternate screen
+set -w alternate-screen on
+
+# Automatic window renaming
+set -w automatic-rename on
+set -w automatic-rename-format "#{?pane_in_mode,[tmux],#{pane_current_command}}#{?pane_dead,[dead],}"
+
+# Clock mode
+set -w clock-mode-colour blue
+set -w clock-mode-style 24
+
+# Copy mode colors
+set -w copy-mode-match-style "bg=cyan,fg=black"
+set -w copy-mode-current-match-style "bg=magenta,fg=black"
+set -w copy-mode-mark-style "bg=red,fg=black"
+
+# Fill character for unused space
+set -w fill-character ""
+
+# Main pane size in main layouts
+set -w main-pane-height 24
+set -w main-pane-width 80
+
+# Other pane size in main layouts  
+set -w other-pane-height 0
+set -w other-pane-width 0
+
+# Copy mode key bindings (emacs/vi)
+set -w mode-keys emacs
+
+# Mode style (copy mode, etc)
+set -w mode-style "bg=yellow,fg=black"
+
+# Monitor window for activity
+set -w monitor-activity off
+
+# Monitor window for bell
+set -w monitor-bell on
+
+# Monitor window for silence (seconds)
+set -w monitor-silence 0
+
+# Pane borders
+set -w pane-active-border-style "fg=green"
+set -w pane-border-style "default"
+set -w pane-border-format "#{pane_index} \"#{pane_title}\""
+set -w pane-border-indicators colour
+set -w pane-border-lines single
+set -w pane-border-status off
+
+# Pane colors (256 color palette override)
+set -w pane-colours ""
+
+# Remain on exit behavior
+set -w remain-on-exit off
+
+# Synchronize input to all panes
+set -w synchronize-panes off
+
+# Window size calculation (largest/smallest/manual/latest)
+set -w window-size latest
+
+# Window status formats
+set -w window-status-format "#I:#W#{?window_flags,#{window_flags}, }"
+set -w window-status-current-format "#I:#W#{?window_flags,#{window_flags}, }"
+set -w window-status-separator " "
+
+# Window status styles
+set -w window-status-style default
+set -w window-status-current-style default
+set -w window-status-last-style default
+set -w window-status-activity-style reverse
+set -w window-status-bell-style reverse
+```
+
+From options-table.c:1056-1550, these are the window option definitions.
+
+### Pane Options
+
+Some options can be set at the pane level (per-pane basis):
+
+```bash
+# Set option for specific pane
+set -p -t:.1 allow-passthrough on
+
+# Pane-specific options include:
+set -w -p remain-on-exit on
+set -w -p window-style "bg=colour234"
+set -w -p window-active-style "bg=colour232"
+```
+
+## Option Types
+
+From options-table.c:34-111, tmux options have different types:
+
+### String Options
+
+```bash
+set -g status-left "[#{session_name}]"
+set -s default-terminal "screen-256color"
+```
+
+### Number Options
+
+```bash
+set -g history-limit 10000
+set -s escape-time 0
+```
+
+### Flag Options (Boolean)
+
+```bash
+set -g mouse on
+set -w monitor-activity off
+```
+
+### Choice Options
+
+```bash
+# One of: emacs, vi
+set -w mode-keys vi
+
+# One of: left, centre, right, absolute-centre
+set -g status-justify centre
+
+# One of: top, bottom
+set -g status-position top
+```
+
+### Color Options
+
+```bash
+# Named colors
+set -g status-bg green
+set -g status-fg black
+
+# 256 colors
+set -g status-bg colour235
+
+# RGB colors
+set -g status-bg "#1a1a1a"
+```
+
+### Style Options
+
+Style options combine multiple attributes:
+
+```bash
+set -g status-style "bg=green,fg=black,bold"
+set -w window-status-current-style "bg=red,fg=white,underscore"
+```
+
+### Array Options
+
+Array options can have multiple values:
+
+```bash
+# Append to array
+set -ga terminal-overrides ",xterm*:RGB"
+set -ga terminal-features "screen*:title"
+
+# Set entire array
+set -g command-alias[0] "split-pane=split-window"
+set -g command-alias[1] "splitp=split-window"
+```
+
+## Format Variables
+
+Many options support format variables that are expanded at runtime:
+
+```bash
+# Session info
+set -g status-left "[#{session_name}] "
+
+# Window info  
+set -w window-status-format "#I:#W#{?window_flags,#{window_flags}, }"
+
+# Pane info
+set -w pane-border-format "#{pane_index} #{pane_title}"
+
+# Conditional formats
+set -w automatic-rename-format "#{?pane_in_mode,[tmux],#{pane_current_command}}"
+```
+
+Common format variables:
+- `#{session_name}` - Session name
+- `#{window_index}` - Window index
+- `#{window_name}` - Window name
+- `#{pane_index}` - Pane index
+- `#{pane_title}` - Pane title
+- `#{pane_current_command}` - Current command in pane
+
+## Command Aliases
+
+From options-table.c:294-306, command aliases allow shorthand for common commands:
+
+```bash
+set -s command-alias[0] "split-pane=split-window"
+set -s command-alias[1] "splitp=split-window"
+set -s command-alias[2] "server-info=show-messages -JT"
+set -s command-alias[3] "info=show-messages -JT"
+```
+
+## Option Inheritance
+
+Options inherit from broader scopes:
+
+1. **Pane options** inherit from window options
+2. **Window options** inherit from session options
+3. **Session options** inherit from global options
+4. **Global options** use built-in defaults
+
+You can override at any level:
+
+```bash
+# Set globally
+set -g status-position bottom
+
+# Override for specific session
+set -t mysession status-position top
+```
+
+## Viewing Options
+
+```bash
+# Show all server options
+show -s
+
+# Show all global session options
+show -g
+
+# Show all window options
+show -w
+
+# Show specific option
+show -g status-position
+
+# Show only the value
+show -gv status-position
+
+# Show all options with defaults
+show -A
+```
+
+## Unsetting Options
+
+Revert an option to its default value:
+
+```bash
+# Unset option (revert to default)
+set -u status-position
+
+# Unset for specific target
+set -u -t mysession status-position
+```
+
+## Common Configuration Patterns
+
+### Status Line Configuration
+
+```bash
+set -g status on
+set -g status-position top
+set -g status-justify centre
+set -g status-style "bg=colour235,fg=colour15"
+set -g status-left "[#S] "
+set -g status-left-length 20
+set -g status-right "%H:%M %d-%b-%y"
+set -g status-right-length 40
+set -g status-interval 60
+```
+
+### Window Status Configuration
+
+```bash
+set -w window-status-format " #I:#W "
+set -w window-status-current-format " #I:#W "
+set -w window-status-style "fg=colour240"
+set -w window-status-current-style "bg=colour235,fg=colour15,bold"
+set -w window-status-activity-style "bg=colour235,fg=colour208"
+set -w window-status-bell-style "bg=colour235,fg=colour196"
+```
+
+### Terminal Configuration
+
+```bash
+set -s default-terminal "tmux-256color"
+set -sa terminal-features ",xterm-256color:RGB"
+set -sa terminal-overrides ",xterm-256color:Tc"
+set -s escape-time 10
+set -s focus-events on
+```
+
+### Mouse Configuration
+
+```bash
+set -g mouse on
+
+# Disable drag to resize panes
+unbind -n MouseDrag1Border
+```
+
+<Note>
+Some options only take effect for new sessions, windows, or panes. Changes to `default-terminal`, for example, only affect newly created sessions.
+</Note>

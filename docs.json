@@ -4,9 +4,10 @@
   "theme": "aspen",
   "colors": {
     "primary": "#1BB91F",
-    "light": "#1BB91F",
-    "dark": "#1BB91F"
+    "light": "#26D128",
+    "dark": "#159118"
   },
+  "favicon": "/favicon.svg",
   "navbar": {
     "primary": {
       "type": "github",
@@ -37,27 +38,28 @@
               "concepts/sessions",
               "concepts/windows",
               "concepts/panes",
-              "concepts/client-server"
+              "concepts/status-bar"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "configuration/overview",
+              "configuration/key-bindings",
+              "configuration/options",
+              "configuration/hooks",
+              "configuration/styles-and-colors"
             ]
           },
           {
             "group": "Guides",
             "pages": [
-              "guides/key-bindings",
-              "guides/configuration",
-              "guides/status-line",
+              "guides/basic-usage",
+              "guides/window-management",
+              "guides/pane-management",
               "guides/copy-mode",
-              "guides/mouse-support",
-              "guides/scripting"
-            ]
-          },
-          {
-            "group": "Advanced",
-            "pages": [
-              "advanced/formats",
-              "advanced/styles",
-              "advanced/hooks",
-              "advanced/control-mode"
+              "guides/scripting",
+              "guides/control-mode"
             ]
           }
         ]
@@ -69,37 +71,44 @@
             "group": "Command Reference",
             "pages": [
               "commands/overview",
-              "commands/sessions",
-              "commands/windows",
-              "commands/panes",
-              "commands/key-bindings",
-              "commands/options",
-              "commands/buffers",
-              "commands/miscellaneous"
+              "commands/session-commands",
+              "commands/window-commands",
+              "commands/pane-commands",
+              "commands/key-binding-commands",
+              "commands/option-commands",
+              "commands/buffer-commands",
+              "commands/client-commands",
+              "commands/miscellaneous-commands"
+            ]
+          },
+          {
+            "group": "Format Variables",
+            "pages": [
+              "commands/format-variables"
             ]
           }
         ]
       },
       {
-        "tab": "Configuration",
+        "tab": "Advanced",
         "groups": [
           {
-            "group": "Options Reference",
+            "group": "Advanced Topics",
             "pages": [
-              "options/overview",
-              "options/server",
-              "options/session",
-              "options/window",
-              "options/pane"
+              "advanced/terminal-features",
+              "advanced/layouts",
+              "advanced/mouse-support",
+              "advanced/clipboard-integration",
+              "advanced/sixel-images"
             ]
           },
           {
-            "group": "Examples",
+            "group": "Reference",
             "pages": [
-              "examples/basic-config",
-              "examples/advanced-config",
-              "examples/plugins",
-              "examples/use-cases"
+              "reference/options-reference",
+              "reference/key-reference",
+              "reference/faq",
+              "reference/changelog"
             ]
           }
         ]

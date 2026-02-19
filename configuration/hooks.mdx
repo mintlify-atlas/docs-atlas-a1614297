@@ -1,0 +1,424 @@
+---
+title: "Hooks"
+description: "Use tmux hooks to run commands in response to events"
+---
+
+tmux hooks allow you to automatically execute commands when specific events occur. Hooks enable powerful automation and customization of tmux behavior.
+
+## Understanding Hooks
+
+Hooks are commands that run automatically in response to tmux events. From options-table.c:1552-1620, tmux defines hooks as session-level options that are arrays of commands.
+
+### Hook Definition
+
+The hook macros from options-table.c:236-261 define three types:
+
+```c
+// Session hooks
+OPTIONS_TABLE_HOOK(hook_name, default_value)
+
+// Window hooks  
+OPTIONS_TABLE_WINDOW_HOOK(hook_name, default_value)
+
+// Pane hooks
+OPTIONS_TABLE_PANE_HOOK(hook_name, default_value)
+```
+
+All hooks are array options with scope-specific visibility.
+
+## Setting Hooks
+
+Use `set-hook` or `set-option` to configure hooks:
+
+```bash
+# Set a hook
+set-hook [-agpRuw] [-t target] hook-name command
+
+# Using set-option
+set -g after-new-window 'display "New window created"'
+```
+
+**Flags**:
+- `-a`: Append to hook (run after existing commands)
+- `-g`: Set globally
+- `-t`: Target specific session/window/pane
+- `-u`: Unset/remove hook
+- `-R`: Run the hook immediately
+
+## Available Hooks
+
+From options-table.c:1552-1620, here are all available hooks:
+
+### Command Hooks
+
+These hooks run after specific commands:
+
+```bash
+# After commands
+set-hook -g after-bind-key 'display "Key bound"'
+set-hook -g after-capture-pane 'display "Pane captured"'
+set-hook -g after-copy-mode 'display "Left copy mode"'
+set-hook -g after-display-message ''
+set-hook -g after-display-panes ''
+set-hook -g after-kill-pane ''
+set-hook -g after-list-buffers ''
+set-hook -g after-list-clients ''
+set-hook -g after-list-keys ''
+set-hook -g after-list-panes ''
+set-hook -g after-list-sessions ''
+set-hook -g after-list-windows ''
+set-hook -g after-load-buffer ''
+set-hook -g after-lock-server ''
+set-hook -g after-new-session 'display "Session created: #{session_name}"'
+set-hook -g after-new-window 'display "Window #{window_index} created"'
+set-hook -g after-paste-buffer ''
+set-hook -g after-pipe-pane ''
+set-hook -g after-queue ''
+set-hook -g after-refresh-client ''
+set-hook -g after-rename-session ''
+set-hook -g after-rename-window ''
+set-hook -g after-resize-pane ''
+set-hook -g after-resize-window ''
+set-hook -g after-save-buffer ''
+set-hook -g after-select-layout ''
+set-hook -g after-select-pane ''
+set-hook -g after-select-window ''
+set-hook -g after-send-keys ''
+set-hook -g after-set-buffer ''
+set-hook -g after-set-environment ''
+set-hook -g after-set-hook ''
+set-hook -g after-set-option ''
+set-hook -g after-show-environment ''
+set-hook -g after-show-messages ''
+set-hook -g after-show-options ''
+set-hook -g after-split-window 'display "Pane split"'
+set-hook -g after-unbind-key ''
+```
+
+### Alert Hooks
+
+These hooks run when alerts are triggered:
+
+```bash
+set-hook -g alert-activity 'display "Activity in #{window_name}"'
+set-hook -g alert-bell 'display "Bell in #{window_name}"'
+set-hook -g alert-silence 'display "Silence in #{window_name}"'
+```
+
+### Client Hooks
+
+These hooks run for client events:
+
+```bash
+set-hook -g client-active 'display "Client activated"'
+set-hook -g client-attached 'display "Client attached"'
+set-hook -g client-detached 'display "Client detached"'
+set-hook -g client-focus-in 'display "Client focused"'
+set-hook -g client-focus-out 'display "Client unfocused"'
+set-hook -g client-resized 'display "Client resized"'
+set-hook -g client-session-changed 'display "Session changed"'
+set-hook -g client-light-theme 'source-file ~/.tmux-light.conf'
+set-hook -g client-dark-theme 'source-file ~/.tmux-dark.conf'
+```
+
+### Command Error Hook
+
+```bash
+set-hook -g command-error 'display "Command failed: #{command_error}"'
+```
+
+### Pane Hooks
+
+These hooks run for pane events:
+
+```bash
+set-hook -g pane-died 'display "Pane #{pane_id} died"'
+set-hook -g pane-exited 'display "Pane #{pane_id} exited with status #{pane_dead_status}"'
+set-hook -g pane-focus-in 'display "Focused pane #{pane_id}"'
+set-hook -g pane-focus-out 'display "Unfocused pane #{pane_id}"'
+set-hook -g pane-mode-changed 'display "Mode changed in pane #{pane_id}"'
+set-hook -g pane-set-clipboard ''
+set-hook -g pane-title-changed 'display "Pane title: #{pane_title}"'
+```
+
+### Session Hooks
+
+These hooks run for session events:
+
+```bash
+set-hook -g session-closed 'display "Session closed"'
+set-hook -g session-created 'display "Session #{session_name} created"'
+set-hook -g session-renamed 'display "Session renamed to #{session_name}"'
+set-hook -g session-window-changed 'display "Window changed"'
+```
+
+### Window Hooks
+
+These hooks run for window events:
+
+```bash
+set-hook -g window-layout-changed 'display "Layout: #{window_layout}"'
+set-hook -g window-linked 'display "Window linked"'
+set-hook -g window-pane-changed 'display "Active pane changed"'
+set-hook -g window-renamed 'display "Window renamed to #{window_name}"'
+set-hook -g window-resized 'display "Window resized"'
+set-hook -g window-unlinked 'display "Window unlinked"'
+```
+
+## Hook Execution Context
+
+Hooks execute with access to format variables relevant to the event:
+
+```bash
+# Access session variables
+set-hook -g session-created 'display "Created: #{session_name}"'
+
+# Access window variables
+set-hook -g window-renamed 'display "Window #{window_index}: #{window_name}"'
+
+# Access pane variables
+set-hook -g pane-exited 'display "Pane #{pane_index} exit status: #{pane_dead_status}"'
+```
+
+## Hook Examples
+
+### Automatic Logging
+
+```bash
+# Log pane output to file when created
+set-hook -g after-split-window 'pipe-pane -o "cat >> ~/tmux-#S-#I-#P.log"'
+```
+
+### Status Line Updates
+
+```bash
+# Update status line when window changes
+set-hook -g after-select-window 'refresh-client -S'
+
+# Update when pane focus changes  
+set-hook -g pane-focus-in 'refresh-client -S'
+```
+
+### Theme Switching
+
+```bash
+# Automatically switch themes based on system theme
+set-hook -g client-light-theme '
+  set -g status-style "bg=white,fg=black"; 
+  set -g pane-border-style "fg=colour240"; 
+  set -g pane-active-border-style "fg=colour33"
+'
+
+set-hook -g client-dark-theme '
+  set -g status-style "bg=black,fg=white"; 
+  set -g pane-border-style "fg=colour240"; 
+  set -g pane-active-border-style "fg=colour208"
+'
+```
+
+### Session Management
+
+```bash
+# Save session layout when window created
+set-hook -g after-new-window 'run-shell "tmux-session-save #{session_name}"'
+
+# Notify when session closes
+set-hook -g session-closed 'run-shell "notify-send \"tmux\" \"Session closed\""'
+```
+
+### Pane Lifecycle
+
+```bash
+# Set pane title when created
+set-hook -g after-split-window 'select-pane -T "New pane"'
+
+# Clean up when pane exits
+set-hook -g pane-exited '
+  if -F "#{!=:#{pane_dead_status},0}" 
+    "display \"Pane exited with error: #{pane_dead_status}\""
+'
+```
+
+### Window Monitoring
+
+```bash
+# Enable activity monitoring for new windows
+set-hook -g after-new-window 'set -w monitor-activity on'
+
+# Alert on activity
+set-hook -g alert-activity '
+  display -d 3000 "Activity in window #{window_index}: #{window_name}"
+'
+```
+
+## Multiple Hook Commands
+
+Hooks can run multiple commands using `;` or by setting multiple array entries:
+
+```bash
+# Single hook with multiple commands
+set-hook -g after-new-window '
+  set -w monitor-activity on; 
+  set -w automatic-rename on
+'
+
+# Multiple hook entries (run in order)
+set-hook -g after-new-window[0] 'set -w monitor-activity on'
+set-hook -g after-new-window[1] 'set -w automatic-rename on'
+```
+
+## Appending to Hooks
+
+Use `-a` to add commands without replacing existing hooks:
+
+```bash
+# Set initial hook
+set-hook -g after-new-window 'display "Window created"'
+
+# Append additional command
+set-hook -ag after-new-window 'set -w monitor-activity on'
+
+# Both commands will run
+```
+
+## Conditional Hooks
+
+Use `if-shell` for conditional hook execution:
+
+```bash
+# Only notify if session has multiple windows
+set-hook -g after-new-window '
+  if -F "#{>:#{session_windows},1}" 
+    "display \"#{session_windows} windows in session\""
+'
+
+# Set options based on pane count
+set-hook -g after-split-window '
+  if -F "#{>:#{window_panes},2}" 
+    "set -w main-pane-width 120" 
+    "set -w main-pane-width 80"
+'
+```
+
+## Hook Debugging
+
+View configured hooks:
+
+```bash
+# Show all hooks
+show-hooks
+
+# Show specific hook
+show-hooks after-new-window
+
+# Show global hooks
+show-hooks -g
+```
+
+Test hooks by running them manually:
+
+```bash
+# Run hook immediately with -R
+set-hook -Rg after-new-window 'display "Test"'
+```
+
+## Removing Hooks
+
+Unset hooks to remove them:
+
+```bash
+# Remove specific hook
+set-hook -ug after-new-window
+
+# Remove hook for specific target
+set-hook -u -t mysession after-new-window
+
+# Remove all array entries
+set-hook -ug after-new-window[0]
+set-hook -ug after-new-window[1]
+```
+
+## Hook Scope
+
+Hooks can be set at different scopes:
+
+```bash
+# Global (affects all sessions)
+set-hook -g after-new-window 'display "Global hook"'
+
+# Session-specific
+set-hook -t mysession after-new-window 'display "Session hook"'
+
+# Window-specific (for window hooks)
+set-hook -t mysession:1 window-renamed 'display "Window hook"'
+```
+
+More specific hooks override global ones.
+
+## Common Use Cases
+
+<AccordionGroup>
+  <Accordion title="Auto-save tmux session">
+    ```bash
+    set-hook -g session-created 'run-shell "tmux-resurrect save"'
+    set-hook -g session-closed 'run-shell "tmux-resurrect save"'
+    set-hook -g after-new-window 'run-shell "tmux-resurrect save"'
+    ```
+  </Accordion>
+
+  <Accordion title="Automatic pane naming">
+    ```bash
+    set-hook -g after-split-window 'select-pane -T "#{pane_current_command}"'
+    set-hook -g pane-focus-in 'select-pane -T "#{pane_current_command}"'
+    ```
+  </Accordion>
+
+  <Accordion title="Notification system">
+    ```bash
+    set-hook -g alert-activity 'run-shell "notify-send Activity #{window_name}"'
+    set-hook -g alert-bell 'run-shell "notify-send Bell #{window_name}"'
+    ```
+  </Accordion>
+
+  <Accordion title="Session initialization">
+    ```bash
+    set-hook -g session-created '
+      new-window -n editor vim; 
+      new-window -n shell; 
+      select-window -t 1
+    '
+    ```
+  </Accordion>
+
+  <Accordion title="Dynamic layouts">
+    ```bash
+    set-hook -g after-split-window '
+      if -F "#{>:#{window_panes},3}" 
+        "select-layout tiled" 
+        "select-layout main-vertical"
+    '
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Hook Best Practices
+
+<Card title="Keep hooks simple" icon="lightbulb">
+Hooks should execute quickly. For complex operations, call external scripts with `run-shell`.
+</Card>
+
+<Card title="Use format variables" icon="brackets-curly">
+Leverage format variables to access context: `#{session_name}`, `#{window_index}`, etc.
+</Card>
+
+<Card title="Test thoroughly" icon="flask">
+Hooks run automatically and can cause issues if misconfigured. Test with `-R` flag before relying on them.
+</Card>
+
+<Card title="Document your hooks" icon="file-lines">
+Add comments explaining what each hook does and why it's needed.
+</Card>
+
+<Warning>
+Hooks that fail or produce errors can disrupt tmux operation. Always test hooks before deploying them in production configurations.
+</Warning>

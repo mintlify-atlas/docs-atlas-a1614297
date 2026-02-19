@@ -1,0 +1,495 @@
+---
+title: 'Frequently Asked Questions'
+description: 'Common questions and answers about using tmux'
+---
+
+This page answers frequently asked questions about tmux usage, configuration, and troubleshooting.
+
+## General Questions
+
+<Accordion title="What is tmux and why should I use it?">
+  tmux is a terminal multiplexer that allows you to:
+  
+  - Create multiple terminal sessions from a single window
+  - Detach from sessions and reattach later (useful for remote work)
+  - Split your terminal into multiple panes
+  - Share sessions between users
+  - Persist terminal sessions across SSH disconnections
+  
+  It's especially valuable for system administrators, developers working on remote servers, and anyone who needs to manage multiple terminal tasks simultaneously.
+</Accordion>
+
+<Accordion title="What's the difference between a session, window, and pane?">
+  tmux has three hierarchical levels:
+  
+  - **Session**: The top-level container. You can attach to and detach from sessions. A session contains one or more windows.
+  - **Window**: Similar to tabs in a web browser. Each window has a name and fills the entire terminal. A window contains one or more panes.
+  - **Pane**: A split section of a window that runs a single terminal instance. Panes divide a window into multiple sections.
+  
+  Hierarchy: `Session` → `Window` → `Pane`
+</Accordion>
+
+<Accordion title="How do I pronounce tmux?">
+  The most common pronunciations are "tee-mux" or "tmux" (rhymes with "ducks"). Both are acceptable.
+</Accordion>
+
+## Getting Started
+
+<Accordion title="How do I start tmux?">
+  Simply run:
+  
+  ```bash
+  tmux
+  ```
+  
+  To create a named session:
+  
+  ```bash
+  tmux new-session -s mysession
+  # or shorthand:
+  tmux new -s mysession
+  ```
+</Accordion>
+
+<Accordion title="How do I exit tmux?">
+  There are several ways:
+  
+  - **Detach** (keeps session running): Press `C-b d` or run `tmux detach`
+  - **Kill session** (destroys session): Press `C-b :` then type `kill-session`
+  - **Exit shell**: Type `exit` or press `C-d` in each pane until all panes are closed
+  
+  Detaching is recommended as it preserves your session for later reattachment.
+</Accordion>
+
+<Accordion title="How do I reattach to a session?">
+  To list all sessions:
+  
+  ```bash
+  tmux list-sessions
+  # or shorthand:
+  tmux ls
+  ```
+  
+  To attach to the most recent session:
+  
+  ```bash
+  tmux attach
+  ```
+  
+  To attach to a specific session:
+  
+  ```bash
+  tmux attach -t mysession
+  ```
+</Accordion>
+
+## Key Bindings
+
+<Accordion title="What is the prefix key and how do I change it?">
+  The prefix key (default `C-b`, Control-b) is pressed before most tmux commands. To change it, add this to `~/.tmux.conf`:
+  
+  ```bash
+  # Change prefix to C-a (like screen)
+  unbind C-b
+  set-option -g prefix C-a
+  bind-key C-a send-prefix
+  ```
+  
+  Many users prefer `C-a` as it's easier to type and matches GNU Screen's default.
+</Accordion>
+
+<Accordion title="How do I split panes?">
+  - **Vertical split** (side by side): `C-b %`
+  - **Horizontal split** (top and bottom): `C-b "`
+  
+  Many users rebind these to more intuitive keys:
+  
+  ```bash
+  # Split vertically with |
+  bind | split-window -h
+  # Split horizontally with -
+  bind - split-window -v
+  ```
+</Accordion>
+
+<Accordion title="How do I navigate between panes?">
+  - Arrow keys: `C-b Up/Down/Left/Right`
+  - Select pane by number: `C-b q` then press the number
+  - Cycle through panes: `C-b o`
+  - Last active pane: `C-b ;`
+  
+  You can also enable mouse support:
+  
+  ```bash
+  set -g mouse on
+  ```
+</Accordion>
+
+<Accordion title="How do I resize panes?">
+  - Hold `C-b` then press and hold an arrow key, or
+  - `C-b C-Up/Down/Left/Right` (repeatable)
+  - `C-b M-Up/Down/Left/Right` (resize by 5 cells, repeatable)
+  
+  Or create custom bindings:
+  
+  ```bash
+  bind -r H resize-pane -L 5
+  bind -r J resize-pane -D 5
+  bind -r K resize-pane -U 5
+  bind -r L resize-pane -R 5
+  ```
+</Accordion>
+
+## Configuration
+
+<Accordion title="Where is the tmux configuration file?">
+  tmux looks for configuration in these locations (in order):
+  
+  1. `~/.config/tmux/tmux.conf`
+  2. `~/.tmux.conf`
+  
+  You can also specify a config file with:
+  
+  ```bash
+  tmux -f /path/to/config.conf
+  ```
+</Accordion>
+
+<Accordion title="How do I reload my configuration?">
+  After editing your config file:
+  
+  ```bash
+  # From within tmux:
+  C-b : source-file ~/.tmux.conf
+  
+  # Or from command line:
+  tmux source-file ~/.tmux.conf
+  ```
+  
+  You can add a binding to make this easier:
+  
+  ```bash
+  bind r source-file ~/.tmux.conf \; display "Config reloaded!"
+  ```
+</Accordion>
+
+<Accordion title="How do I enable true color support?">
+  Add these lines to your `~/.tmux.conf`:
+  
+  ```bash
+  set -g default-terminal "tmux-256color"
+  set -ga terminal-overrides ",*256col*:Tc"
+  ```
+  
+  Also ensure your outer terminal supports true color.
+</Accordion>
+
+<Accordion title="How do I enable mouse support?">
+  Add to your config:
+  
+  ```bash
+  set -g mouse on
+  ```
+  
+  This allows:
+  - Clicking to select panes
+  - Dragging pane borders to resize
+  - Clicking windows in status bar
+  - Scrolling with mouse wheel
+</Accordion>
+
+## Copy Mode and Clipboard
+
+<Accordion title="How do I copy text in tmux?">
+  1. Enter copy mode: `C-b [`
+  2. Navigate to start of text
+  3. Begin selection: `Space` (vi mode) or `C-Space` (emacs mode)
+  4. Navigate to end of text
+  5. Copy: `Enter` (vi mode) or `M-w` (emacs mode)
+  6. Paste: `C-b ]`
+  
+  With mouse enabled, you can also:
+  - Click and drag to select
+  - Double-click to select word
+  - Triple-click to select line
+</Accordion>
+
+<Accordion title="How do I use vi key bindings in copy mode?">
+  Add to your config:
+  
+  ```bash
+  set-window-option -g mode-keys vi
+  ```
+  
+  This enables vi-style navigation (h/j/k/l, w/b, etc.) in copy mode.
+</Accordion>
+
+<Accordion title="How do I integrate tmux with system clipboard?">
+  On Linux with xclip:
+  
+  ```bash
+  bind -T copy-mode-vi y send-keys -X copy-pipe-and-cancel 'xclip -in -selection clipboard'
+  ```
+  
+  On macOS:
+  
+  ```bash
+  bind -T copy-mode-vi y send-keys -X copy-pipe-and-cancel 'pbcopy'
+  ```
+  
+  Or use the built-in OSC 52 support:
+  
+  ```bash
+  set -g set-clipboard on
+  ```
+</Accordion>
+
+<Accordion title="Why can't I scroll with my mouse wheel?">
+  If mouse mode is on but scrolling enters copy mode instead of scrolling the application:
+  
+  - Some applications need to enable alternate screen buffer
+  - Try holding Shift while scrolling to scroll the terminal history
+  - In alternate screen mode, scrolling is sent to the application
+</Accordion>
+
+## Session Management
+
+<Accordion title="How do I switch between sessions?">
+  - List sessions: `C-b s` (choose from list)
+  - Switch to last session: `C-b L`
+  - Switch to next session: `C-b )`
+  - Switch to previous session: `C-b (`
+  
+  Or from command line:
+  
+  ```bash
+  tmux switch-client -t session-name
+  ```
+</Accordion>
+
+<Accordion title="How do I rename a session or window?">
+  - Rename session: `C-b $`
+  - Rename window: `C-b ,`
+  
+  Or use commands:
+  
+  ```bash
+  tmux rename-session -t old-name new-name
+  tmux rename-window -t 0 new-name
+  ```
+</Accordion>
+
+<Accordion title="How do I prevent automatic window renaming?">
+  By default, tmux automatically renames windows based on the running command. To disable:
+  
+  ```bash
+  set-option -g allow-rename off
+  set-option -g automatic-rename off
+  ```
+</Accordion>
+
+<Accordion title="How do I share a session with another user?">
+  Both users can attach to the same session:
+  
+  ```bash
+  # User 1 creates session
+  tmux new-session -s shared
+  
+  # User 2 attaches
+  tmux attach-session -t shared
+  ```
+  
+  For read-only access:
+  
+  ```bash
+  tmux attach-session -t shared -r
+  ```
+</Accordion>
+
+## Troubleshooting
+
+<Accordion title="Why do my colors look wrong?">
+  Common causes:
+  
+  1. **Wrong TERM value**: Set in your config:
+     ```bash
+     set -g default-terminal "tmux-256color"
+     ```
+  
+  2. **Missing terminfo**: On some systems, install `tmux-256color` terminfo
+  
+  3. **Outer terminal doesn't support colors**: Check your terminal emulator settings
+  
+  4. **No true color support**: Add terminal-overrides as shown in the configuration section
+</Accordion>
+
+<Accordion title="Why is my escape key so slow in vim?">
+  tmux waits for `escape-time` to determine if Escape is part of a function key sequence. Reduce the timeout:
+  
+  ```bash
+  set -g escape-time 10
+  ```
+  
+  The default is already 10ms in recent versions, but older versions used 500ms.
+</Accordion>
+
+<Accordion title="Why doesn't my .bashrc / .zshrc get sourced?">
+  tmux creates login shells by default. To create non-login shells:
+  
+  ```bash
+  set -g default-command "${SHELL}"
+  ```
+  
+  Or explicitly source your rc file in your shell's profile.
+</Accordion>
+
+<Accordion title="How do I see the tmux server log?">
+  Start tmux with verbose logging:
+  
+  ```bash
+  tmux -vv new-session
+  ```
+  
+  The log is written to `~/tmux-client-*.log` and `~/tmux-server-*.log`.
+</Accordion>
+
+<Accordion title="Why do my environment variables not update?">
+  When you attach to a session, tmux preserves the environment from when the session was created. To update specific variables:
+  
+  ```bash
+  set -g update-environment "DISPLAY SSH_ASKPASS SSH_AUTH_SOCK SSH_AGENT_PID SSH_CONNECTION WINDOWID XAUTHORITY"
+  ```
+  
+  Or manually update in a running session:
+  
+  ```bash
+  tmux setenv -g SSH_AUTH_SOCK $SSH_AUTH_SOCK
+  ```
+</Accordion>
+
+<Accordion title="Can I run tmux inside tmux?">
+  Yes, but it can be confusing. The inner tmux won't start if the `$TMUX` variable is set unless you use:
+  
+  ```bash
+  TMUX= tmux new-session
+  ```
+  
+  Consider using different prefix keys for nested sessions:
+  
+  ```bash
+  bind -n C-a send-prefix  # Send C-b to inner session
+  ```
+</Accordion>
+
+## Advanced Usage
+
+<Accordion title="How do I script tmux session creation?">
+  Create a script to set up your development environment:
+  
+  ```bash
+  #!/bin/bash
+  SESSION="dev"
+  
+  # Create session
+  tmux new-session -d -s $SESSION
+  
+  # Create windows
+  tmux rename-window -t $SESSION:0 'editor'
+  tmux new-window -t $SESSION:1 -n 'server'
+  tmux new-window -t $SESSION:2 -n 'logs'
+  
+  # Split panes
+  tmux split-window -h -t $SESSION:1
+  tmux split-window -v -t $SESSION:2
+  
+  # Run commands
+  tmux send-keys -t $SESSION:0 'vim' C-m
+  tmux send-keys -t $SESSION:1 'npm run dev' C-m
+  tmux send-keys -t $SESSION:2.0 'tail -f app.log' C-m
+  
+  # Attach
+  tmux attach -t $SESSION:0
+  ```
+</Accordion>
+
+<Accordion title="How do I customize the status bar?">
+  The status bar is highly customizable:
+  
+  ```bash
+  # Status bar style
+  set -g status-style 'bg=#333333 fg=#5eacd3'
+  
+  # Left side
+  set -g status-left-length 20
+  set -g status-left '#[fg=green]#S #[fg=white]| '
+  
+  # Right side
+  set -g status-right '#[fg=white]%H:%M %d-%b-%y'
+  
+  # Window status
+  set -g window-status-format '#I:#W'
+  set -g window-status-current-format '#[bold]#I:#W'
+  
+  # Update interval
+  set -g status-interval 60
+  ```
+</Accordion>
+
+<Accordion title="How do I use tmux with SSH?">
+  Common workflow:
+  
+  ```bash
+  # SSH into server and attach/create session
+  ssh user@server -t tmux attach || tmux new
+  ```
+  
+  To automatically start/attach tmux on login, add to `.bashrc` or `.zshrc`:
+  
+  ```bash
+  if command -v tmux &> /dev/null && [ -z "$TMUX" ]; then
+    tmux attach -t default || tmux new -s default
+  fi
+  ```
+</Accordion>
+
+<Accordion title="How do I run a command in all panes?">
+  Enable synchronize-panes:
+  
+  ```bash
+  # Toggle synchronization
+  C-b : setw synchronize-panes
+  ```
+  
+  Or bind to a key:
+  
+  ```bash
+  bind S setw synchronize-panes
+  ```
+  
+  When enabled, input is sent to all panes in the current window. The active pane border turns red by default.
+</Accordion>
+
+## Performance
+
+<Accordion title="Can tmux handle large amounts of scrollback?">
+  Yes, but large history uses more memory. The default is 2000 lines. To increase:
+  
+  ```bash
+  set -g history-limit 10000
+  ```
+  
+  Note that this only affects new panes. Very large values (50000+) may impact performance.
+</Accordion>
+
+<Accordion title="Does tmux work over slow connections?">
+  Yes! tmux is excellent for slow or unstable connections because:
+  
+  - Sessions persist through disconnections
+  - Only screen updates are sent (efficient protocol)
+  - You can reduce status bar updates to save bandwidth:
+    ```bash
+    set -g status-interval 0  # Disable automatic updates
+    ```
+</Accordion>
+
+For more detailed information, consult the [tmux manual page](/docs/manual) or visit the [official tmux GitHub repository](https://github.com/tmux/tmux).

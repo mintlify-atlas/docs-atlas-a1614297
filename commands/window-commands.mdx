@@ -1,0 +1,428 @@
+---
+title: Window Commands
+description: Commands for creating, managing, and manipulating tmux windows
+---
+
+## Overview
+
+Windows are the primary containers within a tmux session. Each session has one or more windows, and windows may be linked to multiple sessions. Windows are made up of one or more panes.
+
+## new-window
+
+Alias: `neww`
+
+```bash
+new-window [-abdkPS] [-c start-directory] [-e environment] [-F format] 
+           [-n window-name] [-t target-window] [shell-command [argument ...]]
+```
+
+Create a new window.
+
+<ParamField path="-a" type="flag">
+  Insert the new window at the next index after the specified target-window, moving windows up if necessary.
+</ParamField>
+
+<ParamField path="-b" type="flag">
+  Insert the new window at the next index before the specified target-window.
+</ParamField>
+
+<ParamField path="-d" type="flag">
+  Do not make the new window the current window.
+</ParamField>
+
+<ParamField path="-k" type="flag">
+  If the target window exists, destroy it before creating the new window.
+</ParamField>
+
+<ParamField path="-P" type="flag">
+  Print information about the new window after it has been created. Default format is `#{session_name}:#{window_index}` but can be changed with `-F`.
+</ParamField>
+
+<ParamField path="-S" type="flag">
+  Set synchronized-panes on for the new window.
+</ParamField>
+
+<ParamField path="-c" type="string">
+  Specify the working directory for the new window.
+</ParamField>
+
+<ParamField path="-e" type="string">
+  Set an environment variable for the new window in the form `VARIABLE=value`. May be specified multiple times.
+</ParamField>
+
+<ParamField path="-F" type="string">
+  Format for output when `-P` is used.
+</ParamField>
+
+<ParamField path="-n" type="string">
+  Name for the new window.
+</ParamField>
+
+<ParamField path="-t" type="string">
+  The target window position. If it doesn't exist, the new window is created at the next free index.
+</ParamField>
+
+<ParamField path="shell-command" type="string">
+  Shell command to execute in the new window. If not specified, the default command is used.
+</ParamField>
+
+## kill-window
+
+Alias: `killw`
+
+```bash
+kill-window [-a] [-t target-window]
+```
+
+Destroy the given window.
+
+<ParamField path="-a" type="flag">
+  Kill all windows except the specified one.
+</ParamField>
+
+<ParamField path="-t" type="string">
+  The target window to destroy.
+</ParamField>
+
+## select-window
+
+Alias: `selectw`
+
+```bash
+select-window [-lnpT] [-t target-window]
+```
+
+Select a window. Makes the window the current window in the session.
+
+<ParamField path="-l" type="flag">
+  Select the last (previously selected) window.
+</ParamField>
+
+<ParamField path="-n" type="flag">
+  Select the next window.
+</ParamField>
+
+<ParamField path="-p" type="flag">
+  Select the previous window.
+</ParamField>
+
+<ParamField path="-T" type="flag">
+  If the window is already the current window, select the last window.
+</ParamField>
+
+<ParamField path="-t" type="string">
+  The target window to select.
+</ParamField>
+
+## list-windows
+
+Alias: `lsw`
+
+```bash
+list-windows [-a] [-r] [-F format] [-f filter] [-O sort-order] [-t target-session]
+```
+
+List windows. By default, lists windows in the current session.
+
+<ParamField path="-a" type="flag">
+  List all windows across all sessions.
+</ParamField>
+
+<ParamField path="-r" type="flag">
+  Reverse the sort order.
+</ParamField>
+
+<ParamField path="-F" type="string">
+  Specify the format of each line.
+</ParamField>
+
+<ParamField path="-f" type="string">
+  Only show windows for which the filter is true.
+</ParamField>
+
+<ParamField path="-O" type="string">
+  Specify sort order: `index`, `name`, `creation` (time), or `activity` (time).
+</ParamField>
+
+<ParamField path="-t" type="string">
+  List windows in the target session.
+</ParamField>
+
+## rename-window
+
+Alias: `renamew`
+
+```bash
+rename-window [-t target-window] new-name
+```
+
+Rename the window to `new-name`.
+
+<ParamField path="-t" type="string">
+  The target window to rename.
+</ParamField>
+
+<ParamField path="new-name" type="string" required>
+  The new name for the window.
+</ParamField>
+
+## move-window
+
+Alias: `movew`
+
+```bash
+move-window [-abdkr] [-s src-window] [-t dst-window]
+```
+
+Move or link a window to another location.
+
+<ParamField path="-a" type="flag">
+  Move the window to the next index after dst-window.
+</ParamField>
+
+<ParamField path="-b" type="flag">
+  Move the window to the next index before dst-window.
+</ParamField>
+
+<ParamField path="-d" type="flag">
+  Do not make the moved window the current window.
+</ParamField>
+
+<ParamField path="-k" type="flag">
+  If dst-window exists, destroy it before moving or linking.
+</ParamField>
+
+<ParamField path="-r" type="flag">
+  Renumber windows in the session in sequential order.
+</ParamField>
+
+<ParamField path="-s" type="string">
+  The source window to move.
+</ParamField>
+
+<ParamField path="-t" type="string">
+  The destination window position.
+</ParamField>
+
+## link-window
+
+Alias: `linkw`
+
+```bash
+link-window [-abdk] [-s src-window] [-t dst-window]
+```
+
+Link a window from one session into another. Links create a window that appears in multiple sessions.
+
+<ParamField path="-a" type="flag">
+  Link the window at the next index after dst-window.
+</ParamField>
+
+<ParamField path="-b" type="flag">
+  Link the window at the next index before dst-window.
+</ParamField>
+
+<ParamField path="-d" type="flag">
+  Do not make the linked window the current window.
+</ParamField>
+
+<ParamField path="-k" type="flag">
+  If dst-window exists, destroy it before linking.
+</ParamField>
+
+<ParamField path="-s" type="string">
+  The source window to link.
+</ParamField>
+
+<ParamField path="-t" type="string">
+  The destination window position.
+</ParamField>
+
+## unlink-window
+
+Alias: `unlinkw`
+
+```bash
+unlink-window [-k] [-t target-window]
+```
+
+Unlink a window from the current session. If the window is only linked to one session, it is destroyed.
+
+<ParamField path="-k" type="flag">
+  Kill the window if it is only present in one session.
+</ParamField>
+
+<ParamField path="-t" type="string">
+  The target window to unlink.
+</ParamField>
+
+## swap-window
+
+Alias: `swapw`
+
+```bash
+swap-window [-d] [-s src-window] [-t dst-window]
+```
+
+Swap two windows.
+
+<ParamField path="-d" type="flag">
+  Do not make the swapped window the current window.
+</ParamField>
+
+<ParamField path="-s" type="string">
+  The source window.
+</ParamField>
+
+<ParamField path="-t" type="string">
+  The destination window.
+</ParamField>
+
+## rotate-window
+
+Alias: `rotatew`
+
+```bash
+rotate-window [-DUZ] [-t target-window]
+```
+
+Rotate the panes in the window. All panes are moved around one position.
+
+<ParamField path="-D" type="flag">
+  Rotate downward (the last pane becomes the first).
+</ParamField>
+
+<ParamField path="-U" type="flag">
+  Rotate upward (the first pane becomes the last).
+</ParamField>
+
+<ParamField path="-Z" type="flag">
+  Keep the window zoomed if it was zoomed.
+</ParamField>
+
+<ParamField path="-t" type="string">
+  The target window.
+</ParamField>
+
+## respawn-window
+
+Alias: `respawnw`
+
+```bash
+respawn-window [-c start-directory] [-e environment] [-k] [-t target-window] 
+               [shell-command [argument ...]]
+```
+
+Reactivate a window where the command has exited.
+
+<ParamField path="-c" type="string">
+  Specify the working directory for the command.
+</ParamField>
+
+<ParamField path="-e" type="string">
+  Set an environment variable in the form `VARIABLE=value`. May be specified multiple times.
+</ParamField>
+
+<ParamField path="-k" type="flag">
+  Kill the existing command if it is still running.
+</ParamField>
+
+<ParamField path="-t" type="string">
+  The target window to respawn.
+</ParamField>
+
+<ParamField path="shell-command" type="string">
+  Shell command to execute. If not specified, the command used when the window was created is reused.
+</ParamField>
+
+## find-window
+
+Alias: `findw`
+
+```bash
+find-window [-iCNrTZ] [-t target-pane] match-string
+```
+
+Search for windows with names, titles, or visible content matching `match-string`.
+
+<ParamField path="-i" type="flag">
+  Ignore case when matching.
+</ParamField>
+
+<ParamField path="-C" type="flag">
+  Match only visible window contents.
+</ParamField>
+
+<ParamField path="-N" type="flag">
+  Match only window names.
+</ParamField>
+
+<ParamField path="-r" type="flag">
+  Match match-string as a regular expression.
+</ParamField>
+
+<ParamField path="-T" type="flag">
+  Match only window titles.
+</ParamField>
+
+<ParamField path="-Z" type="flag">
+  Zoom the pane.
+</ParamField>
+
+<ParamField path="-t" type="string">
+  The target pane for displaying results.
+</ParamField>
+
+<ParamField path="match-string" type="string" required>
+  The string or pattern to search for.
+</ParamField>
+
+## last-window
+
+Alias: `last`
+
+```bash
+last-window [-t target-session]
+```
+
+Select the last (previously selected) window.
+
+<ParamField path="-t" type="string">
+  The target session.
+</ParamField>
+
+## next-window
+
+Alias: `next`
+
+```bash
+next-window [-a] [-t target-session]
+```
+
+Select the next window in the session.
+
+<ParamField path="-a" type="flag">
+  Move to the next window with an alert (bell, activity, or silence).
+</ParamField>
+
+<ParamField path="-t" type="string">
+  The target session.
+</ParamField>
+
+## previous-window
+
+Alias: `prev`
+
+```bash
+previous-window [-a] [-t target-session]
+```
+
+Select the previous window in the session.
+
+<ParamField path="-a" type="flag">
+  Move to the previous window with an alert.
+</ParamField>
+
+<ParamField path="-t" type="string">
+  The target session.
+</ParamField>

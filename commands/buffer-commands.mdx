@@ -1,0 +1,465 @@
+---
+title: Buffer Commands
+description: Commands for managing paste buffers and copy mode in tmux
+---
+
+## Overview
+
+tmux maintains a set of named paste buffers. Each buffer may be either explicitly or automatically named. Buffers can be created from copy mode or by loading content from files.
+
+## Buffer Naming
+
+### Automatic Names
+
+Automatically named buffers are given names like `buffer0001`, `buffer0002`, etc. When the `buffer-limit` option is reached, the oldest automatically named buffer is deleted.
+
+### Explicit Names
+
+Buffers can be explicitly named when created with `set-buffer` or `load-buffer`, or by renaming with `set-buffer -n`. Explicitly named buffers are not subject to `buffer-limit` and must be deleted manually with `delete-buffer`.
+
+## copy-mode
+
+```bash
+copy-mode [-eHMqu] [-s src-pane] [-t target-pane]
+```
+
+Enter copy mode, which allows a section of a window or its history to be copied to a paste buffer.
+
+<ParamField path="-e" type="flag">
+  Scroll to bottom when reaching the end in copy mode.
+</ParamField>
+
+<ParamField path="-H" type="flag">
+  Hide the position indicator in the top right.
+</ParamField>
+
+<ParamField path="-M" type="flag">
+  Begin a mouse drag (only valid if bound to a mouse key binding).
+</ParamField>
+
+<ParamField path="-q" type="flag">
+  Cancel copy mode and any other modes.
+</ParamField>
+
+<ParamField path="-u" type="flag">
+  Scroll one page up immediately after entering copy mode.
+</ParamField>
+
+<ParamField path="-s" type="string">
+  Copy from src-pane instead of target-pane.
+</ParamField>
+
+<ParamField path="-t" type="string">
+  The target pane to enter copy mode in.
+</ParamField>
+
+### Copy Mode Key Bindings
+
+Copy mode uses one of two key tables depending on the `mode-keys` option:
+- `copy-mode` for emacs-style bindings
+- `copy-mode-vi` for vi-style bindings
+
+Key tables can be viewed with `list-keys -T copy-mode` or `list-keys -T copy-mode-vi`.
+
+### Copy Mode Commands
+
+Commands are sent to copy mode using `send-keys -X`. Common commands include:
+
+- `begin-selection`: Start selecting text
+- `cancel`: Exit copy mode
+- `copy-selection`: Copy the current selection
+- `copy-selection-and-cancel`: Copy selection and exit
+- `cursor-down`, `cursor-up`, `cursor-left`, `cursor-right`: Move cursor
+- `halfpage-down`, `halfpage-up`: Scroll half page
+- `history-top`, `history-bottom`: Jump to top/bottom of history
+- `search-forward`, `search-backward`: Search
+
+## paste-buffer
+
+Alias: `pasteb`
+
+```bash
+paste-buffer [-dpr] [-b buffer-name] [-s separator] [-t target-pane]
+```
+
+Insert the contents of a paste buffer into the specified pane.
+
+<ParamField path="-d" type="flag">
+  Also delete the paste buffer after pasting.
+</ParamField>
+
+<ParamField path="-p" type="flag">
+  Paste bracket control codes are sent before and after the buffer if the application has requested bracketed paste mode.
+</ParamField>
+
+<ParamField path="-r" type="flag">
+  Do not replace line feeds (LF) with carriage returns (CR) when pasting.
+</ParamField>
+
+<ParamField path="-b" type="string">
+  Name of the buffer to paste. If not specified, the most recently added automatically named buffer is used.
+</ParamField>
+
+<ParamField path="-s" type="string">
+  Separator to replace LF characters with. Default is carriage return (CR). Ignored with `-r`.
+</ParamField>
+
+<ParamField path="-t" type="string">
+  The target pane. If not specified, paste into the current pane.
+</ParamField>
+
+### Examples
+
+```bash
+# Paste the most recent buffer
+paste-buffer
+
+# Paste a specific buffer
+paste-buffer -b mybuffer
+
+# Paste and delete buffer
+paste-buffer -d
+
+# Paste without LF to CR conversion
+paste-buffer -r
+
+# Paste to a specific pane
+paste-buffer -t 0
+```
+
+## list-buffers
+
+Alias: `lsb`
+
+```bash
+list-buffers [-r] [-F format] [-f filter] [-O sort-order]
+```
+
+List the global paste buffers.
+
+<ParamField path="-r" type="flag">
+  Reverse the sort order.
+</ParamField>
+
+<ParamField path="-F" type="string">
+  Specify the format of each line. Available format variables:
+  - `#{buffer_name}`: Name of buffer
+  - `#{buffer_size}`: Size in bytes
+  - `#{buffer_sample}`: Sample of start of buffer
+  - `#{buffer_created}`: Time buffer was created
+</ParamField>
+
+<ParamField path="-f" type="string">
+  Only show buffers for which the filter is true.
+</ParamField>
+
+<ParamField path="-O" type="string">
+  Specify sort order: `name`, `size`, or `creation` (time).
+</ParamField>
+
+### Examples
+
+```bash
+# List all buffers
+list-buffers
+
+# List with custom format
+list-buffers -F "#{buffer_name}: #{buffer_size} bytes"
+
+# List sorted by size
+list-buffers -O size
+
+# List in reverse order
+list-buffers -r -O creation
+```
+
+## set-buffer
+
+Alias: `setb`
+
+```bash
+set-buffer [-aw] [-b buffer-name] [-t target-client] [-n new-buffer-name] [data]
+```
+
+Set the contents of a paste buffer or rename it.
+
+<ParamField path="-a" type="flag">
+  Append to the buffer instead of replacing.
+</ParamField>
+
+<ParamField path="-w" type="flag">
+  Send the buffer to the clipboard for target-client using the xterm escape sequence.
+</ParamField>
+
+<ParamField path="-b" type="string">
+  Name of the buffer. If not specified, a new automatically named buffer is created.
+</ParamField>
+
+<ParamField path="-t" type="string">
+  Target client for sending to clipboard (with `-w`).
+</ParamField>
+
+<ParamField path="-n" type="string">
+  Rename the buffer to new-buffer-name.
+</ParamField>
+
+<ParamField path="data" type="string">
+  Data to set in the buffer. If not specified and `-n` is used, renames the buffer.
+</ParamField>
+
+### Examples
+
+```bash
+# Create a new buffer with data
+set-buffer "Hello, World!"
+
+# Create a named buffer
+set-buffer -b mybuffer "Some text"
+
+# Append to a buffer
+set-buffer -a -b mybuffer " more text"
+
+# Rename a buffer
+set-buffer -b buffer0001 -n mybuffer
+
+# Send buffer to clipboard
+set-buffer -w -b mybuffer
+```
+
+## delete-buffer
+
+Alias: `deleteb`
+
+```bash
+delete-buffer [-b buffer-name]
+```
+
+Delete the specified paste buffer.
+
+<ParamField path="-b" type="string">
+  Name of the buffer to delete. If not specified, deletes the most recently added automatically named buffer.
+</ParamField>
+
+### Examples
+
+```bash
+# Delete the most recent buffer
+delete-buffer
+
+# Delete a specific buffer
+delete-buffer -b mybuffer
+```
+
+## load-buffer
+
+Alias: `loadb`
+
+```bash
+load-buffer [-w] [-b buffer-name] [-t target-client] path
+```
+
+Load the contents of a file into a paste buffer.
+
+<ParamField path="-w" type="flag">
+  Send the buffer to the clipboard for target-client using the xterm escape sequence.
+</ParamField>
+
+<ParamField path="-b" type="string">
+  Name for the buffer. If not specified, creates a new automatically named buffer.
+</ParamField>
+
+<ParamField path="-t" type="string">
+  Target client for sending to clipboard (with `-w`).
+</ParamField>
+
+<ParamField path="path" type="string" required>
+  Path to the file to load. Use `-` to read from stdin.
+</ParamField>
+
+### Examples
+
+```bash
+# Load from file
+load-buffer /path/to/file.txt
+
+# Load into named buffer
+load-buffer -b mybuffer /path/to/file.txt
+
+# Load from stdin
+echo "test" | tmux load-buffer -
+
+# Load and send to clipboard
+load-buffer -w /path/to/file.txt
+```
+
+## save-buffer
+
+Alias: `saveb`
+
+```bash
+save-buffer [-a] [-b buffer-name] path
+```
+
+Save the contents of a paste buffer to a file.
+
+<ParamField path="-a" type="flag">
+  Append to the file instead of overwriting.
+</ParamField>
+
+<ParamField path="-b" type="string">
+  Name of the buffer to save. If not specified, uses the most recently added automatically named buffer.
+</ParamField>
+
+<ParamField path="path" type="string" required>
+  Path to save to. Use `-` to write to stdout.
+</ParamField>
+
+### Examples
+
+```bash
+# Save to file
+save-buffer /path/to/file.txt
+
+# Save specific buffer
+save-buffer -b mybuffer /path/to/file.txt
+
+# Append to file
+save-buffer -a /path/to/file.txt
+
+# Write to stdout
+save-buffer -
+```
+
+## show-buffer
+
+Alias: `showb`
+
+```bash
+show-buffer [-b buffer-name]
+```
+
+Display the contents of a paste buffer.
+
+<ParamField path="-b" type="string">
+  Name of the buffer to show. If not specified, shows the most recently added automatically named buffer.
+</ParamField>
+
+### Examples
+
+```bash
+# Show most recent buffer
+show-buffer
+
+# Show specific buffer
+show-buffer -b mybuffer
+```
+
+## choose-buffer
+
+```bash
+choose-buffer [-NryZ] [-F format] [-f filter] [-K key-format] 
+              [-O sort-order] [-t target-pane] [template]
+```
+
+Put a pane into buffer mode, where a buffer may be chosen interactively from a list.
+
+<ParamField path="-N" type="flag">
+  Start without the preview.
+</ParamField>
+
+<ParamField path="-r" type="flag">
+  Reverse the sort order.
+</ParamField>
+
+<ParamField path="-y" type="flag">
+  Disable any confirmation prompts.
+</ParamField>
+
+<ParamField path="-Z" type="flag">
+  Zoom the pane.
+</ParamField>
+
+<ParamField path="-F" type="string">
+  Format for each item in the list.
+</ParamField>
+
+<ParamField path="-f" type="string">
+  Initial filter (as a format expression).
+</ParamField>
+
+<ParamField path="-K" type="string">
+  Format for each shortcut key.
+</ParamField>
+
+<ParamField path="-O" type="string">
+  Initial sort order: `creation` (time), `name`, or `size`.
+</ParamField>
+
+<ParamField path="-t" type="string">
+  Target pane.
+</ParamField>
+
+<ParamField path="template" type="string">
+  After a buffer is chosen, `%%` is replaced by the buffer name and the result is executed as a command. Default: `paste-buffer -p -b '%%'`
+</ParamField>
+
+### Buffer Mode Keys
+
+- `Enter`: Paste selected buffer
+- `Up`/`Down`: Navigate
+- `C-s`: Search
+- `n`/`N`: Repeat search forward/backward
+- `t`: Toggle tag
+- `T`/`C-t`: Tag none/all
+- `p`/`P`: Paste selected/tagged buffers
+- `d`/`D`: Delete selected/tagged buffers
+- `e`: Open buffer in editor
+- `f`: Enter filter
+- `O`: Change sort order
+- `r`: Reverse sort
+- `v`: Toggle preview
+- `q`: Exit
+
+### Examples
+
+```bash
+# Choose buffer interactively
+choose-buffer
+
+# Choose with custom action
+choose-buffer "save-buffer -b '%%' /tmp/buffer.txt"
+
+# Choose sorted by size
+choose-buffer -O size
+```
+
+## clear-history
+
+Alias: `clearhist`
+
+```bash
+clear-history [-H] [-t target-pane]
+```
+
+Remove and free the history for the specified pane.
+
+<ParamField path="-H" type="flag">
+  Also remove all hyperlinks.
+</ParamField>
+
+<ParamField path="-t" type="string">
+  The target pane.
+</ParamField>
+
+### Examples
+
+```bash
+# Clear history in current pane
+clear-history
+
+# Clear history in specific pane
+clear-history -t 0
+
+# Clear history and hyperlinks
+clear-history -H
+```

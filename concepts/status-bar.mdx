@@ -1,0 +1,432 @@
+---
+title: Status Bar
+description: Understanding the tmux status line for session information and customization
+---
+
+## Overview
+
+The status line in tmux appears at the bottom (or top) of the screen and displays information about the current session. From the man page (tmux.1:51-53):
+
+<Note>
+A status line at the bottom of the screen shows information on the current session and is used to enter interactive commands.
+</Note>
+
+## Status Line Architecture
+
+From `status.c:227-238`, the status line is updated based on intervals:
+
+```c
+void
+status_update_cache(struct session *s)
+{
+    s->statuslines = options_get_number(s->options, "status");
+    if (s->statuslines == 0)
+        s->statusat = -1;
+    else if (options_get_number(s->options, "status-position") == 0)
+        s->statusat = 0;  // Top
+    else
+        s->statusat = 1;  // Bottom
+}
+```
+
+## Basic Configuration
+
+### Enabling and Positioning
+
+```bash
+# Enable status line (0=off, 1=on, 2+ for multiple lines)
+$ tmux set-option -g status on
+$ tmux set-option -g status 2  # Two status lines
+
+# Position at top
+$ tmux set-option -g status-position top
+
+# Position at bottom (default)
+$ tmux set-option -g status-position bottom
+```
+
+### Update Interval
+
+From `status.c:178-200`:
+
+```c
+static void
+status_timer_callback(__unused int fd, __unused short events, void *arg)
+{
+    struct client *c = arg;
+    struct session *s = c->session;
+    struct timeval tv;
+    
+    evtimer_del(&c->status.timer);
+    
+    if (s == NULL)
+        return;
+    
+    if (c->message_string == NULL && c->prompt_string == NULL)
+        c->flags |= CLIENT_REDRAWSTATUS;
+    
+    timerclear(&tv);
+    tv.tv_sec = options_get_number(s->options, "status-interval");
+    
+    if (tv.tv_sec != 0)
+        evtimer_add(&c->status.timer, &tv);
+}
+```
+
+```bash
+# Set update interval (in seconds)
+$ tmux set-option -g status-interval 5
+
+# Disable automatic updates
+$ tmux set-option -g status-interval 0
+```
+
+## Styling the Status Line
+
+### Colors and Attributes
+
+From `status.c:406-417`, the status line applies styles:
+
+```c
+/* Set up default colour. */
+style_apply(&gc, s->options, "status-style", ft);
+fg = options_get_number(s->options, "status-fg");
+if (!COLOUR_DEFAULT(fg))
+    gc.fg = fg;
+bg = options_get_number(s->options, "status-bg");
+if (!COLOUR_DEFAULT(bg))
+    gc.bg = bg;
+```
+
+```bash
+# Set overall status line style
+$ tmux set-option -g status-style bg=black,fg=white
+
+# Set individual colors
+$ tmux set-option -g status-fg yellow
+$ tmux set-option -g status-bg blue
+
+# Add attributes
+$ tmux set-option -g status-style bg=black,fg=white,bold
+$ tmux set-option -g status-style bg=black,fg=white,dim
+$ tmux set-option -g status-style bg=black,fg=white,italics
+```
+
+Available attributes:
+- `bright` or `bold`
+- `dim`
+- `underscore`
+- `blink`
+- `reverse`
+- `hidden` or `invisible`
+- `italics`
+- `strikethrough`
+
+### Left and Right Sections
+
+```bash
+# Configure left section
+$ tmux set-option -g status-left '[#S] '
+$ tmux set-option -g status-left-length 20
+$ tmux set-option -g status-left-style bg=green,fg=black,bold
+
+# Configure right section  
+$ tmux set-option -g status-right '%H:%M %d-%b-%y'
+$ tmux set-option -g status-right-length 40
+$ tmux set-option -g status-right-style bg=cyan,fg=black
+
+# Alignment
+$ tmux set-option -g status-justify left     # left, centre, right
+$ tmux set-option -g status-justify centre
+```
+
+## Format Strings
+
+The status line supports format strings for dynamic content. From the man page, common format variables:
+
+### Session Variables
+
+- `#{session_name}` - Name of session
+- `#{session_id}` - Session ID (with $)
+- `#{session_windows}` - Number of windows in session
+- `#{session_attached}` - Number of clients attached
+- `#{session_created}` - Session creation time
+- `#{session_activity}` - Time of session last activity
+
+### Window Variables
+
+- `#{window_index}` - Window index
+- `#{window_name}` - Window name
+- `#{window_id}` - Window ID (with @)
+- `#{window_active}` - 1 if window is active
+- `#{window_flags}` - Window flags (#,!,~,*,-,Z)
+- `#{window_panes}` - Number of panes in window
+
+### Pane Variables
+
+- `#{pane_index}` - Pane index
+- `#{pane_id}` - Pane ID (with %)
+- `#{pane_current_command}` - Command running in pane
+- `#{pane_current_path}` - Current path in pane
+- `#{pane_width}` - Pane width
+- `#{pane_height}` - Pane height
+
+### System Variables
+
+- `#{host}` - Hostname
+- `#{host_short}` - Hostname without domain
+- `#{pid}` - Server PID
+
+### Time Variables
+
+Supports `strftime` format:
+
+- `%H` - Hour (24-hour)
+- `%M` - Minute
+- `%S` - Second
+- `%d` - Day of month
+- `%m` - Month number
+- `%b` - Month name (abbreviated)
+- `%Y` - Year (4 digits)
+- `%a` - Weekday name (abbreviated)
+
+### Example Configurations
+
+<CodeGroup>
+```bash Simple
+$ tmux set-option -g status-left '[#S] '
+$ tmux set-option -g status-right '%H:%M'
+```
+
+```bash Detailed
+$ tmux set-option -g status-left '#[fg=green][#S] #[fg=yellow]#I:#P '
+$ tmux set-option -g status-right '#[fg=cyan]%d %b #[fg=white]%H:%M'
+```
+
+```bash Advanced
+$ tmux set-option -g status-left '#[bg=blue,fg=black,bold] #S #[bg=yellow,fg=black] #(whoami)@#H '
+$ tmux set-option -g status-right '#[fg=white]#(uptime | cut -d "," -f 3-) #[bg=green,fg=black] %Y-%m-%d %H:%M '
+```
+</CodeGroup>
+
+## Window Status
+
+From `status.c:427-463`, each window is formatted in the status line:
+
+```c
+for (i = 0; i < lines; i++) {
+    screen_write_cursormove(&ctx, 0, i, 0);
+    
+    ov = options_array_get(o, i);
+    if (ov == NULL) {
+        for (n = 0; n < width; n++)
+            screen_write_putc(&ctx, &gc, ' ');
+        continue;
+    }
+    sle = &sl->entries[i];
+    
+    expanded = format_expand_time(ft, ov->string);
+    // ... render window list
+}
+```
+
+### Window Status Formats
+
+```bash
+# Current window format
+$ tmux set-option -g window-status-current-format '#I:#W#F'
+$ tmux set-option -g window-status-current-style bg=red,fg=white,bold
+
+# Other windows format
+$ tmux set-option -g window-status-format '#I:#W#F'
+$ tmux set-option -g window-status-style fg=white
+
+# Separator between windows
+$ tmux set-option -g window-status-separator ' | '
+```
+
+### Window Flags
+
+From `window.c:877-904`, windows display various flags:
+
+- `*` - Current window
+- `-` - Last window (previously selected)
+- `#` - Activity in window (when `monitor-activity` on)
+- `!` - Bell in window
+- `~` - Silence in window (when `monitor-silence` on)
+- `M` - Marked pane in window
+- `Z` - Window is zoomed
+
+```bash
+# Example: show all flags clearly
+$ tmux set-option -g window-status-current-format '[#I:#W#F]'
+```
+
+## Custom Status Format
+
+From `status.c:428`, tmux supports `status-format` array for multiple status lines:
+
+```bash
+# Single custom format
+$ tmux set-option -g status-format[0] '#[align=left]Left #[align=centre]Centre #[align=right]Right'
+
+# Multiple status lines
+$ tmux set-option -g status 2
+$ tmux set-option -g status-format[0] '#[align=centre]#{session_name}'
+$ tmux set-option -g status-format[1] '#[align=left]#{window_name} #[align=right]%H:%M'
+```
+
+## Messages and Prompts
+
+From `status.c:475-526` and `status.c:554-606`:
+
+```c
+void
+status_message_set(struct client *c, int delay, int ignore_styles,
+    int ignore_keys, int no_freeze, const char *fmt, ...)
+{
+    // Set a status line message
+    status_push_screen(c);
+    c->message_string = s;
+    
+    if (delay > 0) {
+        tv.tv_sec = delay / 1000;
+        tv.tv_usec = (delay % 1000) * 1000L;
+        evtimer_add(&c->message_timer, &tv);
+    }
+}
+```
+
+### Message Display
+
+```bash
+# Display time for messages (milliseconds)
+$ tmux set-option -g display-time 2000
+
+# Message style
+$ tmux set-option -g message-style bg=yellow,fg=black
+
+# Command prompt style
+$ tmux set-option -g message-command-style bg=blue,fg=white
+
+# Message position (which status line)
+$ tmux set-option -g message-line 0  # Use first status line
+```
+
+### Command Prompt
+
+From `status.c:622-680`:
+
+```c
+void
+status_prompt_set(struct client *c, struct cmd_find_state *fs,
+    const char *msg, const char *input, prompt_input_cb inputcb,
+    prompt_free_cb freecb, void *data, int flags, enum prompt_type prompt_type)
+{
+    status_push_screen(c);
+    c->prompt_string = xstrdup(msg);
+    c->prompt_buffer = utf8_fromcstr(tmp);
+    // ...
+}
+```
+
+```bash
+# Customize prompt cursor
+$ tmux set-option -g prompt-cursor-colour red
+$ tmux set-option -g prompt-cursor-style block  # block, bar, underline
+
+# Different cursor for command mode (vi mode)
+$ tmux set-option -g prompt-command-cursor-style bar
+```
+
+## Advanced Styling
+
+### Style Ranges
+
+From `status.c:282-296`, the status line supports style ranges for clickable regions:
+
+```c
+struct style_range *
+status_get_range(struct client *c, u_int x, u_int y)
+{
+    struct status_line *sl = &c->status;
+    struct style_range *sr;
+    
+    if (y >= nitems(sl->entries))
+        return (NULL);
+    TAILQ_FOREACH(sr, &sl->entries[y].ranges, entry) {
+        if (x >= sr->start && x < sr->end)
+            return (sr);
+    }
+    return (NULL);
+}
+```
+
+### Colors
+
+Supported color formats:
+
+- Named colors: `black`, `red`, `green`, `yellow`, `blue`, `magenta`, `cyan`, `white`
+- Bright variants: `brightred`, `brightgreen`, etc.
+- `colour0` through `colour255` for 256-color palette
+- `default` for terminal default
+- Hex colors: `#ffffff`, `#ff0000`, etc.
+
+```bash
+# Using various color formats
+$ tmux set-option -g status-style bg=colour235,fg=colour250
+$ tmux set-option -g status-left-style bg=#282828,fg=#ebdbb2
+```
+
+## Example Configurations
+
+### Minimal Status Line
+
+```bash
+tmux set-option -g status-style bg=black,fg=white
+tmux set-option -g status-left '[#S] '
+tmux set-option -g status-right '%H:%M'
+tmux set-option -g window-status-current-style bg=blue,fg=white
+```
+
+### Detailed Status Line
+
+```bash
+tmux set-option -g status-style bg=colour235,fg=colour250
+tmux set-option -g status-left-length 50
+tmux set-option -g status-left '#[bg=colour241,fg=colour255,bold] #S #[bg=colour235,fg=colour241]'
+tmux set-option -g status-right '#[fg=colour241]#[bg=colour241,fg=colour255] %Y-%m-%d #[bg=colour245,fg=colour0,bold] %H:%M '
+tmux set-option -g window-status-format ' #I:#W#F '
+tmux set-option -g window-status-current-format '#[bg=colour33,fg=colour235]#[bg=colour33,fg=colour0,bold] #I:#W#F #[bg=colour235,fg=colour33]'
+```
+
+### Powerline-Style Status Line
+
+```bash
+tmux set-option -g status-left '#[bg=colour33,fg=colour0,bold] #S #[bg=colour235,fg=colour33]'
+tmux set-option -g status-right '#[fg=colour241]#[bg=colour241,fg=colour255] %d %b #[fg=colour245]#[bg=colour245,fg=colour0,bold] %H:%M '
+tmux set-option -g window-status-format ' #I:#W '
+tmux set-option -g window-status-current-format '#[fg=colour235,bg=colour33]#[bg=colour33,fg=colour0,bold] #I:#W #[fg=colour33,bg=colour235]'
+tmux set-option -g window-status-separator ''
+```
+
+<Note>
+Powerline symbols require a font with powerline support. Use Unicode characters: ` ` (U+E0B0) and ` ` (U+E0B2).
+</Note>
+
+## Best Practices
+
+1. **Keep it readable**: Don't overload with information
+2. **Use colors wisely**: Maintain good contrast
+3. **Set appropriate intervals**: Balance freshness vs. CPU usage
+4. **Test on different terminals**: Verify color support
+5. **Consider width**: Remember the status line width is limited
+6. **Use format conditionals**: Show information only when relevant
+7. **Document your config**: Comment complex format strings
+
+```bash
+# Conditional formatting example
+$ tmux set-option -g status-right '#{?client_prefix,#[bg=red],#[bg=green]} %H:%M '
+```
+
+This shows red when prefix is pressed, green otherwise.

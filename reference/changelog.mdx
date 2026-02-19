@@ -1,0 +1,341 @@
+---
+title: 'Changelog'
+description: 'Release history and changes in tmux versions'
+---
+
+This page documents the major changes and improvements in recent tmux releases.
+
+## Version 3.6a (Latest Patch Release)
+
+### Bug Fixes
+
+- Fix a buffer overread and an infinite loop in format processing (issue 4735)
+- Allow drag in alternate screen again (issue 4743)
+- Fix y offset of mouse if status at top (issue 4738)
+- Add a missing skin tone (issue 4736)
+- Allow characters to be combined in either order (issue 4726)
+- Fix horizontal mouse resizing when pane status lines are on (issue 4720)
+- Fix noattr so it does not delete attributes set in the style itself (issue 4713)
+- Newer libevents do not allow event_del on a zero'd event (issue 4706)
+- Place cursor on correct line if message-line is not 0 (issue 4707)
+- Fix compile error on FreeBSD (issue 4701)
+
+## Version 3.6
+
+### New Features
+
+#### Display and Formatting
+
+- Add seconds options for clock mode (12-with-seconds, 24-with-seconds) (issue 4697)
+- Add nicer default second and third status lines (issue 4490)
+- Add a pane-border-lines "spaces" value to use spaces for pane borders (issue 4587)
+
+#### Copy Mode
+
+- Add selection-mode command to explicitly set the selection mode in copy mode (issue 3842)
+- Add commands to centre the cursor in copy mode (issue 4662)
+- Support case insensitive search (all-lowercase means case insensitive, like emacs) (issue 4396)
+
+#### Options and Configuration
+
+- Introduce a new window option, `tiled-layout-max-columns`, which configures the maximum number of columns in the tiled layout
+- Add `buffer_full` format variable (issue 4630)
+- Add `input-buffer-size` option to control buffer size
+- Add `codepoint-widths` option allowing users to override the width of individual Unicode codepoints
+
+#### Popups and Menus
+
+- Add -k flag to display-popup which allows any key to dismiss the popup once the command has exited (issue 4612)
+- Add a resize callback for menus so that they are correctly moved on resize (issue 4696)
+- If display-popup is used inside a popup, modify that popup (issue 4678)
+
+#### Terminal Support
+
+- Add support for DECRQSS SP q (report cursor style)
+- Add DECRQM ?12 (report cursor blink state)
+- Add DECRQM ?2004, ?1004, ?1006 (report mouse state) (issue 4618)
+- Detect support for OSC 52 using the device attributes report (issue 4539)
+
+#### Mouse and Scrollbars
+
+- Add support for a scrollbar at the side of each pane
+- New options `pane-scrollbars`, `pane-scrollbars-position`, and `pane-scrollbars-style` (issue 4221)
+- Allow drag in alternate screen
+
+### Improvements
+
+- Save and restore images in alternate screen (issue 3732)
+- Improve handling of regional indicators and emoji modifiers (issue 3998)
+- Preserve marked pane with swap-window and move-window (issue 3443)
+- Set and check COLORTERM as a hint for RGB colour
+- Add sorting to W, P, L loop operators (issue 4516)
+- Replace invalid UTF-8 characters with the placeholder instead of ignoring them (issue 4514)
+- Fix incorrect handling of Korean Hangul Jamo characters (issue 4546)
+- Allow uppercase letters in gray/grey color names (issue 4560)
+- Don't enter copy mode on mouse wheel in alternate screen (issue 3705)
+- Make -v to source-file pass through to subsequent source-file commands (issue 4216)
+
+### Color and Palette
+
+- If tmux receives a palette request (OSC 4) in a pane and the palette entry has not been set, send a request to the most recently used client and forward any response instead (issue 4665)
+- Fix missing argument from OSC 4 reply (issue 4596)
+- Add `pane-colours` array option to specify the defaults palette
+
+### Other Changes
+
+- Add -l flag to command-prompt to disable splitting into multiple prompts (issue 4483)
+- Fix the logic of the no-detached case for the detach-on-destroy option (issue 4649)
+- Ignore Hangul filler character (issue 3998)
+- Add noattr for styles to allow whether attributes are ignored or used to be configured (issue 4498)
+
+## Version 3.5a
+
+### Bug Fixes
+
+- Do not translate BSpace as Unicode with extended keys
+- Fix so that keys with Shift are represented correctly with extended keys
+- Revert to using /bin/sh for #() and run-shell and if-shell; the change to use default-shell only applies now to popups
+- Fix grey colour without a number suffix in styles
+
+## Version 3.5
+
+### Extended Keys Support
+
+- Revamp extended keys support to more closely match xterm and support mode 2 as well as mode 1
+- This is a substantial change to key handling which changes tmux to always request mode 2 from parent terminal
+- Changes to an unambiguous internal representation of keys
+- Adds an option `extended-keys-format` to control the format (similar to xterm's formatOtherKeys resource)
+
+### Copy Mode Enhancements
+
+- Add copy-mode -d flag to scroll a page down if in copy mode already (matching -e)
+- Display hyperlinks in copy mode
+- Add `copy_cursor_hyperlink` format to get the hyperlink under the cursor
+- Add `search_count` and `search_count_partial` formats in copy mode
+- Allow REP to work with Unicode characters
+
+### New Features
+
+- Add a prefix timeout option (`prefix-timeout`)
+- Add `initial-repeat-time` option to allow the first repeat time to be increased and later reduced (issue 4164)
+- Add mirrored versions of the main-horizontal and main-vertical layouts where the main pane is bottom or right instead of top or left
+- Add `prompt-cursor-colour` and `prompt-cursor-style` to set the style of the cursor in the command prompt (issue 4170)
+- Add `no-detach-on-destroy` client option (issue 4242)
+
+### Layout and Display
+
+- Do not reset mouse pane if clicked on status line
+- Clear an overlay (popup or menu) when command prompt is entered
+- Send focus events to pane when entering or leaving popup (issue 3991)
+- Add -y flag to disable confirmation prompts in modes (issue 4152)
+
+### Terminal Features
+
+- Add support for mode 2031 to automatically report dark or light theme
+- tmux will guess the theme from the background colour on terminals which do not themselves support the escape sequence (issue 4353)
+- Try to query window pixel size from the outside terminal if the values returned by TIOCGWINSZ are zero (issue 4099)
+
+### Improvements
+
+- Treat CRLF as LF in config files where it is easy to do so
+- The Linux console has some bugs with bright colours, so add some workarounds for it
+- If built with systemd, remove some environment variables it uses
+- Add -E flag to run-shell to forward stderr as well as stdout (issue 4246)
+- Switch to getopt_long from OpenSSH (issue 4492)
+
+### Copy and Clipboard
+
+- Add -C and -P flags to the copy commands in copy mode:
+  - -C prevents the commands from sending the text to the clipboard
+  - -P prevents them from adding the text as a paste buffer (issue 4153)
+- Preserve tabs for copying and capture-pane (issue 4201)
+- Allow control characters to be entered at the command prompt by prefixing with C-v (issue 4206)
+
+### Bug Fixes
+
+- Fix size calculation of terminators for clipboard escape sequences
+- Adjust the logic when deleting last buffer to better preserve the selection
+- Do not attempt to search for zero length strings (issue 4209)
+- Use global cursor style and colour options for modes instead of default (issue 4117)
+- Fix pasting so it does not interpret keys but instead copies the input without interpretation
+
+## Version 3.4
+
+### SIXEL Support
+
+- Add basic support for SIXEL if built with --enable-sixel
+- Add `sixel_support` format variable which is 1 if SIXEL is supported
+
+### OSC 133 Shell Integration
+
+- Add support for marking lines with a shell prompt based on the OSC 133 extension
+- Add -o flag to next-prompt/previous-prompt to go to OSC 133 command output
+
+### Menu and Popup Improvements
+
+- Add options and flags for menu styles (`menu-style`, `menu-border-style`) similar to those existing for popups
+- Add `menu-border-lines` option for menu border line types
+
+### Mouse and Status Line
+
+- Add a session, pane and user mouse range types for the status line
+- Add format variables for `mouse_status_line` and `mouse_status_range`
+- Add `message-line` option to control where message and prompt go
+
+### Formatting and Styles
+
+- Add "us" to styles for underscore colour
+- Add support for underscore colours (Setulc capability must be added with terminal-overrides)
+- Allow attributes in menu style (issue 4194)
+
+### Hooks and Commands
+
+- Add a `command-error` hook when a command fails
+- Add `allow-set-title` option to forbid applications from changing the pane title
+
+### Cgroups and Process Management
+
+- Add support for spawning panes in separate cgroups with systemd
+- Add a configure flag (--disable-cgroups) to turn off
+- Set default lock command to vlock on Linux if present at build time
+
+### Format and Display
+
+- Add a format (`pane_unseen_changes`) to show if there are unseen changes while in a mode
+- Add `pane_marked_flag` format variable
+- Store the time lines are scrolled into history and display in copy mode
+- Add an L modifier like P, W, S to loop over clients
+
+### Other Features
+
+- Add -f to list-clients like the other list commands
+- Extend display-message to work for control clients
+- Add a flag to display-menu to select the menu item selected when the menu is open
+- Have tmux recognize pasted text wrapped in bracket paste sequences
+- Add send-keys -K to handle keys directly as if typed (so look up in key table)
+- Add scroll-top and scroll-bottom commands to scroll so cursor is at top or bottom
+
+### Improvements
+
+- Check for libterminfo for NetBSD
+- Use ncurses' new tparm_s function (added in 6.4-20230424) instead of tparm
+- Discard mouse sequences that have the right form but actually are invalid
+- Remove old buffer when renaming rather than complaining
+- Have client return 1 if process is interrupted to an input pane
+
+### OSC and Hyperlinks
+
+- Add support for OSC 8 hyperlinks
+- Query the client terminal for foreground and background colours and if OSC 10 or 11 is received but no colour has been set inside tmux, return the colour from the first attached client
+
+### Bug Fixes and Compatibility
+
+- Correct handling of mouse up events (don't ignore all but the last released button)
+- Fix a crash if focusing a pane that is exiting
+- Do not crash when run-shell produces output from a config file
+- Do not allow pipe-pane on dead panes
+- Fix split-window -p
+- Bypass permission check for Cygwin (issue 4148)
+
+## Version 3.3a
+
+### Bug Fixes
+
+- Do not crash when run-shell produces output from a config file
+- Do not unintentionally turn off all mouse mode when button mode is also present
+
+## Version 3.3
+
+### Access Control
+
+- Add an ACL list for users connecting to the tmux socket
+- Users may be forbidden from attaching, forced to attach read-only, or allowed to attach read-write
+- New command `server-access` configures the list
+- File system permissions must still be configured manually
+
+### Window and Pane Management
+
+- Add options `keep-last` and `keep-group` to destroy-unattached to keep the last session whether in a group
+- Add an option (`pane-border-indicators`) to select how the active pane is shown on the pane border (colour, arrows or both)
+- Support more mouse buttons when the terminal sends them
+- Make pane-border-format a pane option rather than window
+- Add `remain-on-exit-format` to set text shown when pane is dead
+- With split-window -f use percentages of window size not pane size
+
+### Formatting and Display
+
+- Add an option (`fill-character`) to set the character used for unused areas of a client
+- Add an option (`scroll-on-clear`) to control if tmux scrolls into history on clear
+- Add `next_session_id` format with the next session ID
+- Add formats for client and server UID and user
+- Add underscore styles with capture-pane -e
+
+### Cursor and Colors
+
+- Add `cursor-style` and `cursor-colour` options to set the default cursor style and colour
+- Respond to OSC 4 queries
+
+### Popups
+
+- Add -s and -S to display-popup to set styles
+- Add -b to set lines and -T to set popup title
+- New `popup-border-lines`, `popup-border-style` and `popup-style` options set the defaults
+- Add -e flag to set an environment variable for a popup
+- Do not close popups on resize, instead adjust them to fit
+- Support the OSC palette-setting sequences in popups
+
+### Hooks and Events
+
+- Add a `window-resized` hook which is fired when the window is actually resized (may be later than the client resize)
+- Add a `client-active` hook
+- Make `window-linked` and `window-unlinked` window options
+- Change focus to be driven by events rather than scanning panes
+
+### Key Bindings
+
+- Accept some useful and non-conflicting emacs keys in vi normal mode at the command prompt
+- Make send-keys without arguments send the key it is bound to (if bound to a key)
+- Add a -e flag to new-window, split-window, respawn-window, respawn-pane to pass environment variables
+
+### Terminal Features
+
+- Add a capability for OSC 7 and use it similarly to how the title is set (controlled by the same set-titles option)
+- Add support for systemd socket activation (where systemd creates the Unix domain socket for tmux). Build with --enable-systemd
+- If automatic-rename is off, allow the rename escape sequence to set an empty name
+- Bump the time terminals have to respond to device attributes queries to three seconds
+
+### Other Features
+
+- Add argument to refresh-client -l to forward clipboard to a pane
+- Add support for Unicode zero-width joiner
+- Make newline a style delimiter as well so they can cross multiple lines for readability in configuration files
+- Set PWD so shells have a hint about the real path
+- Add `pane_start_path` to match `start_command`
+
+### Bug Fixes
+
+- Handle ANSI escape sequences in run-shell output
+- Better error reporting when applying custom layouts
+- Emit window-layout-changed on swap-pane
+- Do not report mouse positions (incorrectly) above the maximum of 223 in normal mouse mode
+- Fix g/G keys in modes to do the same thing as copy mode (and vi)
+- Trim menu item text more intelligently
+
+## Older Versions
+
+For complete changelog of versions prior to 3.3, please refer to the [CHANGES file](https://github.com/tmux/tmux/blob/master/CHANGES) in the tmux repository.
+
+## Getting Updates
+
+To check your current tmux version:
+
+```bash
+tmux -V
+```
+
+To get the latest version:
+
+- **From package manager**: Use your system's package manager (`apt`, `brew`, `yum`, etc.)
+- **From source**: Visit the [tmux releases page](https://github.com/tmux/tmux/releases)
+
+For detailed installation instructions, see the [Installation Guide](/docs/installation).

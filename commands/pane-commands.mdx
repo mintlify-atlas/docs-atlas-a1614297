@@ -1,0 +1,547 @@
+---
+title: Pane Commands
+description: Commands for creating, managing, and manipulating tmux panes
+---
+
+## Overview
+
+Each window displayed by tmux may be split into one or more panes. Each pane takes up a certain area of the display and is a separate terminal. Panes are numbered beginning from zero in the order they are created.
+
+## split-window
+
+Alias: `splitw`
+
+```bash
+split-window [-bdefhIPvZ] [-c start-directory] [-e environment] [-F format] 
+             [-l size] [-t target-pane] [shell-command [argument ...]]
+```
+
+Create a new pane by splitting the target pane.
+
+<ParamField path="-b" type="flag">
+  Create the new pane to the left of or above the target pane.
+</ParamField>
+
+<ParamField path="-d" type="flag">
+  Do not make the new pane the active pane.
+</ParamField>
+
+<ParamField path="-e" type="string">
+  Set an environment variable for the new pane in the form `VARIABLE=value`. May be specified multiple times.
+</ParamField>
+
+<ParamField path="-f" type="flag">
+  Create a new pane spanning the full window height (with `-h`) or width (with `-v`) instead of splitting the active pane.
+</ParamField>
+
+<ParamField path="-h" type="flag">
+  Split horizontally, creating a pane to the left or right.
+</ParamField>
+
+<ParamField path="-I" type="flag">
+  Create an empty pane and forward any output from stdin to it.
+</ParamField>
+
+<ParamField path="-P" type="flag">
+  Print information about the new pane after it has been created. Default format is `#{session_name}:#{window_index}.#{pane_index}` but can be changed with `-F`.
+</ParamField>
+
+<ParamField path="-v" type="flag">
+  Split vertically, creating a pane above or below. This is the default.
+</ParamField>
+
+<ParamField path="-Z" type="flag">
+  Zoom the active pane if the window is not zoomed, or keep it zoomed if it was zoomed.
+</ParamField>
+
+<ParamField path="-c" type="string">
+  Specify the working directory for the new pane.
+</ParamField>
+
+<ParamField path="-F" type="string">
+  Format for output when `-P` is used.
+</ParamField>
+
+<ParamField path="-l" type="string">
+  Specify the size of the new pane in lines (for vertical split) or columns (for horizontal split). Can be specified as:
+  - A number of cells
+  - A percentage (e.g., `50%`)
+</ParamField>
+
+<ParamField path="-t" type="string">
+  The target pane to split.
+</ParamField>
+
+<ParamField path="shell-command" type="string">
+  Shell command to execute in the new pane.
+</ParamField>
+
+## kill-pane
+
+Alias: `killp`
+
+```bash
+kill-pane [-a] [-t target-pane]
+```
+
+Destroy the given pane.
+
+<ParamField path="-a" type="flag">
+  Kill all panes except the specified one.
+</ParamField>
+
+<ParamField path="-t" type="string">
+  The target pane to destroy.
+</ParamField>
+
+## select-pane
+
+Alias: `selectp`
+
+```bash
+select-pane [-DdeLlMmRUZ] [-T title] [-t target-pane]
+```
+
+Make a pane the active pane in the window.
+
+<ParamField path="-D" type="flag">
+  Select the pane below the active pane.
+</ParamField>
+
+<ParamField path="-d" type="flag">
+  Disable input to the pane.
+</ParamField>
+
+<ParamField path="-e" type="flag">
+  Enable input to the pane.
+</ParamField>
+
+<ParamField path="-L" type="flag">
+  Select the pane to the left of the active pane.
+</ParamField>
+
+<ParamField path="-l" type="flag">
+  Select the last (previously active) pane.
+</ParamField>
+
+<ParamField path="-M" type="flag">
+  Clear the marked pane.
+</ParamField>
+
+<ParamField path="-m" type="flag">
+  Mark the pane. The marked pane is the default target for `-s` to `join-pane`, `move-pane`, `swap-pane`, and `swap-window`.
+</ParamField>
+
+<ParamField path="-R" type="flag">
+  Select the pane to the right of the active pane.
+</ParamField>
+
+<ParamField path="-U" type="flag">
+  Select the pane above the active pane.
+</ParamField>
+
+<ParamField path="-Z" type="flag">
+  Keep the window zoomed if it was zoomed.
+</ParamField>
+
+<ParamField path="-T" type="string">
+  Set the pane title.
+</ParamField>
+
+<ParamField path="-t" type="string">
+  The target pane to select.
+</ParamField>
+
+## resize-pane
+
+Alias: `resizep`
+
+```bash
+resize-pane [-DLMRTUZ] [-t target-pane] [-x width] [-y height] [adjustment]
+```
+
+Resize a pane, up, down, left or right.
+
+<ParamField path="-D" type="flag">
+  Resize downward by `adjustment` (default 1).
+</ParamField>
+
+<ParamField path="-L" type="flag">
+  Resize to the left by `adjustment`.
+</ParamField>
+
+<ParamField path="-M" type="flag">
+  Begin mouse resizing (only valid if bound to a mouse key binding).
+</ParamField>
+
+<ParamField path="-R" type="flag">
+  Resize to the right by `adjustment`.
+</ParamField>
+
+<ParamField path="-T" type="flag">
+  Trim all lines below the current cursor position and move lines out of the history.
+</ParamField>
+
+<ParamField path="-U" type="flag">
+  Resize upward by `adjustment`.
+</ParamField>
+
+<ParamField path="-Z" type="flag">
+  Toggle the zoom state of the pane.
+</ParamField>
+
+<ParamField path="-t" type="string">
+  The target pane to resize.
+</ParamField>
+
+<ParamField path="-x" type="string">
+  Set absolute width. Can be a number or a percentage (e.g., `50%`).
+</ParamField>
+
+<ParamField path="-y" type="string">
+  Set absolute height. Can be a number or a percentage.
+</ParamField>
+
+<ParamField path="adjustment" type="number">
+  The number of cells to resize by (default 1).
+</ParamField>
+
+## list-panes
+
+Alias: `lsp`
+
+```bash
+list-panes [-as] [-r] [-F format] [-f filter] [-O sort-order] [-t target-window]
+```
+
+List panes. By default, lists panes in the current window.
+
+<ParamField path="-a" type="flag">
+  List all panes across all sessions.
+</ParamField>
+
+<ParamField path="-s" type="flag">
+  List all panes in the session.
+</ParamField>
+
+<ParamField path="-r" type="flag">
+  Reverse the sort order.
+</ParamField>
+
+<ParamField path="-F" type="string">
+  Specify the format of each line.
+</ParamField>
+
+<ParamField path="-f" type="string">
+  Only show panes for which the filter is true.
+</ParamField>
+
+<ParamField path="-O" type="string">
+  Specify sort order: `index`, `left`, `top`, `right`, `bottom`.
+</ParamField>
+
+<ParamField path="-t" type="string">
+  List panes in the target window.
+</ParamField>
+
+## swap-pane
+
+Alias: `swapp`
+
+```bash
+swap-pane [-dDUZ] [-s src-pane] [-t dst-pane]
+```
+
+Swap two panes.
+
+<ParamField path="-d" type="flag">
+  Do not change the active pane.
+</ParamField>
+
+<ParamField path="-D" type="flag">
+  Swap with the pane below (or the bottom pane if the target is the bottom pane).
+</ParamField>
+
+<ParamField path="-U" type="flag">
+  Swap with the pane above (or the top pane if the target is the top pane).
+</ParamField>
+
+<ParamField path="-Z" type="flag">
+  Keep the window zoomed if it was zoomed.
+</ParamField>
+
+<ParamField path="-s" type="string">
+  The source pane. If not specified, uses the marked pane.
+</ParamField>
+
+<ParamField path="-t" type="string">
+  The destination pane.
+</ParamField>
+
+## break-pane
+
+Alias: `breakp`
+
+```bash
+break-pane [-abdP] [-F format] [-n window-name] [-s src-pane] [-t dst-window]
+```
+
+Break a pane off from its containing window to make it the only pane in a new window.
+
+<ParamField path="-a" type="flag">
+  Move the window to the next index after dst-window.
+</ParamField>
+
+<ParamField path="-b" type="flag">
+  Move the window to the next index before dst-window.
+</ParamField>
+
+<ParamField path="-d" type="flag">
+  Do not make the new window the current window.
+</ParamField>
+
+<ParamField path="-P" type="flag">
+  Print information about the new window after it has been created.
+</ParamField>
+
+<ParamField path="-F" type="string">
+  Format for output when `-P` is used.
+</ParamField>
+
+<ParamField path="-n" type="string">
+  Name for the new window.
+</ParamField>
+
+<ParamField path="-s" type="string">
+  The source pane to break out.
+</ParamField>
+
+<ParamField path="-t" type="string">
+  The destination window position.
+</ParamField>
+
+## join-pane
+
+Alias: `joinp`, `movep`
+
+```bash
+join-pane [-bdfhv] [-l size] [-s src-pane] [-t dst-pane]
+```
+
+Join a pane to another pane, creating a split. This is the reverse of `break-pane`.
+
+<ParamField path="-b" type="flag">
+  Join the pane to the left of or above the target pane.
+</ParamField>
+
+<ParamField path="-d" type="flag">
+  Do not make the joined pane the active pane.
+</ParamField>
+
+<ParamField path="-f" type="flag">
+  Create a pane spanning the full window height (with `-h`) or width (with `-v`).
+</ParamField>
+
+<ParamField path="-h" type="flag">
+  Join horizontally (create a pane to the left or right).
+</ParamField>
+
+<ParamField path="-v" type="flag">
+  Join vertically (create a pane above or below). This is the default.
+</ParamField>
+
+<ParamField path="-l" type="string">
+  Specify the size of the joined pane in lines (for vertical) or columns (for horizontal).
+</ParamField>
+
+<ParamField path="-s" type="string">
+  The source pane to join. If not specified, uses the marked pane.
+</ParamField>
+
+<ParamField path="-t" type="string">
+  The destination pane.
+</ParamField>
+
+## display-panes
+
+Alias: `displayp`
+
+```bash
+display-panes [-bN] [-d duration] [-t target-client] [template]
+```
+
+Display a visible indicator of each pane shown by the target client. Panes are numbered beginning from zero in the order they are created.
+
+<ParamField path="-b" type="flag">
+  Do not block other commands from running until the indicator is closed.
+</ParamField>
+
+<ParamField path="-N" type="flag">
+  Ignore keys pressed.
+</ParamField>
+
+<ParamField path="-d" type="number">
+  Duration in milliseconds for which the indicator is shown. A duration of 0 means until a key is pressed.
+</ParamField>
+
+<ParamField path="-t" type="string">
+  The target client.
+</ParamField>
+
+<ParamField path="template" type="string">
+  If a key is pressed, template is executed as a command with `%%` replaced by the pane ID.
+</ParamField>
+
+## respawn-pane
+
+Alias: `respawnp`
+
+```bash
+respawn-pane [-c start-directory] [-e environment] [-k] [-t target-pane] 
+             [shell-command [argument ...]]
+```
+
+Reactivate a pane where the command has exited.
+
+<ParamField path="-c" type="string">
+  Specify the working directory for the command.
+</ParamField>
+
+<ParamField path="-e" type="string">
+  Set an environment variable in the form `VARIABLE=value`. May be specified multiple times.
+</ParamField>
+
+<ParamField path="-k" type="flag">
+  Kill the existing command if it is still running.
+</ParamField>
+
+<ParamField path="-t" type="string">
+  The target pane to respawn.
+</ParamField>
+
+<ParamField path="shell-command" type="string">
+  Shell command to execute. If not specified, the command used when the pane was created is reused.
+</ParamField>
+
+## pipe-pane
+
+Alias: `pipep`
+
+```bash
+pipe-pane [-IOo] [-t target-pane] [shell-command]
+```
+
+Pipe output sent to a pane to a shell command or vice versa.
+
+<ParamField path="-I" type="flag">
+  Pipe output from stdin to the pane.
+</ParamField>
+
+<ParamField path="-O" type="flag">
+  Pipe output from the pane to shell-command.
+</ParamField>
+
+<ParamField path="-o" type="flag">
+  Only open a new pipe if none is currently open.
+</ParamField>
+
+<ParamField path="-t" type="string">
+  The target pane.
+</ParamField>
+
+<ParamField path="shell-command" type="string">
+  Shell command to pipe output to or from. If not specified and a pipe is currently open, it is closed.
+</ParamField>
+
+## capture-pane
+
+Alias: `capturep`
+
+```bash
+capture-pane [-aCeJNpPq] [-b buffer-name] [-E end-line] [-S start-line] 
+             [-t target-pane]
+```
+
+Capture the contents of a pane.
+
+<ParamField path="-a" type="flag">
+  Use the alternate screen if present.
+</ParamField>
+
+<ParamField path="-C" type="flag">
+  Escape non-printable characters as octal \ooo.
+</ParamField>
+
+<ParamField path="-e" type="flag">
+  Include escape sequences for attributes.
+</ParamField>
+
+<ParamField path="-J" type="flag">
+  Join wrapped lines and preserve trailing whitespace.
+</ParamField>
+
+<ParamField path="-N" type="flag">
+  Preserve trailing spaces.
+</ParamField>
+
+<ParamField path="-p" type="flag">
+  Print the captured text to stdout.
+</ParamField>
+
+<ParamField path="-P" type="flag">
+  Only capture text that is the beginning of an as-yet incomplete line.
+</ParamField>
+
+<ParamField path="-q" type="flag">
+  Do not output to stdout when `-p` is used.
+</ParamField>
+
+<ParamField path="-b" type="string">
+  Name for the paste buffer to store the captured text.
+</ParamField>
+
+<ParamField path="-E" type="number">
+  End line number. Negative numbers count from the bottom, 0 is the first line of visible pane content.
+</ParamField>
+
+<ParamField path="-S" type="number">
+  Start line number. Negative numbers count from the bottom, 0 is the first line of visible pane content.
+</ParamField>
+
+<ParamField path="-t" type="string">
+  The target pane.
+</ParamField>
+
+## select-layout
+
+Alias: `selectl`
+
+```bash
+select-layout [-Enop] [-t target-pane] [layout-name]
+```
+
+Choose a specific layout for a window.
+
+<ParamField path="-E" type="flag">
+  Spread the panes out evenly.
+</ParamField>
+
+<ParamField path="-n" type="flag">
+  Select the next layout.
+</ParamField>
+
+<ParamField path="-o" type="flag">
+  Undo the last layout change.
+</ParamField>
+
+<ParamField path="-p" type="flag">
+  Select the previous layout.
+</ParamField>
+
+<ParamField path="-t" type="string">
+  The target pane (window will be selected).
+</ParamField>
+
+<ParamField path="layout-name" type="string">
+  Layout name: `even-horizontal`, `even-vertical`, `main-horizontal`, `main-vertical`, `tiled`, or a custom layout string.
+</ParamField>
