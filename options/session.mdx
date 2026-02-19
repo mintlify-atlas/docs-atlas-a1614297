@@ -1,0 +1,650 @@
+---
+title: 'Session Options'
+description: 'Session-level options that control session behavior and status line'
+---
+
+# Session Options
+
+Session options control the behavior of individual tmux sessions. Set session options using `set-option -g` (global) or `set-option -t session-name` (specific session).
+
+## Session Basics
+
+### base-index
+
+**Type:** Number | **Default:** `0` | **Range:** 0 to INT_MAX
+
+Starting index for window numbers in each session.
+
+```bash tmux.conf
+# Start windows at 1 instead of 0
+set -g base-index 1
+```
+
+### default-command
+
+**Type:** String | **Default:** `""`
+
+Default command to run in new panes. If empty, the default shell is started.
+
+```bash
+# Start fish shell in new panes
+set -g default-command "fish"
+```
+
+### default-shell
+
+**Type:** String | **Default:** `"/bin/sh"` (or system _PATH_BSHELL)
+
+Path to the default shell for new panes.
+
+```bash
+set -g default-shell "/usr/bin/zsh"
+```
+
+### default-size
+
+**Type:** String (pattern: XxY) | **Default:** `"80x24"`
+
+Initial size of new sessions.
+
+```bash
+set -g default-size "120x40"
+```
+
+## Key Bindings
+
+### prefix
+
+**Type:** Key | **Default:** `C-b` (Ctrl-b)
+
+The main prefix key. Press this before any tmux command.
+
+```bash tmux.conf
+# Change prefix to C-a (like GNU Screen)
+set -g prefix C-a
+unbind C-b
+bind C-a send-prefix
+```
+
+### prefix2
+
+**Type:** Key | **Default:** `None`
+
+A second prefix key.
+
+```bash
+# Add ` as alternative prefix
+set -g prefix2 `
+```
+
+### repeat-time
+
+**Type:** Number (milliseconds) | **Default:** `500` | **Range:** 0 to 2000000
+
+Time window for repeating a command bound with `-r` flag.
+
+```bash
+# Allow 1 second to repeat commands
+set -g repeat-time 1000
+```
+
+### initial-repeat-time
+
+**Type:** Number (milliseconds) | **Default:** `0` | **Range:** 0 to 2000000
+
+Time to wait for the first repeat of a key binding. Subsequent repeats use `repeat-time`.
+
+```bash
+set -g initial-repeat-time 300
+```
+
+### key-table
+
+**Type:** String | **Default:** `"root"`
+
+Default key table for key lookups.
+
+```bash
+set -g key-table root
+```
+
+## Mouse Support
+
+### mouse
+
+**Type:** Flag | **Default:** `off`
+
+Enable mouse support. When enabled, you can:
+- Click to select panes
+- Drag to resize panes
+- Click window names in status line
+- Scroll with mouse wheel
+
+```bash tmux.conf
+# Enable mouse mode
+set -g mouse on
+```
+
+<Note>
+Applications inside panes can use the mouse even when this option is off.
+</Note>
+
+### focus-follows-mouse
+
+**Type:** Flag | **Default:** `off`
+
+Whether moving the mouse into a pane automatically selects it.
+
+```bash
+set -g focus-follows-mouse on
+```
+
+## Status Line
+
+### status
+
+**Type:** Choice | **Default:** `on` | **Choices:** `off`, `on`, `2`, `3`, `4`, `5`
+
+Number of status lines to show. `on` shows 1 line.
+
+```bash
+# Show status line at top
+set -g status on
+
+# Show 2 status lines
+set -g status 2
+```
+
+### status-position
+
+**Type:** Choice | **Default:** `bottom` | **Choices:** `top`, `bottom`
+
+Position of the status line.
+
+```bash
+set -g status-position top
+```
+
+### status-interval
+
+**Type:** Number (seconds) | **Default:** `15` | **Range:** 0 to INT_MAX
+
+Update interval for the status line. Set to 0 to disable automatic updates.
+
+```bash
+set -g status-interval 5
+```
+
+### status-style
+
+**Type:** Style | **Default:** `"bg=green,fg=black"`
+
+Style of the status line background and foreground.
+
+```bash tmux.conf
+set -g status-style "bg=blue,fg=white"
+```
+
+### status-left
+
+**Type:** String (format) | **Default:** `"[#{session_name}] "`
+
+Content displayed on the left side of the status line.
+
+```bash tmux.conf
+set -g status-left "#[fg=green][#S] "
+```
+
+### status-left-length
+
+**Type:** Number | **Default:** `10` | **Range:** 0 to SHRT_MAX
+
+Maximum width of the left side of the status line.
+
+```bash
+set -g status-left-length 20
+```
+
+### status-left-style
+
+**Type:** Style | **Default:** `"default"`
+
+Style of the left side of the status line.
+
+```bash
+set -g status-left-style "bg=yellow,fg=black,bold"
+```
+
+### status-right
+
+**Type:** String (format) | **Default:** Time and date format
+
+Content displayed on the right side of the status line.
+
+```bash tmux.conf
+# Show time only
+set -g status-right "%H:%M"
+
+# Show host, time, and date
+set -g status-right "#H %H:%M %d-%b-%y"
+```
+
+**Default:**
+```
+#{?window_bigger,[#{window_offset_x}#,#{window_offset_y}] ,}\"#{=21:pane_title}\" %H:%M %d-%b-%y
+```
+
+### status-right-length
+
+**Type:** Number | **Default:** `40` | **Range:** 0 to SHRT_MAX
+
+Maximum width of the right side of the status line.
+
+```bash
+set -g status-right-length 50
+```
+
+### status-right-style
+
+**Type:** Style | **Default:** `"default"`
+
+Style of the right side of the status line.
+
+```bash
+set -g status-right-style "fg=cyan"
+```
+
+### status-justify
+
+**Type:** Choice | **Default:** `left` | **Choices:** `left`, `centre`, `right`, `absolute-centre`
+
+Position of the window list in the status line.
+
+```bash
+set -g status-justify centre
+```
+
+### status-keys
+
+**Type:** Choice | **Default:** `emacs` | **Choices:** `emacs`, `vi`
+
+Key bindings to use at the command prompt.
+
+```bash
+set -g status-keys vi
+```
+
+### status-format
+
+**Type:** Array (String) | **Default:** Complex format
+
+Formats for multiple status lines. Each array member defines one status line.
+
+```bash
+set -g status-format[1] "#[align=centre]#{P:#{pane_index} #{pane_current_command}}"
+```
+
+## Alerts and Activity
+
+### bell-action
+
+**Type:** Choice | **Default:** `any` | **Choices:** `none`, `any`, `current`, `other`
+
+Action to take on a bell alert:
+- `none`: Ignore bells
+- `any`: Bell in any window triggers alert
+- `current`: Only current window
+- `other`: Only non-current windows
+
+```bash tmux.conf
+# No bells at all
+set -g bell-action none
+```
+
+### activity-action
+
+**Type:** Choice | **Default:** `other` | **Choices:** `none`, `any`, `current`, `other`
+
+Action to take on an activity alert.
+
+```bash
+set -g activity-action other
+```
+
+### silence-action
+
+**Type:** Choice | **Default:** `other` | **Choices:** `none`, `any`, `current`, `other`
+
+Action to take on a silence alert.
+
+```bash
+set -g silence-action other
+```
+
+### visual-bell
+
+**Type:** Choice | **Default:** `off` | **Choices:** `off`, `on`, `both`
+
+How to display bell alerts:
+- `off`: No display
+- `on`: Show a message
+- `both`: Show a message and ring the terminal bell
+
+```bash
+set -g visual-bell on
+```
+
+### visual-activity
+
+**Type:** Choice | **Default:** `off` | **Choices:** `off`, `on`, `both`
+
+How to display activity alerts.
+
+```bash
+set -g visual-activity on
+```
+
+### visual-silence
+
+**Type:** Choice | **Default:** `off` | **Choices:** `off`, `on`, `both`
+
+How to display silence alerts.
+
+```bash
+set -g visual-silence on
+```
+
+## Display and Timing
+
+### display-time
+
+**Type:** Number (milliseconds) | **Default:** `750` | **Range:** 0 to INT_MAX
+
+Duration for which status line messages are displayed.
+
+```bash
+set -g display-time 2000
+```
+
+### display-panes-time
+
+**Type:** Number (milliseconds) | **Default:** `1000` | **Range:** 1 to INT_MAX
+
+Duration for which pane indicators are shown (`display-panes` command).
+
+```bash
+set -g display-panes-time 3000
+```
+
+### display-panes-colour
+
+**Type:** Colour | **Default:** `4` (blue)
+
+Color of inactive pane indicators.
+
+```bash
+set -g display-panes-colour blue
+```
+
+### display-panes-active-colour
+
+**Type:** Colour | **Default:** `1` (red)
+
+Color of the active pane indicator.
+
+```bash
+set -g display-panes-active-colour red
+```
+
+### assume-paste-time
+
+**Type:** Number (milliseconds) | **Default:** `1` | **Range:** 0 to INT_MAX
+
+Maximum time between input characters to assume it's pasting rather than typing.
+
+```bash
+set -g assume-paste-time 10
+```
+
+## History
+
+### history-limit
+
+**Type:** Number (lines) | **Default:** `2000` | **Range:** 0 to INT_MAX
+
+Maximum number of lines to keep in scrollback history for each pane.
+
+```bash tmux.conf
+# Increase scrollback buffer
+set -g history-limit 10000
+```
+
+<Note>
+If changed, the new value applies only to new panes, not existing ones.
+</Note>
+
+## Messages and Prompts
+
+### message-style
+
+**Type:** Style | **Default:** `"bg=yellow,fg=black"`
+
+Style of status line messages and command prompt.
+
+```bash
+set -g message-style "bg=red,fg=white"
+```
+
+### message-command-style
+
+**Type:** Style | **Default:** `"bg=black,fg=yellow"`
+
+Style of the command prompt when in vi command mode (if `status-keys` is `vi`).
+
+```bash
+set -g message-command-style "bg=black,fg=cyan"
+```
+
+### message-line
+
+**Type:** Choice | **Default:** `0` | **Choices:** `0`, `1`, `2`, `3`, `4`
+
+Position (line number) of messages and command prompt in multi-line status.
+
+```bash
+set -g message-line 0
+```
+
+## Session Management
+
+### destroy-unattached
+
+**Type:** Choice | **Default:** `off` | **Choices:** `off`, `on`, `keep-last`, `keep-group`
+
+Whether to destroy sessions when they have no attached clients:
+- `off`: Keep all unattached sessions
+- `on`: Destroy unattached sessions
+- `keep-last`: Keep at least one session
+- `keep-group`: Keep the last session in each group
+
+```bash
+set -g destroy-unattached off
+```
+
+### detach-on-destroy
+
+**Type:** Choice | **Default:** `on` | **Choices:** `off`, `on`, `no-detached`, `previous`, `next`
+
+What to do when a session is destroyed:
+- `off`: Don't detach
+- `on`: Detach the client
+- `no-detached`: Switch to another session, or detach if no unattached sessions exist
+- `previous`: Switch to previous session
+- `next`: Switch to next session
+
+```bash
+set -g detach-on-destroy no-detached
+```
+
+### renumber-windows
+
+**Type:** Flag | **Default:** `off`
+
+Automatically renumber windows when one is closed (no gaps in numbering).
+
+```bash
+set -g renumber-windows on
+```
+
+## Titles
+
+### set-titles
+
+**Type:** Flag | **Default:** `off`
+
+Whether to set the terminal title (if supported).
+
+```bash
+set -g set-titles on
+```
+
+### set-titles-string
+
+**Type:** String (format) | **Default:** `"#S:#I:#W - \"#T\" #{session_alerts}"`
+
+Format of the terminal title when `set-titles` is enabled.
+
+```bash
+set -g set-titles-string "tmux: #S / #W"
+```
+
+## Lock
+
+### lock-after-time
+
+**Type:** Number (seconds) | **Default:** `0` | **Range:** 0 to INT_MAX
+
+Time of inactivity before locking a client. Zero means never lock.
+
+```bash
+# Lock after 15 minutes of inactivity
+set -g lock-after-time 900
+```
+
+### lock-command
+
+**Type:** String | **Default:** `"lock -np"` (or system TMUX_LOCK_CMD)
+
+Shell command to run when locking a client.
+
+```bash
+set -g lock-command "vlock"
+```
+
+## Cursor
+
+### prompt-cursor-colour
+
+**Type:** Colour | **Default:** `-1` (terminal default)
+
+Color of the cursor in the command prompt.
+
+```bash
+set -g prompt-cursor-colour red
+```
+
+### prompt-cursor-style
+
+**Type:** Choice | **Default:** `default` | **Choices:** `default`, `blinking-block`, `block`, `blinking-underline`, `underline`, `blinking-bar`, `bar`
+
+Style of cursor in the command prompt.
+
+```bash
+set -g prompt-cursor-style blinking-block
+```
+
+### prompt-command-cursor-style
+
+**Type:** Choice | **Default:** `default`
+
+Cursor style in command mode when `status-keys` is `vi`.
+
+```bash
+set -g prompt-command-cursor-style underline
+```
+
+## Environment
+
+### update-environment
+
+**Type:** Array (String) | **Default:** Multiple variables
+
+List of environment variables to update in the session when a client attaches.
+
+```bash
+set -g update-environment "DISPLAY SSH_ASKPASS SSH_AUTH_SOCK"
+```
+
+**Default:**
+```
+DISPLAY KRB5CCNAME MSYSTEM SSH_ASKPASS SSH_AUTH_SOCK SSH_AGENT_PID SSH_CONNECTION WINDOWID XAUTHORITY
+```
+
+### word-separators
+
+**Type:** String | **Default:** Non-alphanumeric ASCII except underscore
+
+Characters considered to separate words in copy mode.
+
+```bash
+set -g word-separators " -_@"
+```
+
+**Default:** `!"#$%&'()*+,-./:;<=>?@[\\]^`{|}~`
+
+## Example Configuration
+
+```bash tmux.conf
+# Basic settings
+set -g base-index 1
+set -g default-terminal "tmux-256color"
+set -g history-limit 10000
+
+# Prefix key
+set -g prefix C-a
+unbind C-b
+bind C-a send-prefix
+
+# Mouse support
+set -g mouse on
+
+# Status line
+set -g status-position top
+set -g status-style "bg=blue,fg=white"
+set -g status-left "[#S] "
+set -g status-right "%H:%M %d-%b"
+set -g status-interval 5
+
+# Alerts
+set -g bell-action none
+set -g visual-activity on
+
+# Window management
+set -g renumber-windows on
+set -g detach-on-destroy no-detached
+
+# Terminal title
+set -g set-titles on
+set -g set-titles-string "tmux: #S"
+```
+
+## Related
+
+<CardGroup cols={2}>
+  <Card title="Window Options" icon="grid-2" href="/options/window">
+    Window-level settings
+  </Card>
+  <Card title="Server Options" icon="server" href="/options/server">
+    Global server options
+  </Card>
+</CardGroup>

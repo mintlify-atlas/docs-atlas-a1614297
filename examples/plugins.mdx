@@ -1,0 +1,562 @@
+---
+title: Plugins and Plugin Managers
+description: Popular tmux plugins and how to use the tmux plugin manager (TPM)
+---
+
+## Overview
+
+tmux can be extended with plugins that add features like session persistence, better mouse support, theme management, and integration with system clipboards. The most popular way to manage plugins is with TPM (Tmux Plugin Manager).
+
+## TPM - Tmux Plugin Manager
+
+### Installation
+
+<Steps>
+<Step title="Clone TPM repository">
+```bash
+git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm
+```
+</Step>
+
+<Step title="Add to your tmux.conf">
+```conf
+# List of plugins
+set -g @plugin 'tmux-plugins/tpm'
+set -g @plugin 'tmux-plugins/tmux-sensible'
+
+# Other examples:
+# set -g @plugin 'github_username/plugin_name'
+# set -g @plugin 'github_username/plugin_name#branch'
+# set -g @plugin 'git@github.com:user/plugin'
+# set -g @plugin 'git@bitbucket.com:user/plugin'
+
+# Initialize TMUX plugin manager (keep this line at the very bottom of tmux.conf)
+run '~/.tmux/plugins/tpm/tpm'
+```
+</Step>
+
+<Step title="Reload tmux configuration">
+```bash
+# Inside tmux, press prefix + : then type
+source-file ~/.tmux.conf
+```
+</Step>
+
+<Step title="Install plugins">
+Press `prefix` + `I` (capital i) to fetch and install plugins.
+</Step>
+</Steps>
+
+### TPM Key Bindings
+
+| Key | Action |
+|-----|--------|
+| `prefix` + `I` | Install new plugins |
+| `prefix` + `U` | Update plugins |
+| `prefix` + `alt` + `u` | Uninstall plugins not in list |
+
+## Essential Plugins
+
+### tmux-sensible
+
+Provides basic tmux settings that everyone can agree on.
+
+<Tabs>
+<Tab title="Installation">
+```conf
+set -g @plugin 'tmux-plugins/tmux-sensible'
+```
+</Tab>
+
+<Tab title="Features">
+- Increases scrollback buffer to 50000 lines
+- Uses Emacs key bindings in command prompt
+- Sets escape time to 0 for vim compatibility
+- Enables focus events
+- UTF-8 support
+- Aggressive window resizing
+- Sets default terminal to `screen-256color`
+</Tab>
+</Tabs>
+
+### tmux-resurrect
+
+Restore tmux environment after system restart.
+
+<CodeGroup>
+
+```conf Basic Setup
+set -g @plugin 'tmux-plugins/tmux-resurrect'
+
+# Save: prefix + Ctrl-s
+# Restore: prefix + Ctrl-r
+```
+
+```conf With Process Restoration
+set -g @plugin 'tmux-plugins/tmux-resurrect'
+
+# Restore vim sessions
+set -g @resurrect-strategy-vim 'session'
+
+# Restore neovim sessions
+set -g @resurrect-strategy-nvim 'session'
+
+# Restore pane contents
+set -g @resurrect-capture-pane-contents 'on'
+```
+
+```conf Custom Programs
+set -g @plugin 'tmux-plugins/tmux-resurrect'
+
+# Restore additional programs
+set -g @resurrect-processes 'ssh psql mysql sqlite3 "~yarn start" "~npm start"'
+```
+
+</CodeGroup>
+
+**Key Features:**
+- Saves and restores tmux sessions
+- Restores window/pane layout
+- Can restore running programs
+- Works with vim/neovim sessions
+- Automatic interval saving (with tmux-continuum)
+
+### tmux-continuum
+
+Continuous saving of tmux environment. Works with tmux-resurrect.
+
+```conf
+set -g @plugin 'tmux-plugins/tmux-resurrect'
+set -g @plugin 'tmux-plugins/tmux-continuum'
+
+# Automatically restore last saved environment
+set -g @continuum-restore 'on'
+
+# Save interval in minutes (default: 15)
+set -g @continuum-save-interval '15'
+
+# Status line integration
+set -g status-right 'Continuum: #{continuum_status}'
+```
+
+**Status Indicators:**
+- `●` - Continuum is running
+- `⏸` - Continuum is paused
+- `△` - Continuum is inactive
+
+### tmux-yank
+
+Better clipboard integration for copy mode.
+
+<Tabs>
+<Tab title="Installation">
+```conf
+set -g @plugin 'tmux-plugins/tmux-yank'
+```
+</Tab>
+
+<Tab title="Usage">
+**Normal Mode (prefix + [):**
+- `y` - Copy selection to system clipboard
+- `Y` - Copy selection and paste to command line
+
+**Copy Mode (vi):**
+- `y` - Copy selection
+- `Y` - Copy selection and paste
+
+**Copy Mode (emacs):**
+- `M-w` - Copy selection
+- `M-W` - Copy selection and paste
+</Tab>
+
+<Tab title="Configuration">
+```conf
+set -g @plugin 'tmux-plugins/tmux-yank'
+
+# Use vi key bindings
+set -g @yank_selection_mouse 'clipboard'
+
+# Stay in copy mode after yanking
+set -g @yank_action 'copy-pipe'
+
+# Custom copy command
+set -g @override_copy_command 'xclip -in -selection clipboard'
+```
+</Tab>
+</Tabs>
+
+### tmux-copycat
+
+Enhances tmux copy mode with predefined searches.
+
+```conf
+set -g @plugin 'tmux-plugins/tmux-copycat'
+```
+
+**Search Shortcuts (prefix + ):**
+- `/` - Regex search
+- `Ctrl-f` - File search
+- `Ctrl-g` - Git status files
+- `Alt-h` - SHA-1 hashes
+- `Ctrl-u` - URLs
+- `Ctrl-d` - Numbers
+- `Alt-i` - IP addresses
+
+### tmux-open
+
+Open highlighted files and URLs.
+
+<CodeGroup>
+
+```conf Basic
+set -g @plugin 'tmux-plugins/tmux-open'
+
+# In copy mode:
+# - o: open selection
+# - Ctrl-o: open selection in $EDITOR
+```
+
+```conf Custom Applications
+set -g @plugin 'tmux-plugins/tmux-open'
+
+# Open with specific applications
+set -g @open-S 'https://www.google.com/search?q='
+set -g @open 'x' 'xdg-open'
+```
+
+</CodeGroup>
+
+## Theme Plugins
+
+### tmux-power
+
+Modern, colorful theme with multiple color schemes.
+
+```conf
+set -g @plugin 'wfxr/tmux-power'
+
+# Color schemes: gold, red, green, blue, cyan, etc.
+set -g @tmux_power_theme 'gold'
+
+# Show upload/download speed
+set -g @tmux_power_show_upload_speed true
+set -g @tmux_power_show_download_speed true
+
+# Show CPU usage
+set -g @tmux_power_show_cpu_usage true
+```
+
+### tmux-onedark-theme
+
+Atom's One Dark theme for tmux.
+
+```conf
+set -g @plugin 'odedlaz/tmux-onedark-theme'
+
+# Customize widgets
+set -g @onedark_widgets "#(date +%s)"
+set -g @onedark_time_format "%I:%M %p"
+set -g @onedark_date_format "%D"
+```
+
+### dracula/tmux
+
+Dracula theme with various plugins.
+
+```conf
+set -g @plugin 'dracula/tmux'
+
+# Available plugins: battery, cpu-usage, gpu-usage, ram-usage,
+# network, network-bandwidth, weather, time, spotify-tui, etc.
+set -g @dracula-plugins "cpu-usage ram-usage time"
+
+# Show powerline symbols
+set -g @dracula-show-powerline true
+
+# Show left separator
+set -g @dracula-show-left-sep 
+
+# Show right separator
+set -g @dracula-show-right-sep 
+```
+
+## Utility Plugins
+
+### tmux-fzf
+
+Use fzf for tmux operations.
+
+```conf
+set -g @plugin 'sainnhe/tmux-fzf'
+
+# Launch with prefix + F
+set -g @tmux-fzf-launch-key 'F'
+
+# Options:
+# - Session management
+# - Window management
+# - Pane management
+# - Command history
+```
+
+### tmux-sessionist
+
+Session management utilities.
+
+```conf
+set -g @plugin 'tmux-plugins/tmux-sessionist'
+```
+
+**Key Bindings:**
+- `prefix` + `g` - Switch to another session
+- `prefix` + `C` - Create new session
+- `prefix` + `X` - Kill current session without detaching
+- `prefix` + `S` - Switch to last session
+- `prefix` + `@` - Promote current pane to new session
+
+### tmux-sidebar
+
+Directory tree sidebar.
+
+```conf
+set -g @plugin 'tmux-plugins/tmux-sidebar'
+
+# Toggle sidebar: prefix + Tab
+# Focus sidebar: prefix + Backspace
+
+# Use different tree command
+set -g @sidebar-tree-command 'exa --tree --level=2'
+
+# Sidebar position
+set -g @sidebar-tree-position 'right'
+
+# Sidebar width
+set -g @sidebar-tree-width '40'
+```
+
+### tmux-logging
+
+Easy logging of tmux output.
+
+```conf
+set -g @plugin 'tmux-plugins/tmux-logging'
+```
+
+**Commands:**
+- `prefix` + `shift-p` - Toggle logging to file
+- `prefix` + `alt-p` - Save complete pane history
+- `prefix` + `alt-shift-p` - Clear pane history
+- `prefix` + `alt-c` - Save visible text only
+
+## Complete Plugin Configuration Example
+
+<Accordion title="View Complete Configuration with Plugins">
+
+```conf
+# ~/.tmux.conf - Complete configuration with plugins
+
+# ========================================
+# Basic Settings
+# ========================================
+set -g prefix C-a
+unbind C-b
+bind C-a send-prefix
+
+set -g mouse on
+set -g default-terminal "tmux-256color"
+set-option -sa terminal-features ",xterm*:RGB"
+
+# ========================================
+# TPM Configuration
+# ========================================
+
+# List of plugins
+set -g @plugin 'tmux-plugins/tpm'
+set -g @plugin 'tmux-plugins/tmux-sensible'
+
+# Session management
+set -g @plugin 'tmux-plugins/tmux-resurrect'
+set -g @plugin 'tmux-plugins/tmux-continuum'
+
+# Copy mode enhancements
+set -g @plugin 'tmux-plugins/tmux-yank'
+set -g @plugin 'tmux-plugins/tmux-copycat'
+set -g @plugin 'tmux-plugins/tmux-open'
+
+# Utilities
+set -g @plugin 'tmux-plugins/tmux-sessionist'
+set -g @plugin 'tmux-plugins/tmux-logging'
+set -g @plugin 'sainnhe/tmux-fzf'
+
+# Theme
+set -g @plugin 'wfxr/tmux-power'
+set -g @tmux_power_theme 'gold'
+
+# ========================================
+# Plugin Configuration
+# ========================================
+
+# Resurrect/Continuum
+set -g @resurrect-capture-pane-contents 'on'
+set -g @resurrect-strategy-vim 'session'
+set -g @resurrect-strategy-nvim 'session'
+set -g @continuum-restore 'on'
+set -g @continuum-save-interval '15'
+
+# Yank
+set -g @yank_selection_mouse 'clipboard'
+
+# FZF
+set -g @tmux-fzf-launch-key 'F'
+
+# ========================================
+# Key Bindings
+# ========================================
+
+# Vi mode
+setw -g mode-keys vi
+bind -T copy-mode-vi v send -X begin-selection
+bind -T copy-mode-vi y send -X copy-selection-and-cancel
+
+# Pane navigation (vim-style)
+bind -r h select-pane -L
+bind -r j select-pane -D
+bind -r k select-pane -U
+bind -r l select-pane -R
+
+# Reload config
+bind r source-file ~/.tmux.conf \; display "Reloaded!"
+
+# ========================================
+# Initialize TPM (keep at bottom)
+# ========================================
+run '~/.tmux/plugins/tpm/tpm'
+```
+
+</Accordion>
+
+## Creating Custom Plugins
+
+### Plugin Structure
+
+```bash
+# Basic plugin structure
+~/.tmux/plugins/my-plugin/
+├── my-plugin.tmux      # Main script (must be executable)
+├── scripts/
+│   └── helper.sh       # Helper scripts
+└── README.md           # Documentation
+```
+
+### Simple Plugin Example
+
+```bash
+#!/usr/bin/env bash
+# my-plugin.tmux
+
+CURRENT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+# Get option value
+get_tmux_option() {
+    local option=$1
+    local default_value=$2
+    local option_value=$(tmux show-option -gqv "$option")
+    if [ -z "$option_value" ]; then
+        echo "$default_value"
+    else
+        echo "$option_value"
+    fi
+}
+
+# Main function
+main() {
+    local greeting=$(get_tmux_option "@my_greeting" "Hello")
+    tmux set-option -gq status-right "$greeting #H"
+}
+
+main
+```
+
+Usage:
+```conf
+set -g @plugin 'yourusername/my-plugin'
+set -g @my_greeting 'Hi'
+```
+
+## Plugin Management Tips
+
+<Tabs>
+<Tab title="Installing">
+1. Add plugin to `~/.tmux.conf`
+2. Reload tmux config: `prefix + :` then `source ~/.tmux.conf`
+3. Install plugins: `prefix + I`
+</Tab>
+
+<Tab title="Updating">
+1. Update all plugins: `prefix + U`
+2. Or manually: `~/.tmux/plugins/tpm/bin/update_plugins all`
+</Tab>
+
+<Tab title="Uninstalling">
+1. Remove plugin line from `~/.tmux.conf`
+2. Uninstall: `prefix + alt + u`
+3. Or manually remove: `rm -rf ~/.tmux/plugins/plugin-name`
+</Tab>
+
+<Tab title="Troubleshooting">
+Check TPM is working:
+```bash
+ls -la ~/.tmux/plugins/tpm/tpm
+```
+
+Reinstall all plugins:
+```bash
+rm -rf ~/.tmux/plugins/
+git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm
+```
+
+Then inside tmux: `prefix + I`
+</Tab>
+</Tabs>
+
+## Popular Plugin Collections
+
+<CardGroup cols={2}>
+
+<Card title="tmux-plugins" icon="github" href="https://github.com/tmux-plugins">
+Official tmux plugin organization with high-quality plugins
+</Card>
+
+<Card title="Awesome tmux" icon="star" href="https://github.com/rothgar/awesome-tmux">
+Curated list of tmux plugins and resources
+</Card>
+
+<Card title="TPM Repository" icon="box" href="https://github.com/tmux-plugins/tpm">
+Plugin manager source code and documentation
+</Card>
+
+<Card title="Plugin Development" icon="code" href="https://github.com/tmux-plugins/tpm/blob/master/docs/how_to_create_plugin.md">
+Guide to creating your own tmux plugins
+</Card>
+
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+<Card title="Basic Configuration" icon="sliders" href="/examples/basic-config">
+Essential tmux configuration options
+</Card>
+
+<Card title="Advanced Configuration" icon="gear" href="/examples/advanced-config">
+Status line customization and hooks
+</Card>
+
+<Card title="Use Cases" icon="rocket" href="/examples/use-cases">
+Real-world workflows and usage patterns
+</Card>
+
+<Card title="Scripting" icon="terminal" href="/guides/scripting">
+Automate tmux with shell scripts
+</Card>
+</CardGroup>

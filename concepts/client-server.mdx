@@ -1,0 +1,601 @@
+---
+title: "Client-Server Architecture"
+description: "Understanding tmux's client-server model and how components communicate"
+---
+
+## Architecture Overview
+
+Tmux uses a **client-server architecture** where a single server process manages all sessions, windows, and panes, while multiple clients can connect to interact with them.
+
+<Info>
+From tmux.1:86-94: "In tmux, a session is displayed on screen by a client and all sessions are managed by a single server. The server and each client are separate processes which communicate through a socket in /tmp."
+</Info>
+
+## Core Components
+
+### Server Process
+
+From server.c:38-56, the server is the central process:
+
+```c
+/*
+ * Main server functions.
+ */
+
+struct clients     clients;      // Connected clients
+struct tmuxproc   *server_proc;  // Server process
+static int         server_fd;    // Server socket
+static int         server_exit;  // Exit flag
+```
+
+### Server Responsibilities
+
+<Accordion title="What the Server Manages">
+
+**Sessions** (server.c:215)
+```c
+RB_INIT(&sessions);
+```
+- Creates and destroys sessions
+- Manages session state
+- Handles session switching
+- Tracks attached clients
+
+**Windows** (server.c:212)
+```c
+RB_INIT(&windows);
+RB_INIT(&all_window_panes);
+```
+- Maintains global window list
+- Manages window layouts
+- Handles window creation/destruction
+- Tracks all panes
+
+**Clients** (server.c:214)
+```c
+TAILQ_INIT(&clients);
+```
+- Accepts new connections
+- Manages client state
+- Routes input/output
+- Handles client disconnection
+
+**Jobs** (server.c:256-257)
+- Background command execution
+- Job cleanup and monitoring
+
+</Accordion>
+
+## Server Lifecycle
+
+### Server Startup
+
+From server.c:174-260, `server_start()` initializes the server:
+
+```c
+int
+server_start(struct tmuxproc *client, uint64_t flags, struct event_base *base,
+    int lockfd, char *lockfile)
+{
+    // Fork and daemonize (unless CLIENT_NOFORK)
+    if (~flags & CLIENT_NOFORK) {
+        if (proc_fork_and_daemon(&fd) != 0) {
+            return (fd);
+        }
+    }
+    
+    // Initialize server process
+    server_proc = proc_start("server");
+    proc_set_signals(server_proc, server_signal);
+    
+    // Initialize data structures
+    RB_INIT(&windows);
+    RB_INIT(&all_window_panes);
+    TAILQ_INIT(&clients);
+    RB_INIT(&sessions);
+    
+    // Create server socket
+    server_fd = server_create_socket(flags, &cause);
+    if (server_fd != -1)
+        server_update_socket();
+    
+    // Start main event loop
+    server_add_accept(0);
+    proc_loop(server_proc, server_loop);
+    
+    exit(0);
+}
+```
+
+<Tabs>
+  <Tab title="Socket Creation">
+    From server.c:105-154, the server creates a Unix domain socket:
+    
+    ```c
+    int server_create_socket(uint64_t flags, char **cause) {
+        struct sockaddr_un sa;
+        
+        memset(&sa, 0, sizeof sa);
+        sa.sun_family = AF_UNIX;
+        strlcpy(sa.sun_path, socket_path, sizeof sa.sun_path);
+        
+        unlink(sa.sun_path);
+        
+        fd = socket(AF_UNIX, SOCK_STREAM, 0);
+        bind(fd, (struct sockaddr *)&sa, sizeof sa);
+        listen(fd, 128);
+        
+        return (fd);
+    }
+    ```
+  </Tab>
+  <Tab title="Socket Path">
+    Socket location from tmux.1:161-186:
+    
+    - Default: `$TMUX_TMPDIR/tmux-UID/default`
+    - Falls back to `/tmp/tmux-UID/default`
+    - Can be customized with `-L socket-name`
+    - Full path with `-S socket-path`
+    - Socket must not be world-accessible
+  </Tab>
+</Tabs>
+
+### Main Server Loop
+
+From server.c:262-306, `server_loop()` processes events:
+
+```c
+static int
+server_loop(void)
+{
+    struct client *c;
+    u_int items;
+    
+    current_time = time(NULL);
+    
+    // Process command queues
+    do {
+        items = cmdq_next(NULL);
+        TAILQ_FOREACH(c, &clients, entry) {
+            if (c->flags & CLIENT_IDENTIFIED)
+                items += cmdq_next(c);
+        }
+    } while (items != 0);
+    
+    server_client_loop();
+    
+    // Check exit conditions
+    if (!options_get_number(global_options, "exit-empty") && !server_exit)
+        return (0);
+    
+    if (!options_get_number(global_options, "exit-unattached")) {
+        if (!RB_EMPTY(&sessions))
+            return (0);
+    }
+    
+    // Check for attached clients
+    TAILQ_FOREACH(c, &clients, entry) {
+        if (c->session != NULL)
+            return (0);
+    }
+    
+    // Exit if no clients or sessions
+    if (!TAILQ_EMPTY(&clients))
+        return (0);
+    
+    return (1);  // Exit server
+}
+```
+
+<Note>
+The server exits when no sessions remain (if `exit-empty` is on) or when no clients are attached (if `exit-unattached` is on).
+</Note>
+
+### Signal Handling
+
+From server.c:429-459, the server handles Unix signals:
+
+```c
+static void
+server_signal(int sig)
+{
+    switch (sig) {
+    case SIGINT:
+    case SIGTERM:
+        server_exit = 1;
+        server_send_exit();
+        break;
+    case SIGCHLD:
+        server_child_signal();
+        break;
+    case SIGUSR1:
+        // Recreate socket
+        fd = server_create_socket(server_client_flags, NULL);
+        if (fd != -1) {
+            close(server_fd);
+            server_fd = fd;
+            server_update_socket();
+        }
+        break;
+    case SIGUSR2:
+        // Toggle logging
+        proc_toggle_log(server_proc);
+        break;
+    }
+}
+```
+
+<Tip>
+Send SIGUSR1 to recreate the socket if it's accidentally deleted. Send SIGUSR2 to toggle verbose logging.
+</Tip>
+
+## Client Process
+
+### Client Structure
+
+From tmux.h:1946-2020, clients track connection state:
+
+```c
+struct client {
+    const char      *name;
+    struct tmuxpeer *peer;         // Server connection
+    struct cmdq_list *queue;       // Command queue
+    
+    pid_t            pid;
+    int              fd;           // Connection file descriptor
+    struct event     event;
+    
+    struct environ  *environ;
+    char            *term_name;    // Terminal type
+    struct tty       tty;          // Terminal state
+    
+    struct session  *session;      // Attached session
+    
+    uint64_t         flags;        // Client flags
+};
+```
+
+### Client Connection
+
+From client.c:103-181, `client_connect()` establishes connection:
+
+```c
+static int
+client_connect(struct event_base *base, const char *path, uint64_t flags)
+{
+    struct sockaddr_un sa;
+    int fd;
+    
+    // Set up socket address
+    memset(&sa, 0, sizeof sa);
+    sa.sun_family = AF_UNIX;
+    strlcpy(sa.sun_path, path, sizeof sa.sun_path);
+    
+retry:
+    fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    
+    if (connect(fd, (struct sockaddr *)&sa, sizeof sa) == -1) {
+        if (errno == ECONNREFUSED || errno == ENOENT) {
+            // Server not running
+            if (flags & CLIENT_STARTSERVER) {
+                // Start server and retry
+                fd = server_start(client_proc, flags, base, lockfd, lockfile);
+            }
+        }
+        return (-1);
+    }
+    
+    setblocking(fd, 0);
+    return (fd);
+}
+```
+
+<Info>
+If the server isn't running and CLIENT_STARTSERVER is set, the client automatically starts the server process.
+</Info>
+
+### Client Identification
+
+From client.c:448-495, clients send identification to server:
+
+```c
+static void
+client_send_identify(const char *ttynam, const char *termname, char **caps,
+    u_int ncaps, const char *cwd, int feat)
+{
+    // Send client flags
+    proc_send(client_peer, MSG_IDENTIFY_LONGFLAGS, -1, 
+        &client_flags, sizeof client_flags);
+    
+    // Send terminal information
+    proc_send(client_peer, MSG_IDENTIFY_TERM, -1, 
+        termname, strlen(termname) + 1);
+    proc_send(client_peer, MSG_IDENTIFY_TTYNAME, -1, 
+        ttynam, strlen(ttynam) + 1);
+    proc_send(client_peer, MSG_IDENTIFY_CWD, -1, 
+        cwd, strlen(cwd) + 1);
+    
+    // Send terminal capabilities
+    for (i = 0; i < ncaps; i++) {
+        proc_send(client_peer, MSG_IDENTIFY_TERMINFO, -1,
+            caps[i], strlen(caps[i]) + 1);
+    }
+    
+    // Send stdin/stdout file descriptors
+    proc_send(client_peer, MSG_IDENTIFY_STDIN, dup(STDIN_FILENO), NULL, 0);
+    proc_send(client_peer, MSG_IDENTIFY_STDOUT, dup(STDOUT_FILENO), NULL, 0);
+    
+    // Send environment
+    for (ss = environ; *ss != NULL; ss++) {
+        proc_send(client_peer, MSG_IDENTIFY_ENVIRON, -1, *ss, strlen(*ss) + 1);
+    }
+    
+    proc_send(client_peer, MSG_IDENTIFY_DONE, -1, NULL, 0);
+}
+```
+
+## Communication Protocol
+
+### Message Types
+
+From client.c and server.c, clients and servers exchange messages:
+
+<Accordion title="Message Types">
+
+**Identification Messages**
+- `MSG_IDENTIFY_LONGFLAGS` - Client capability flags
+- `MSG_IDENTIFY_TERM` - Terminal type
+- `MSG_IDENTIFY_TTYNAME` - TTY device name
+- `MSG_IDENTIFY_CWD` - Current working directory
+- `MSG_IDENTIFY_STDIN/STDOUT` - File descriptors
+- `MSG_IDENTIFY_ENVIRON` - Environment variables
+- `MSG_IDENTIFY_DONE` - Identification complete
+
+**Control Messages**
+- `MSG_COMMAND` - Execute tmux command
+- `MSG_SHELL` - Start shell
+- `MSG_READY` - Server ready for client
+- `MSG_EXIT` - Exit with status
+- `MSG_SHUTDOWN` - Server shutting down
+
+**Session Messages**
+- `MSG_DETACH` - Detach client
+- `MSG_DETACHKILL` - Detach and send SIGHUP
+- `MSG_SUSPEND` - Suspend client
+- `MSG_LOCK` - Lock client
+
+**I/O Messages**
+- `MSG_RESIZE` - Window size changed
+- `MSG_EXITING` - Client exiting
+
+</Accordion>
+
+### Client Dispatch
+
+From client.c:582-809, `client_dispatch()` handles server messages:
+
+```c
+static void
+client_dispatch(struct imsg *imsg, __unused void *arg)
+{
+    if (imsg == NULL) {
+        // Connection lost
+        client_exitreason = CLIENT_EXIT_LOST_SERVER;
+        proc_exit(client_proc);
+        return;
+    }
+    
+    if (client_attached)
+        client_dispatch_attached(imsg);
+    else
+        client_dispatch_wait(imsg);
+}
+```
+
+## Server Acceptance
+
+From server.c:367-401, the server accepts new clients:
+
+```c
+static void
+server_accept(int fd, short events, __unused void *data)
+{
+    struct sockaddr_storage sa;
+    socklen_t slen = sizeof sa;
+    int newfd;
+    struct client *c;
+    
+    server_add_accept(0);
+    if (!(events & EV_READ))
+        return;
+    
+    newfd = accept(fd, (struct sockaddr *)&sa, &slen);
+    if (newfd == -1) {
+        if (errno == EAGAIN || errno == EINTR || errno == ECONNABORTED)
+            return;
+        if (errno == ENFILE || errno == EMFILE) {
+            // Out of file descriptors - retry in 1 second
+            server_add_accept(1);
+            return;
+        }
+        fatal("accept failed");
+    }
+    
+    if (server_exit) {
+        close(newfd);
+        return;
+    }
+    
+    // Create client and check ACL
+    c = server_client_create(newfd);
+    if (!server_acl_join(c)) {
+        c->exit_message = xstrdup("access not allowed");
+        c->flags |= CLIENT_EXIT;
+    }
+}
+```
+
+<Note>
+The server uses backoff when running out of file descriptors, delaying new connections for 1 second.
+</Note>
+
+## Socket Management
+
+### Socket Permissions
+
+From server.c:331-365, socket permissions reflect session state:
+
+```c
+void
+server_update_socket(void)
+{
+    struct session *s;
+    static int last = -1;
+    int n, mode;
+    struct stat sb;
+    
+    // Count attached sessions
+    n = 0;
+    RB_FOREACH(s, sessions, &sessions) {
+        if (s->attached != 0) {
+            n++;
+            break;
+        }
+    }
+    
+    if (n != last) {
+        last = n;
+        
+        if (stat(socket_path, &sb) != 0)
+            return;
+        mode = sb.st_mode & ACCESSPERMS;
+        
+        // Add execute permission if sessions attached
+        if (n != 0) {
+            if (mode & S_IRUSR) mode |= S_IXUSR;
+            if (mode & S_IRGRP) mode |= S_IXGRP;
+            if (mode & S_IROTH) mode |= S_IXOTH;
+        } else {
+            mode &= ~(S_IXUSR|S_IXGRP|S_IXOTH);
+        }
+        
+        chmod(socket_path, mode);
+    }
+}
+```
+
+<Info>
+The socket gains execute permission when sessions are attached, making it easier to identify active tmux servers.
+</Info>
+
+## Process Management
+
+### Child Processes
+
+From server.c:461-527, the server monitors child processes:
+
+```c
+static void
+server_child_signal(void)
+{
+    int status;
+    pid_t pid;
+    
+    for (;;) {
+        pid = waitpid(WAIT_ANY, &status, WNOHANG|WUNTRACED);
+        if (pid == -1) {
+            if (errno == ECHILD)
+                return;
+            fatal("waitpid failed");
+        }
+        if (pid == 0)
+            return;
+        
+        if (WIFSTOPPED(status))
+            server_child_stopped(pid, status);
+        else if (WIFEXITED(status) || WIFSIGNALED(status))
+            server_child_exited(pid, status);
+    }
+}
+```
+
+### Pane Exit Handling
+
+From server.c:484-507, exited panes are marked:
+
+```c
+static void
+server_child_exited(pid_t pid, int status)
+{
+    struct window *w, *w1;
+    struct window_pane *wp;
+    
+    RB_FOREACH_SAFE(w, windows, &windows, w1) {
+        TAILQ_FOREACH(wp, &w->panes, entry) {
+            if (wp->pid == pid) {
+                wp->status = status;
+                wp->flags |= PANE_STATUSREADY;
+                
+                log_debug("%%%u exited", wp->id);
+                wp->flags |= PANE_EXITED;
+                
+                if (window_pane_destroy_ready(wp))
+                    server_destroy_pane(wp, 1);
+                break;
+            }
+        }
+    }
+}
+```
+
+## Client Flags
+
+From tmux.h:1999-2020, clients have various flags:
+
+```c
+#define CLIENT_TERMINAL 0x1        // Terminal attached
+#define CLIENT_LOGIN 0x2           // Login shell
+#define CLIENT_DEAD 0x4            // Dead/exited
+#define CLIENT_REDRAWWINDOW 0x8    // Redraw window
+#define CLIENT_CONTROL 0x10        // Control mode
+#define CLIENT_CONTROLCONTROL 0x20 // Extended control mode
+#define CLIENT_FOCUSED 0x40        // Has focus
+#define CLIENT_UTF8 0x80           // UTF-8 support
+#define CLIENT_READONLY 0x100      // Read-only mode
+```
+
+## Best Practices
+
+<Accordion title="Architecture Best Practices">
+
+**Server Management**
+- Let tmux auto-start the server when needed
+- Use named sockets (`-L`) for multiple servers
+- Monitor server resource usage with many sessions
+- Clean up old sockets in `/tmp/tmux-UID/`
+
+**Client Connections**
+- Use `-d` to create detached sessions
+- Leverage control mode for automation
+- Set appropriate client flags for use case
+- Handle connection loss gracefully
+
+**Socket Security**
+- Never make sockets world-accessible
+- Use proper file permissions (0700 for directory)
+- Be cautious with `server-access` command
+- Monitor who has access to your tmux server
+
+**Resource Limits**
+- Watch out for file descriptor limits
+- Monitor memory usage with many panes
+- Set appropriate `history-limit`
+- Clean up unused sessions regularly
+
+</Accordion>
+
+## See Also
+
+- [Sessions](/concepts/sessions) - Session lifecycle and management
+- [Windows](/concepts/windows) - Window management
+- [Panes](/concepts/panes) - Pane creation and handling

@@ -1,0 +1,668 @@
+---
+title: Configuration
+description: Understanding tmux configuration files and options
+---
+
+## Overview
+
+tmux configuration is controlled through configuration files that contain tmux commands. The primary configuration file is `~/.tmux.conf`, loaded when the server starts.
+
+## Configuration File Format
+
+### File Locations
+
+tmux searches for configuration files in this order:
+
+<Steps>
+
+<Step title="System Configuration">
+```bash
+/etc/tmux.conf  # System-wide configuration
+```
+</Step>
+
+<Step title="User Configuration">
+```bash
+~/.tmux.conf  # Traditional location
+```
+</Step>
+
+<Step title="XDG Configuration">
+```bash
+$XDG_CONFIG_HOME/tmux/tmux.conf  # XDG Base Directory
+```
+</Step>
+
+</Steps>
+
+<Note>
+From `cfg.c:88-152`, configuration files are loaded once when the server process starts. Use `source-file` to reload later.
+</Note>
+
+### Basic Syntax
+
+<CodeGroup>
+
+```bash Comments
+# This is a comment
+set -g status-bg blue  # Inline comments work too
+```
+
+```bash Line Continuation
+# Use backslash for line continuation
+bind R source-file ~/.tmux.conf \; \
+    display-message "Config reloaded"
+```
+
+```bash Command Sequences
+# Separate commands with semicolons
+new-session; new-window; split-window
+```
+
+```bash Braces
+# Use braces for command blocks
+bind r {
+    source-file ~/.tmux.conf
+    display-message "Config reloaded"
+}
+```
+
+</CodeGroup>
+
+## Configuration Loading
+
+### Startup Process
+
+From `cfg.c:65-93`, the configuration loading process:
+
+<Tabs>
+  <Tab title="Server Startup">
+    ```c
+    void start_cfg(void)
+    {
+        struct client *c;
+        u_int i;
+        int flags = 0;
+
+        // Block initial client during config load
+        cfg_client = c = TAILQ_FIRST(&clients);
+        if (c != NULL) {
+            cfg_item = cmdq_get_callback(cfg_client_done, NULL);
+            cmdq_append(c, cfg_item);
+        }
+
+        // Load all config files
+        if (cfg_quiet)
+            flags = CMD_PARSE_QUIET;
+        for (i = 0; i < cfg_nfiles; i++)
+            load_cfg(cfg_files[i], c, NULL, NULL, flags, NULL);
+
+        cmdq_append(NULL, cmdq_get_callback(cfg_done, NULL));
+    }
+    ```
+  </Tab>
+
+  <Tab title="File Loading">
+    ```c
+    int load_cfg(const char *path, struct client *c,
+        struct cmdq_item *item, struct cmd_find_state *current,
+        int flags, struct cmdq_item **new_item)
+    {
+        FILE *f;
+        struct cmd_parse_input pi;
+        struct cmd_parse_result *pr;
+
+        log_debug("loading %s", path);
+        if ((f = fopen(path, "rb")) == NULL) {
+            if (errno == ENOENT && (flags & CMD_PARSE_QUIET))
+                return (0);
+            cfg_add_cause("%s: %s", path, strerror(errno));
+            return (-1);
+        }
+
+        // Parse and execute commands
+        pr = cmd_parse_from_file(f, &pi);
+        fclose(f);
+        // ... execute commands
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### Reload Configuration
+
+```bash
+# Reload configuration file
+tmux source-file ~/.tmux.conf
+
+# Bind reload to a key
+bind r source-file ~/.tmux.conf \; display "Config reloaded!"
+```
+
+<Tip>
+From `cfg.c:240-281`, error messages from configuration files are displayed in the first session created.
+</Tip>
+
+## Example Configuration
+
+From `example_tmux.conf`, a complete working configuration:
+
+<CodeGroup>
+
+```bash Basic Settings
+# Change the default terminal
+set -g default-terminal "tmux-256color"
+
+# Enable RGB color for xterm
+set-option -sa terminal-features ",xterm*:RGB"
+
+# No bells
+set -g bell-action none
+
+# Keep windows around after exit
+set -g remain-on-exit on
+```
+
+```bash Status Line
+# Status line configuration
+set -g status-right "%H:%M"
+set -g window-status-current-style "underscore"
+
+# Conditional: red status if nested
+%if #{TMUX}
+set -g status-bg red
+%endif
+```
+
+```bash Prefix Key
+# Change prefix to C-a
+set -g prefix C-a
+unbind C-b
+bind C-a send-prefix
+```
+
+```bash Mouse Support
+# Enable mouse but disable dragging
+set -g mouse on
+unbind -n MouseDrag1Pane
+unbind -Tcopy-mode MouseDrag1Pane
+```
+
+```bash Key Bindings
+# Function keys for windows 10-21
+bind F1 selectw -t:10
+bind F2 selectw -t:11
+bind F3 selectw -t:12
+# ... more function keys
+
+# Toggle settings
+bind m set monitor-activity
+bind y set synchronize-panes\; \
+    display 'synchronize-panes #{?synchronize-panes,on,off}'
+```
+
+```bash Sessions
+# Create default session with windows
+new -d -s0 -nirssi 'exec irssi'
+set -t0:0 monitor-activity on
+set -t0:0 aggressive-resize on
+
+neww -d -ntodo 'exec emacs ~/TODO'
+setw -t0:1 aggressive-resize on
+
+neww -d -nmutt 'exec mutt'
+setw -t0:2 aggressive-resize on
+
+neww -d
+neww -d
+neww -d
+```
+
+</CodeGroup>
+
+## Conditional Configuration
+
+### If-Else Blocks
+
+```bash
+# Conditional based on host
+%if #{==:#{host},myhost}
+set -g status-style bg=red
+%elif #{==:#{host},otherhost}
+set -g status-style bg=green
+%else
+set -g status-style bg=blue
+%endif
+
+# Check if running inside tmux
+%if #{TMUX}
+set -g status-bg red
+%endif
+
+# Single line conditionals
+%if #{==:#{host},myhost} set -g status-style bg=red %endif
+```
+
+### Runtime Conditionals
+
+```bash
+# Use if-shell for runtime conditions
+if-shell "test -f ~/.tmux.local.conf" \
+    "source-file ~/.tmux.local.conf"
+
+# With command syntax
+if-shell "test -d /tmp" {
+    display-message "Found /tmp"
+} {
+    display-message "No /tmp directory"
+}
+```
+
+## Environment Variables
+
+### Setting Variables
+
+```bash
+# Set during parsing (global environment)
+MYVAR=value
+
+# Hidden variables (not passed to processes)
+%hidden SECRET=password
+
+# Environment expansion
+HOME=/home/user
+bind h split-window -c "$HOME"
+```
+
+### Variable Expansion
+
+<Accordion title="Expansion Rules">
+
+From tmux.1 manual:
+
+1. **Environment variables** - `$VAR` expands from global environment
+2. **Tilde expansion** - `~` and `~user` expand to home directories
+3. **Unicode** - `\uXXXX` for Unicode codepoints
+4. **Escape sequences**:
+   - `\e` - Escape character
+   - `\r` - Carriage return
+   - `\n` - Newline
+   - `\t` - Tab
+5. **Octal** - `\ooo` for octal values
+
+</Accordion>
+
+## Command Parsing
+
+### Quoting
+
+<CodeGroup>
+
+```bash Single Quotes
+# Single quotes preserve everything literally
+bind r display 'Status: #{status}'
+```
+
+```bash Double Quotes
+# Double quotes allow variable expansion
+set -g status-right "#H %H:%M"
+```
+
+```bash Braces
+# Braces avoid escaping issues
+bind r {
+    source-file ~/.tmux.conf
+    display "Reloaded: $HOME/.tmux.conf"
+}
+```
+
+```bash Escaping
+# Escape special characters
+bind \; last-pane
+bind '$' command-prompt -I'#S' "rename-session -- '%%'"
+```
+
+</CodeGroup>
+
+### Semicolon Handling
+
+From the tmux.1 manual:
+
+```bash
+# Semicolon as command separator (requires escaping in shell)
+$ tmux neww \; splitw
+$ tmux neww ';' splitw
+
+# In config file (no shell escaping needed)
+neww ; splitw
+
+# Semicolon as argument (escape twice for shell)
+$ tmux neww 'foo\;' bar
+$ tmux neww foo\\\; bar
+
+# In config file (escape once)
+neww 'foo\;' bar
+```
+
+## Best Practices
+
+### Organization
+
+<Steps>
+
+<Step title="Section Your Config">
+```bash
+# ==========================================
+# GENERAL SETTINGS
+# ==========================================
+set -g default-terminal "tmux-256color"
+set -g history-limit 50000
+
+# ==========================================
+# KEY BINDINGS
+# ==========================================
+bind r source-file ~/.tmux.conf
+
+# ==========================================
+# STATUS LINE
+# ==========================================
+set -g status-style bg=black,fg=white
+```
+</Step>
+
+<Step title="Use Comments">
+```bash
+# Increase scrollback buffer
+set -g history-limit 50000
+
+# Don't wait after escape key
+set -s escape-time 0
+
+# Update window title
+set -g set-titles on
+set -g set-titles-string "#T"
+```
+</Step>
+
+<Step title="Modular Configuration">
+```bash
+# Load local overrides if present
+if-shell "test -f ~/.tmux.local.conf" \
+    "source-file ~/.tmux.local.conf"
+
+# Load platform-specific config
+if-shell "uname | grep -q Darwin" \
+    "source-file ~/.tmux.macos.conf"
+
+if-shell "uname | grep -q Linux" \
+    "source-file ~/.tmux.linux.conf"
+```
+</Step>
+
+</Steps>
+
+### Error Handling
+
+From `cfg.c:206-238`:
+
+```bash
+# Check for errors with -n flag (parse-only)
+tmux -f ~/.tmux.conf -n
+
+# Quiet loading (suppress file not found errors)
+tmux source-file -q ~/.tmux.optional.conf
+
+# Verbose loading (show parsed commands)
+tmux source-file -v ~/.tmux.conf
+```
+
+### Performance
+
+<Accordion title="Configuration Performance Tips">
+
+1. **Minimize format expansions** - Format strings are evaluated on every refresh
+2. **Use conditional loading** - Load only what's needed
+3. **Avoid expensive shell commands** - In status-right/status-left
+4. **Set escape-time** - Reduce delay after escape key
+
+```bash
+# Reduce escape time
+set -s escape-time 0
+
+# Update status less frequently
+set -g status-interval 5
+
+# Disable automatic renaming if not needed
+setw -g automatic-rename off
+```
+
+</Accordion>
+
+## Common Configurations
+
+### Vi Mode
+
+```bash
+# Vi mode in copy mode
+setw -g mode-keys vi
+
+# Vi-style copy bindings
+bind -T copy-mode-vi v send -X begin-selection
+bind -T copy-mode-vi y send -X copy-selection-and-cancel
+bind -T copy-mode-vi C-v send -X rectangle-toggle
+```
+
+### 256 Color Support
+
+```bash
+# Set 256 color terminal
+set -g default-terminal "screen-256color"
+
+# Enable RGB support for modern terminals
+set-option -sa terminal-features ",xterm*:RGB"
+set-option -ga terminal-overrides ",xterm-256color:Tc"
+```
+
+### Activity Monitoring
+
+```bash
+# Monitor activity in other windows
+setw -g monitor-activity on
+set -g visual-activity off  # Don't show message
+
+# Highlight window with activity
+setw -g window-status-activity-style fg=red,bg=default
+```
+
+### Window and Pane Numbering
+
+```bash
+# Start numbering at 1 instead of 0
+set -g base-index 1
+setw -g pane-base-index 1
+
+# Renumber windows after closing
+set -g renumber-windows on
+```
+
+## Debugging Configuration
+
+### Show Loaded Config
+
+```bash
+# Show all options
+tmux show-options -g    # Global options
+tmux show-options -gw   # Global window options
+tmux show-options -gs   # Server options
+
+# Show specific option
+tmux show-options -gv status-style
+```
+
+### Test Configuration
+
+<Steps>
+
+<Step title="Parse Check">
+```bash
+# Check syntax without executing
+tmux -f ~/.tmux.conf -n
+```
+</Step>
+
+<Step title="Verbose Loading">
+```bash
+# See what commands are executed
+tmux source-file -v ~/.tmux.conf
+```
+</Step>
+
+<Step title="Check Messages">
+```bash
+# View configuration errors
+tmux show-messages
+```
+</Step>
+
+</Steps>
+
+### Common Issues
+
+<Accordion title="Troubleshooting Common Problems">
+
+**Config not loading:**
+```bash
+# Check if server is using old config
+tmux kill-server
+tmux start-server
+```
+
+**Syntax errors:**
+```bash
+# Parse only, don't execute
+tmux -f ~/.tmux.conf -n
+```
+
+**Option not taking effect:**
+```bash
+# Check option scope (global vs window vs pane)
+tmux show-options -g | grep option-name
+tmux show-options -gw | grep option-name
+```
+
+**Unknown command:**
+```bash
+# Check tmux version
+tmux -V
+
+# List available commands
+tmux list-commands
+```
+
+</Accordion>
+
+## Configuration Templates
+
+### Minimal Configuration
+
+```bash
+# Minimal but useful configuration
+
+# Improve colors
+set -g default-terminal "screen-256color"
+
+# Increase scrollback
+set -g history-limit 10000
+
+# Start windows at 1
+set -g base-index 1
+
+# Easier prefix
+set -g prefix C-a
+unbind C-b
+bind C-a send-prefix
+
+# Easy config reload
+bind r source-file ~/.tmux.conf \; display "Reloaded!"
+
+# Mouse support
+set -g mouse on
+```
+
+### Power User Configuration
+
+```bash
+# Advanced configuration
+
+# ========== GENERAL ==========
+set -g default-terminal "tmux-256color"
+set -ga terminal-overrides ",*256col*:Tc"
+set -g history-limit 50000
+set -g buffer-limit 20
+set -sg escape-time 0
+set -g display-time 1500
+set -g remain-on-exit off
+set -g repeat-time 300
+setw -g allow-rename off
+setw -g automatic-rename off
+setw -g aggressive-resize on
+
+# ========== NAVIGATION ==========
+set -g base-index 1
+setw -g pane-base-index 1
+set -g renumber-windows on
+
+# ========== KEY BINDINGS ==========
+set -g prefix C-a
+unbind C-b
+bind C-a send-prefix
+
+bind r source-file ~/.tmux.conf \; display "Config reloaded"
+
+# Split panes
+bind | split-window -h -c "#{pane_current_path}"
+bind - split-window -v -c "#{pane_current_path}"
+
+# Vim-style pane navigation
+bind h select-pane -L
+bind j select-pane -D
+bind k select-pane -U
+bind l select-pane -R
+
+# Resize panes
+bind -r H resize-pane -L 5
+bind -r J resize-pane -D 5
+bind -r K resize-pane -U 5
+bind -r L resize-pane -R 5
+
+# ========== COPY MODE ==========
+setw -g mode-keys vi
+bind [ copy-mode
+bind -T copy-mode-vi v send -X begin-selection
+bind -T copy-mode-vi y send -X copy-selection-and-cancel
+
+# ========== MOUSE ==========
+set -g mouse on
+
+# ========== STATUS LINE ==========
+set -g status on
+set -g status-interval 5
+set -g status-position bottom
+set -g status-justify left
+set -g status-style bg=colour235,fg=colour136
+
+set -g status-left "#[fg=colour250,bg=colour241,bold] #S #[default]"
+set -g status-right "#[fg=colour250,bg=colour241] %H:%M #[default]"
+
+setw -g window-status-format " #I:#W "
+setw -g window-status-current-format "#[fg=colour235,bg=colour136,bold] #I:#W #[default]"
+
+# ========== PLUGINS ==========
+# Add your plugin configuration here
+```
+
+## See Also
+
+- [Key Bindings](/guides/key-bindings) - Customize key bindings
+- [Status Line](/guides/status-line) - Configure the status line
+- [Scripting](/guides/scripting) - Advanced automation

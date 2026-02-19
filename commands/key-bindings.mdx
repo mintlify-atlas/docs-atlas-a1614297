@@ -1,0 +1,483 @@
+---
+title: 'Key Binding Commands'
+description: 'Commands for managing tmux key bindings'
+---
+
+## Overview
+
+Key bindings map keys to tmux commands. tmux supports multiple key tables for different contexts, with the default `prefix` table requiring `Ctrl-b` first.
+
+## Creating Key Bindings
+
+### bind-key
+
+Bind a key to a command.
+
+```bash
+tmux bind-key [-nr] [-T key-table] [-N note] key [command [arguments ...]]
+```
+
+**Alias:** `bind`
+
+<ParamField path="-n" type="flag">
+Bind in `root` key table (no prefix required)
+</ParamField>
+
+<ParamField path="-r" type="flag">
+Key may repeat (can be pressed multiple times)
+</ParamField>
+
+<ParamField path="-T" type="string">
+Key table to bind in (default: `prefix`)
+</ParamField>
+
+<ParamField path="-N" type="string">
+Note/description for the binding
+</ParamField>
+
+<ParamField path="key" type="string" required>
+Key to bind (e.g., `C-a`, `M-n`, `F1`)
+</ParamField>
+
+<ParamField path="command" type="string">
+Command to execute when key is pressed
+</ParamField>
+
+<CodeGroup>
+```bash Basic Bindings
+# Bind key in prefix table (requires Ctrl-b first)
+tmux bind-key c new-window
+
+# Bind with description
+tmux bind-key -N "Create new window" c new-window
+
+# Bind multiple keys to same command
+tmux bind-key h select-pane -L
+tmux bind-key j select-pane -D
+tmux bind-key k select-pane -U
+tmux bind-key l select-pane -R
+```
+
+```bash Root Table
+# Bind without prefix (direct key press)
+tmux bind-key -n C-Left select-pane -L
+tmux bind-key -n C-Right select-pane -R
+
+# Equivalent using -T root
+tmux bind-key -T root C-Up select-pane -U
+tmux bind-key -T root C-Down select-pane -D
+```
+
+```bash Repeatable Keys
+# Bind repeatable keys for resizing
+tmux bind-key -r H resize-pane -L 5
+tmux bind-key -r J resize-pane -D 5
+tmux bind-key -r K resize-pane -U 5
+tmux bind-key -r L resize-pane -R 5
+
+# Press Ctrl-b, then hold H to keep resizing
+```
+
+```bash Complex Commands
+# Bind key to multiple commands
+tmux bind-key S split-window -v \; select-pane -t :.+
+
+# Bind key with braces (no escaping needed)
+tmux bind-key C-s {
+    split-window -h
+    select-pane -t :.+
+    resize-pane -x 80
+}
+
+# Bind key to prompt for command
+tmux bind-key : command-prompt
+```
+</CodeGroup>
+
+## Key Tables
+
+tmux uses different key tables for different contexts:
+
+### Default Key Tables
+
+<Accordion title="prefix (default)">
+Default key table. Keys require pressing the prefix key (`Ctrl-b`) first.
+
+```bash
+# These require Ctrl-b first
+tmux bind-key c new-window
+tmux bind-key % split-window -h
+```
+</Accordion>
+
+<Accordion title="root">
+Keys bound here work without prefix. Use with caution.
+
+```bash
+# Direct key bindings
+tmux bind-key -T root F1 select-window -t :1
+tmux bind-key -T root F2 select-window -t :2
+tmux bind-key -n M-n new-window  # -n is alias for -T root
+```
+</Accordion>
+
+<Accordion title="copy-mode / copy-mode-vi">
+Key tables for copy mode (emacs/vi keybindings).
+
+```bash
+# Customize copy mode keys
+tmux bind-key -T copy-mode-vi v send-keys -X begin-selection
+tmux bind-key -T copy-mode-vi y send-keys -X copy-selection
+```
+</Accordion>
+
+### Custom Key Tables
+
+Create custom key tables for multi-key sequences:
+
+```bash
+# Create custom table for window operations
+tmux bind-key -T window-ops c new-window
+tmux bind-key -T window-ops k kill-window
+tmux bind-key -T window-ops r rename-window
+
+# Bind prefix to switch to custom table
+tmux bind-key w switch-client -T window-ops
+
+# Now: Ctrl-b w c creates window
+#      Ctrl-b w k kills window
+#      Ctrl-b w r renames window
+```
+
+## Removing Key Bindings
+
+### unbind-key
+
+Remove a key binding.
+
+```bash
+tmux unbind-key [-an] [-T key-table] key
+```
+
+**Alias:** `unbind`
+
+<ParamField path="-a" type="flag">
+Remove all key bindings
+</ParamField>
+
+<ParamField path="-n" type="flag">
+Unbind from `root` table
+</ParamField>
+
+<ParamField path="-T" type="string">
+Key table to unbind from
+</ParamField>
+
+```bash
+# Unbind single key
+tmux unbind-key c
+
+# Unbind from root table
+tmux unbind-key -n C-Left
+tmux unbind-key -T root C-Right
+
+# Unbind all keys in table
+tmux unbind-key -a -T copy-mode-vi
+
+# Unbind all keys everywhere
+tmux unbind-key -a
+```
+
+## Listing Key Bindings
+
+### list-keys
+
+List key bindings.
+
+```bash
+tmux list-keys [-1aN] [-P prefix-string] [-T key-table] [key]
+```
+
+**Alias:** `lsk`
+
+<ParamField path="-1" type="flag">
+List only first binding for each command
+</ParamField>
+
+<ParamField path="-a" type="flag">
+List all tables
+</ParamField>
+
+<ParamField path="-N" type="flag">
+List only keys with notes
+</ParamField>
+
+<ParamField path="-P" type="string">
+Prefix string for output (default: `bind-key`)
+</ParamField>
+
+<ParamField path="-T" type="string">
+List keys from specific table
+</ParamField>
+
+<CodeGroup>
+```bash Basic Listing
+# List all key bindings in prefix table
+tmux list-keys
+
+# List bindings in specific table
+tmux list-keys -T root
+tmux list-keys -T copy-mode-vi
+
+# List all tables
+tmux list-keys -a
+```
+
+```bash Filtered Listing
+# List only keys with descriptions
+tmux list-keys -N
+
+# List specific key
+tmux list-keys c
+tmux list-keys -T root C-Left
+
+# List with custom prefix
+tmux list-keys -P "# "
+```
+
+```bash Output Examples
+# Default output format:
+bind-key -T prefix c new-window
+bind-key -T prefix % split-window -h
+
+# With notes (-N):
+c     Create new window
+%     Split window horizontally
+```
+</CodeGroup>
+
+## Key Syntax
+
+Keys can be specified in various formats:
+
+### Key Formats
+
+<Accordion title="Control Keys">
+```bash
+C-a  # Ctrl-a
+C-b  # Ctrl-b
+C-S-a  # Ctrl-Shift-a
+```
+</Accordion>
+
+<Accordion title="Alt/Meta Keys">
+```bash
+M-a  # Alt-a (Meta-a)
+M-1  # Alt-1
+M-S-x  # Alt-Shift-x
+```
+</Accordion>
+
+<Accordion title="Function Keys">
+```bash
+F1, F2, ... F12
+S-F1  # Shift-F1
+C-F1  # Ctrl-F1
+```
+</Accordion>
+
+<Accordion title="Special Keys">
+```bash
+Space
+Enter
+Tab
+BTab  # Backtab (Shift-Tab)
+Escape
+Up, Down, Left, Right
+Home, End
+PageUp, PageDown
+Insert, Delete
+```
+</Accordion>
+
+<Accordion title="Mouse Events">
+```bash
+MouseDown1  # Left button down
+MouseUp1    # Left button up
+MouseDrag1  # Left button drag
+WheelUp     # Scroll wheel up
+WheelDown   # Scroll wheel down
+```
+</Accordion>
+
+## Common Binding Patterns
+
+### Vim-Style Navigation
+
+```bash
+# Pane navigation
+tmux bind-key h select-pane -L
+tmux bind-key j select-pane -D
+tmux bind-key k select-pane -U
+tmux bind-key l select-pane -R
+
+# Repeatable pane resizing
+tmux bind-key -r H resize-pane -L 5
+tmux bind-key -r J resize-pane -D 5
+tmux bind-key -r K resize-pane -U 5
+tmux bind-key -r L resize-pane -R 5
+```
+
+### Quick Window Access
+
+```bash
+# Bind F1-F10 to windows 1-10
+tmux bind-key -n F1 select-window -t :1
+tmux bind-key -n F2 select-window -t :2
+tmux bind-key -n F3 select-window -t :3
+# ... and so on
+```
+
+### Split Bindings
+
+```bash
+# More intuitive split bindings
+tmux bind-key | split-window -h -c "#{pane_current_path}"
+tmux bind-key - split-window -v -c "#{pane_current_path}"
+
+# Split and run command
+tmux bind-key C-l split-window -h 'tail -f /var/log/app.log'
+```
+
+### Reload Configuration
+
+```bash
+# Reload config file
+tmux bind-key r source-file ~/.tmux.conf \; display "Config reloaded!"
+
+# With braces
+tmux bind-key R {
+    source-file ~/.tmux.conf
+    display-message "Configuration reloaded"
+}
+```
+
+### Session Management
+
+```bash
+# Quick session switching
+tmux bind-key S choose-tree -Zs
+
+# Session creation prompt
+tmux bind-key C-n command-prompt -p "New session:" "new-session -s '%%'"
+
+# Kill session with confirmation
+tmux bind-key X confirm-before -p "Kill session? (y/n)" kill-session
+```
+
+### Copy Mode Bindings
+
+```bash
+# Vi-style copy mode
+tmux set-option -g mode-keys vi
+tmux bind-key -T copy-mode-vi v send-keys -X begin-selection
+tmux bind-key -T copy-mode-vi y send-keys -X copy-selection-and-cancel
+tmux bind-key -T copy-mode-vi C-v send-keys -X rectangle-toggle
+
+# Copy to system clipboard
+tmux bind-key -T copy-mode-vi y send-keys -X copy-pipe-and-cancel 'xclip -in -selection clipboard'
+```
+
+## Advanced Examples
+
+<Accordion title="Multi-Step Key Sequences">
+```bash
+# Create prefix tables for organized commands
+
+# Window operations (Ctrl-b w ...)
+tmux bind-key -T window-ops c new-window
+tmux bind-key -T window-ops k kill-window
+tmux bind-key -T window-ops r command-prompt -I "#W" "rename-window '%%'"
+tmux bind-key -T window-ops n next-window
+tmux bind-key -T window-ops p previous-window
+tmux bind-key w switch-client -T window-ops
+
+# Pane operations (Ctrl-b p ...)
+tmux bind-key -T pane-ops h select-pane -L
+tmux bind-key -T pane-ops j select-pane -D
+tmux bind-key -T pane-ops k select-pane -U
+tmux bind-key -T pane-ops l select-pane -R
+tmux bind-key -T pane-ops x kill-pane
+tmux bind-key p switch-client -T pane-ops
+```
+</Accordion>
+
+<Accordion title="Conditional Bindings">
+```bash
+# Toggle status bar
+tmux bind-key t if-shell \
+    '[[ $(tmux show-option -gv status) == "on" ]]' \
+    'set-option -g status off' \
+    'set-option -g status on'
+
+# With braces (cleaner)
+tmux bind-key t if-shell '[ $(tmux show -gv status) = on ]' {
+    set-option -g status off
+} {
+    set-option -g status on
+}
+```
+</Accordion>
+
+<Accordion title="Mouse Bindings">
+```bash
+# Enable mouse support
+tmux set-option -g mouse on
+
+# Copy on mouse drag
+tmux bind-key -T copy-mode-vi MouseDragEnd1Pane \
+    send-keys -X copy-pipe-and-cancel 'xclip -in -selection clipboard'
+
+# Right-click context menu
+tmux bind-key -T root MouseDown3Pane display-menu -T "#[align=centre]#{pane_index} (#{pane_id})" \
+    "Split Horizontal" h "split-window -h" \
+    "Split Vertical" v "split-window -v" \
+    "Kill Pane" x "kill-pane"
+```
+</Accordion>
+
+<Accordion title="Dynamic Bindings">
+```bash
+# Bind keys based on environment
+bind-key C-e if-shell '[ -n "$SSH_CONNECTION" ]' {
+    display-message "Running on remote host"
+} {
+    display-message "Running locally"
+}
+
+# Project-specific bindings
+bind-key P if-shell '[ -f package.json ]' {
+    split-window -h 'npm run dev'
+} {
+    split-window -h
+}
+```
+</Accordion>
+
+## Tips
+
+<Note>
+**Repeatable Keys**: Use `-r` flag for commands you want to press multiple times (like resize-pane). The repeat timeout is controlled by `repeat-time` option.
+</Note>
+
+<Note>
+**Key Table Priority**: Keys are checked in this order:
+1. Mouse bindings
+2. Current key table (if set by `switch-client -T`)
+3. `root` table
+4. `prefix` table (if prefix key was pressed)
+</Note>
+
+<Warning>
+**Overriding Default Bindings**: Be careful when binding to `root` table as it may conflict with terminal or shell shortcuts.
+</Warning>

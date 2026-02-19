@@ -1,0 +1,824 @@
+---
+title: 'Pane Commands'
+description: 'Commands for managing tmux panes'
+---
+
+## Overview
+
+Panes are subdivisions of a window, each containing an independent terminal. Windows can be split horizontally or vertically into multiple panes.
+
+## Creating Panes
+
+### split-window
+
+Split a pane to create a new one.
+
+```bash
+tmux split-window [-bdefhIPvZ] [-c start-directory] \
+                  [-e environment] [-F format] [-l size] \
+                  [-t target-pane] [shell-command]
+```
+
+**Alias:** `splitw`
+
+<ParamField path="-h" type="flag">
+Split horizontally (creates left/right panes). Without this, splits vertically (top/bottom).
+</ParamField>
+
+<ParamField path="-v" type="flag">
+Split vertically (top/bottom). This is the default.
+</ParamField>
+
+<ParamField path="-b" type="flag">
+Create new pane before target pane
+</ParamField>
+
+<ParamField path="-d" type="flag">
+Do not make new pane the active pane
+</ParamField>
+
+<ParamField path="-f" type="flag">
+Create new pane spanning full width/height of window
+</ParamField>
+
+<ParamField path="-I" type="flag">
+Create empty pane (no command, only input mode)
+</ParamField>
+
+<ParamField path="-P" type="flag">
+Print information about new pane after creation
+</ParamField>
+
+<ParamField path="-Z" type="flag">
+Zoom the active pane if it was zoomed
+</ParamField>
+
+<ParamField path="-c" type="string">
+Working directory for new pane
+</ParamField>
+
+<ParamField path="-e" type="string">
+Environment variable (format: `VARIABLE=value`). Can be repeated.
+</ParamField>
+
+<ParamField path="-F" type="string">
+Format string for output when `-P` is used
+</ParamField>
+
+<ParamField path="-l" type="string">
+Size of new pane in cells or percentage (e.g., `20` or `30%`)
+</ParamField>
+
+<CodeGroup>
+```bash Basic
+# Split vertically (top/bottom)
+tmux split-window
+
+# Split horizontally (left/right)
+tmux split-window -h
+
+# Split with specific size
+tmux split-window -l 20
+tmux split-window -h -l 30%
+```
+
+```bash Advanced
+# Split with command
+tmux split-window 'tail -f /var/log/app.log'
+
+# Split in specific directory
+tmux split-window -c ~/projects
+
+# Split full width at top
+tmux split-window -bf
+
+# Split and stay on current pane
+tmux split-window -d
+```
+
+```bash Complex Layouts
+# Create 2x2 grid
+tmux split-window -v
+tmux split-window -h
+tmux select-pane -t 0
+tmux split-window -h
+
+# Create side-by-side editors
+tmux split-window -h 'vim file1.txt'
+tmux split-window -h 'vim file2.txt'
+```
+</CodeGroup>
+
+## Navigating Panes
+
+### select-pane
+
+Make a pane active.
+
+```bash
+tmux select-pane [-DdegLlMmRU] [-T title] [-t target-pane]
+```
+
+**Alias:** `selectp`
+
+<ParamField path="-D" type="flag">
+Select pane below
+</ParamField>
+
+<ParamField path="-U" type="flag">
+Select pane above
+</ParamField>
+
+<ParamField path="-L" type="flag">
+Select pane to the left
+</ParamField>
+
+<ParamField path="-R" type="flag">
+Select pane to the right
+</ParamField>
+
+<ParamField path="-l" type="flag">
+Select last (previously active) pane
+</ParamField>
+
+<ParamField path="-d" type="flag">
+Disable input to the pane
+</ParamField>
+
+<ParamField path="-e" type="flag">
+Enable input to the pane
+</ParamField>
+
+<ParamField path="-g" type="flag">
+Show current pane style
+</ParamField>
+
+<ParamField path="-m" type="flag">
+Mark the pane (for commands like `join-pane`)
+</ParamField>
+
+<ParamField path="-M" type="flag">
+Clear marked pane
+</ParamField>
+
+<ParamField path="-T" type="string">
+Set pane title
+</ParamField>
+
+<CodeGroup>
+```bash Navigation
+# Select by direction
+tmux select-pane -D  # down
+tmux select-pane -U  # up
+tmux select-pane -L  # left
+tmux select-pane -R  # right
+
+# Select last pane
+tmux select-pane -l
+```
+
+```bash Targeting
+# Select specific pane
+tmux select-pane -t :.0
+tmux select-pane -t {top-left}
+tmux select-pane -t {bottom-right}
+
+# Special tokens
+tmux select-pane -t {next}
+tmux select-pane -t {previous}
+```
+
+```bash Marking
+# Mark pane for later operations
+tmux select-pane -m
+
+# Clear mark
+tmux select-pane -M
+```
+
+```bash Control
+# Disable pane input
+tmux select-pane -d -t :.1
+
+# Enable pane input
+tmux select-pane -e -t :.1
+
+# Set pane title
+tmux select-pane -T "Build Output" -t :.2
+```
+</CodeGroup>
+
+### last-pane
+
+Select the last (previously selected) pane.
+
+```bash
+tmux last-pane [-deZ] [-t target-window]
+```
+
+**Alias:** `lastp`
+
+<ParamField path="-d" type="flag">
+Disable input to the pane
+</ParamField>
+
+<ParamField path="-e" type="flag">
+Enable input to the pane
+</ParamField>
+
+<ParamField path="-Z" type="flag">
+Keep window zoomed if it was zoomed
+</ParamField>
+
+```bash
+# Switch to last pane
+tmux last-pane
+
+# Toggle between two panes repeatedly
+tmux bind-key Tab last-pane
+```
+
+## Managing Panes
+
+### resize-pane
+
+Resize a pane.
+
+```bash
+tmux resize-pane [-DLMRUZ] [-t target-pane] [-x width] \
+                 [-y height] [adjustment]
+```
+
+**Alias:** `resizep`
+
+<ParamField path="-D" type="flag">
+Resize downward
+</ParamField>
+
+<ParamField path="-U" type="flag">
+Resize upward
+</ParamField>
+
+<ParamField path="-L" type="flag">
+Resize to the left
+</ParamField>
+
+<ParamField path="-R" type="flag">
+Resize to the right
+</ParamField>
+
+<ParamField path="-M" type="flag">
+Resize to smallest size that fits content
+</ParamField>
+
+<ParamField path="-Z" type="flag">
+Toggle zoom state of the pane
+</ParamField>
+
+<ParamField path="-x" type="string">
+Set absolute width
+</ParamField>
+
+<ParamField path="-y" type="string">
+Set absolute height
+</ParamField>
+
+<ParamField path="adjustment" type="number">
+Number of cells to resize by (default: 1)
+</ParamField>
+
+<CodeGroup>
+```bash Relative Resize
+# Resize by direction
+tmux resize-pane -D 5  # down by 5 cells
+tmux resize-pane -U 3  # up by 3 cells
+tmux resize-pane -L 10 # left by 10 cells
+tmux resize-pane -R 10 # right by 10 cells
+```
+
+```bash Absolute Resize
+# Set exact dimensions
+tmux resize-pane -x 80
+tmux resize-pane -y 24
+tmux resize-pane -x 100 -y 30
+```
+
+```bash Zoom
+# Toggle pane zoom (maximize/restore)
+tmux resize-pane -Z
+
+# Zoom specific pane
+tmux resize-pane -Z -t :.1
+```
+</CodeGroup>
+
+<Note>
+Percentage sizes can be specified with `%`, e.g., `-x 50%` for half width.
+</Note>
+
+### swap-pane
+
+Swap two panes.
+
+```bash
+tmux swap-pane [-dDUZ] [-s src-pane] [-t dst-pane]
+```
+
+**Alias:** `swapp`
+
+<ParamField path="-D" type="flag">
+Swap with next pane
+</ParamField>
+
+<ParamField path="-U" type="flag">
+Swap with previous pane
+</ParamField>
+
+<ParamField path="-d" type="flag">
+Do not change active pane
+</ParamField>
+
+<ParamField path="-Z" type="flag">
+Keep window zoomed if it was zoomed
+</ParamField>
+
+```bash
+# Swap two specific panes
+tmux swap-pane -s :.0 -t :.1
+
+# Swap with next pane
+tmux swap-pane -D
+
+# Swap with previous pane
+tmux swap-pane -U
+
+# Swap with marked pane
+tmux select-pane -m -t :.0
+tmux select-pane -t :.1
+tmux swap-pane -s '{marked}'
+```
+
+### break-pane
+
+Break pane into a new window.
+
+```bash
+tmux break-pane [-abdP] [-F format] [-n window-name] \
+                [-s src-pane] [-t dst-window]
+```
+
+**Alias:** `breakp`
+
+<ParamField path="-a" type="flag">
+Move to next index after dst-window
+</ParamField>
+
+<ParamField path="-b" type="flag">
+Move to next index before dst-window
+</ParamField>
+
+<ParamField path="-d" type="flag">
+Do not make new window current
+</ParamField>
+
+<ParamField path="-P" type="flag">
+Print information about new window
+</ParamField>
+
+<ParamField path="-F" type="string">
+Format string for output with `-P`
+</ParamField>
+
+<ParamField path="-n" type="string">
+Name for new window
+</ParamField>
+
+```bash
+# Break current pane into new window
+tmux break-pane
+
+# Break with window name
+tmux break-pane -n detached-pane
+
+# Break specific pane
+tmux break-pane -s :.1 -n logs
+```
+
+### join-pane
+
+Join a pane to another window.
+
+```bash
+tmux join-pane [-bdfhv] [-l size] [-s src-pane] [-t dst-pane]
+```
+
+**Alias:** `joinp`
+
+<ParamField path="-b" type="flag">
+Join to left of or above dst-pane
+</ParamField>
+
+<ParamField path="-d" type="flag">
+Do not make dst-pane active
+</ParamField>
+
+<ParamField path="-f" type="flag">
+Join with full window width/height
+</ParamField>
+
+<ParamField path="-h" type="flag">
+Horizontal split (left/right)
+</ParamField>
+
+<ParamField path="-v" type="flag">
+Vertical split (top/bottom)
+</ParamField>
+
+<ParamField path="-l" type="string">
+Size for new pane
+</ParamField>
+
+```bash
+# Join pane from another window
+tmux join-pane -s :1.0
+
+# Join with horizontal split
+tmux join-pane -h -s :2.0
+
+# Join marked pane
+tmux select-pane -m -t :1.0
+tmux join-pane
+
+# Join to specific target
+tmux join-pane -s :1.0 -t :2.1
+```
+
+<Note>
+If `-s` is omitted and a marked pane exists, the marked pane is used.
+</Note>
+
+### move-pane
+
+Move a pane (alias for `join-pane`).
+
+```bash
+tmux move-pane [-bdfhv] [-l size] [-s src-pane] [-t dst-pane]
+```
+
+**Alias:** `movep`
+
+```bash
+# Move pane between windows
+tmux move-pane -s :1.0 -t :2
+```
+
+## Destroying Panes
+
+### kill-pane
+
+Destroy a pane.
+
+```bash
+tmux kill-pane [-a] [-t target-pane]
+```
+
+**Alias:** `killp`
+
+<ParamField path="-a" type="flag">
+Kill all panes except target-pane
+</ParamField>
+
+```bash
+# Kill current pane
+tmux kill-pane
+
+# Kill specific pane
+tmux kill-pane -t :.1
+
+# Kill all except current
+tmux kill-pane -a
+```
+
+<Warning>
+If no panes remain, the containing window is also destroyed.
+</Warning>
+
+### respawn-pane
+
+Respawn a pane (restart the command).
+
+```bash
+tmux respawn-pane [-k] [-c start-directory] [-e environment] \
+                  [-t target-pane] [shell-command]
+```
+
+**Alias:** `respawnp`
+
+<ParamField path="-k" type="flag">
+Kill existing process before respawning
+</ParamField>
+
+<ParamField path="-c" type="string">
+Working directory
+</ParamField>
+
+<ParamField path="-e" type="string">
+Environment variable (can be repeated)
+</ParamField>
+
+```bash
+# Respawn current pane
+tmux respawn-pane
+
+# Respawn with new command
+tmux respawn-pane -k 'npm test'
+
+# Respawn in different directory
+tmux respawn-pane -c ~/newproject
+```
+
+## Pane Information
+
+### list-panes
+
+List panes.
+
+```bash
+tmux list-panes [-ars] [-F format] [-f filter] \
+                [-O sort-order] [-t target]
+```
+
+**Alias:** `lsp`
+
+<ParamField path="-a" type="flag">
+List all panes on the server
+</ParamField>
+
+<ParamField path="-s" type="flag">
+List panes in target session (or current session)
+</ParamField>
+
+<ParamField path="-r" type="flag">
+Reverse sort order
+</ParamField>
+
+<ParamField path="-F" type="string">
+Format string for output
+</ParamField>
+
+<ParamField path="-f" type="string">
+Filter expression
+</ParamField>
+
+<ParamField path="-O" type="string">
+Sort order: `name`, `index`, `size`, `creation`, or `activity`
+</ParamField>
+
+```bash
+# List panes in current window
+tmux list-panes
+
+# List all panes in session
+tmux list-panes -s
+
+# List all panes on server
+tmux list-panes -a
+
+# List with custom format
+tmux list-panes -F "#{pane_index}: #{pane_title} [#{pane_width}x#{pane_height}]"
+
+# List sorted by activity
+tmux list-panes -O activity
+```
+
+### display-panes
+
+Display pane numbers for selection.
+
+```bash
+tmux display-panes [-bN] [-d duration] [-t target-client] [template]
+```
+
+**Alias:** `displayp`
+
+<ParamField path="-b" type="flag">
+Do not block other commands while indicator shown
+</ParamField>
+
+<ParamField path="-N" type="flag">
+Do not close indicator on key press
+</ParamField>
+
+<ParamField path="-d" type="string">
+Duration in milliseconds (0 = until key press)
+</ParamField>
+
+```bash
+# Show pane numbers
+tmux display-panes
+
+# Show for specific duration
+tmux display-panes -d 2000
+
+# Custom template for selection
+tmux display-panes 'select-pane -t "%%"'
+```
+
+## Pane Content
+
+### capture-pane
+
+Capture pane contents.
+
+```bash
+tmux capture-pane [-aepPqCJMN] [-b buffer-name] \
+                  [-E end-line] [-S start-line] [-t target-pane]
+```
+
+**Alias:** `capturep`
+
+<ParamField path="-a" type="flag">
+Use alternate screen
+</ParamField>
+
+<ParamField path="-e" type="flag">
+Include escape sequences for text attributes
+</ParamField>
+
+<ParamField path="-p" type="flag">
+Output to stdout instead of buffer
+</ParamField>
+
+<ParamField path="-P" type="flag">
+Capture only incomplete escape sequences
+</ParamField>
+
+<ParamField path="-q" type="flag">
+Quiet mode (no error if alternate screen doesn't exist)
+</ParamField>
+
+<ParamField path="-C" type="flag">
+Escape non-printable characters as octal
+</ParamField>
+
+<ParamField path="-J" type="flag">
+Preserve trailing spaces and join wrapped lines
+</ParamField>
+
+<ParamField path="-M" type="flag">
+Use screen for current mode
+</ParamField>
+
+<ParamField path="-N" type="flag">
+Preserve trailing spaces at line ends
+</ParamField>
+
+<ParamField path="-b" type="string">
+Buffer name to capture into
+</ParamField>
+
+<ParamField path="-S" type="string">
+Start line (0 = first visible line, negative = history)
+</ParamField>
+
+<ParamField path="-E" type="string">
+End line (`-` = start of history or end of visible pane)
+</ParamField>
+
+<CodeGroup>
+```bash Basic
+# Capture visible pane
+tmux capture-pane
+
+# Capture and print to stdout
+tmux capture-pane -p
+
+# Capture to named buffer
+tmux capture-pane -b my-capture
+```
+
+```bash History
+# Capture entire history
+tmux capture-pane -S -
+
+# Capture last 100 lines of history
+tmux capture-pane -S -100
+
+# Capture specific range
+tmux capture-pane -S 0 -E 50
+```
+
+```bash Advanced
+# Capture with escape sequences
+tmux capture-pane -ep
+
+# Capture alternate screen
+tmux capture-pane -a
+
+# Capture and save to file
+tmux capture-pane -p > pane-content.txt
+```
+</CodeGroup>
+
+### pipe-pane
+
+Pipe pane output to a command.
+
+```bash
+tmux pipe-pane [-IOo] [-t target-pane] [shell-command]
+```
+
+<ParamField path="-I" type="flag">
+Pipe stdin to the pane
+</ParamField>
+
+<ParamField path="-O" type="flag">
+Pipe stdout from the pane
+</ParamField>
+
+<ParamField path="-o" type="flag">
+Only open pipe if not already open
+</ParamField>
+
+```bash
+# Pipe pane output to file
+tmux pipe-pane -o 'cat >> ~/output.log'
+
+# Stop piping
+tmux pipe-pane
+
+# Pipe to command
+tmux pipe-pane 'grep ERROR | tee -a errors.log'
+```
+
+## Pane Examples
+
+<Accordion title="Three-Pane Development Layout">
+```bash
+#!/bin/bash
+# Create development layout with editor, terminal, and logs
+
+tmux new-session -d -s dev
+
+# Split horizontally for editor and terminal
+tmux split-window -h -p 40
+
+# Split right pane vertically for terminal and logs
+tmux split-window -v
+
+# Select editor pane
+tmux select-pane -t 0
+
+tmux attach -t dev
+```
+</Accordion>
+
+<Accordion title="Automated Test Dashboard">
+```bash
+# Create 2x2 grid for test monitoring
+tmux new-session -d -s tests
+
+# Create grid
+tmux split-window -v
+tmux split-window -h
+tmux select-pane -t 0
+tmux split-window -h
+
+# Run different tests in each pane
+tmux send-keys -t 0 'npm test -- unit' C-m
+tmux send-keys -t 1 'npm test -- integration' C-m
+tmux send-keys -t 2 'npm run lint' C-m
+tmux send-keys -t 3 'npm run coverage' C-m
+
+tmux attach -t tests
+```
+</Accordion>
+
+<Accordion title="Marked Pane Workflow">
+```bash
+# Mark a pane for later operations
+tmux select-pane -t :.0 -m
+
+# Do other work...
+tmux select-window -t :2
+
+# Join marked pane here
+tmux join-pane
+
+# Or swap with marked pane
+tmux swap-pane -s '{marked}'
+```
+</Accordion>
+
+<Accordion title="Pane Logging">
+```bash
+# Start logging pane output
+tmux pipe-pane -o 'cat >> ~/logs/pane-#{pane_id}.log'
+
+# Later, stop logging
+tmux pipe-pane
+
+# Save pane scrollback to file
+tmux capture-pane -p -S - > pane-history.txt
+```
+</Accordion>

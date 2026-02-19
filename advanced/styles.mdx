@@ -1,0 +1,481 @@
+---
+title: 'Style System'
+description: 'Styling text with colors, attributes, and alignment in tmux'
+---
+
+## Overview
+
+tmux uses a comprehensive style system for customizing the appearance of status lines, window lists, panes, and other UI elements. Styles support colors, text attributes, alignment, and more.
+
+## Style Syntax
+
+Styles are specified as comma-separated attribute pairs in the format `attribute=value`:
+
+```bash
+set -g status-style bg=blue,fg=white,bold
+set -g window-status-style bg=default,fg=yellow
+```
+
+## Colors
+
+### Basic Colors
+
+tmux supports these named colors:
+
+<CodeGroup>
+```bash Named Colors
+black
+red
+green
+yellow
+blue
+magenta
+cyan
+white
+default          # Terminal default
+```
+
+```bash Bright Variants
+brightred
+brightgreen
+brightyellow
+brightblue
+brightmagenta
+brightcyan
+brightwhite
+```
+</CodeGroup>
+
+### Advanced Color Formats
+
+<CodeGroup>
+```bash 256 Color Palette
+colour0          # Black
+colour1          # Red
+colour15         # White
+colour255        # White
+# Valid range: colour0 to colour255
+```
+
+```bash RGB Colors
+#ff0000          # Red (hex RGB)
+#00ff00          # Green
+#0000ff          # Blue
+rgb:255/0/0      # Red (decimal RGB)
+```
+
+```bash Terminal Colors
+terminal         # Use terminal's default color
+```
+</CodeGroup>
+
+### Foreground and Background
+
+```bash
+fg=red           # Foreground (text) color
+bg=blue          # Background color
+us=green         # Underscore color (if supported)
+```
+
+<Note>
+The value `8` or `default` resets a color to the terminal default.
+</Note>
+
+## Text Attributes
+
+### Available Attributes
+
+Apply text styling with these attributes:
+
+<CodeGroup>
+```bash Font Weight and Style
+bold             # Bold text
+dim              # Dimmed text
+italics          # Italic text (if supported)
+```
+
+```bash Text Decoration
+underscore       # Underlined text
+overline         # Overlined text (if supported)
+strikethrough    # Strikethrough text (if supported)
+```
+
+```bash Visual Effects
+blink            # Blinking text
+reverse          # Reverse video (swap fg/bg)
+hidden           # Hidden text
+```
+</CodeGroup>
+
+### Setting Attributes
+
+<CodeGroup>
+```bash Enable Attributes
+set -g status-style fg=white,bg=black,bold
+set -g message-style fg=red,bold,reverse
+```
+
+```bash Disable Attributes
+set -g status-style fg=white,nobold,noitalics
+set -g pane-border-style fg=blue,noreverse
+```
+
+```bash Clear All Attributes
+set -g status-style fg=white,none
+# 'none' clears all attributes
+```
+
+```bash Special Attribute
+set -g status-style noattr
+# noattr prevents any attributes from being applied
+```
+</CodeGroup>
+
+## Fill Color
+
+Set a fill color for padding in status line elements:
+
+```bash
+set -g status-left-style fill=blue
+set -g status-right-style fill=default
+```
+
+The fill color is used for any padding added to status elements.
+
+## Alignment
+
+Control text alignment within status line sections:
+
+<CodeGroup>
+```bash Alignment Options
+align=left       # Left-aligned (default)
+align=centre     # Centered
+align=right      # Right-aligned
+align=absolute-centre  # Centered across entire status line
+```
+
+```bash Examples
+set -g status-left-style align=left
+set -g status-right-style align=right
+set -g status-style align=centre
+```
+</CodeGroup>
+
+## Width and Padding
+
+Control element width and padding:
+
+<CodeGroup>
+```bash Width
+width=20         # Set element width to 20 characters
+width=-1         # Use default width
+```
+
+```bash Padding
+pad=5            # Add 5 characters of padding
+pad=0            # No padding
+```
+</CodeGroup>
+
+## List Styles
+
+Special styles for list items in choose mode:
+
+<CodeGroup>
+```bash List Options
+list=on          # Enable list styling
+list=off         # Disable list styling (default)
+list=focus       # Style when item is focused
+list=left-marker # Style for left selection marker
+list=right-marker # Style for right selection marker
+```
+
+```bash Example
+set -g mode-style list=on,fg=yellow,bg=black
+```
+</CodeGroup>
+
+## Range Styles
+
+Apply styles to specific ranges in the status line for mouse interactions:
+
+<CodeGroup>
+```bash Range Types
+range=left       # Left section of status line
+range=right      # Right section of status line
+range=window|N   # Window with index N
+range=pane|%N    # Pane with ID %N
+range=session|$N # Session with ID $N
+range=user|name  # Custom named range
+```
+
+```bash Examples
+set -g status-left-style range=left
+set -g window-status-style range=window|0
+```
+</CodeGroup>
+
+<Warning>
+Range styles are primarily used internally for mouse event handling. Most users won't need to set these directly.
+</Warning>
+
+## Default Styles
+
+Control default style behavior:
+
+<CodeGroup>
+```bash Default Options
+default          # Use base default style
+push-default     # Push current defaults onto stack
+pop-default      # Pop defaults from stack
+set-default      # Set as new default
+```
+
+```bash Special Flags
+ignore           # Ignore this style
+noignore         # Don't ignore this style (default)
+```
+</CodeGroup>
+
+## Common Style Options
+
+### Status Line
+
+<CodeGroup>
+```bash Status Bar
+set -g status-style bg=black,fg=white
+set -g status-left-style fg=green,bold
+set -g status-right-style fg=cyan
+```
+
+```bash Message Area
+set -g message-style bg=yellow,fg=black,bold
+set -g message-command-style bg=blue,fg=white
+```
+</CodeGroup>
+
+### Window Status
+
+<CodeGroup>
+```bash Window List
+set -g window-status-style fg=white,bg=default
+set -g window-status-current-style fg=black,bg=green,bold
+set -g window-status-activity-style fg=red,bg=default
+set -g window-status-bell-style fg=red,bg=default,bold
+```
+
+```bash Window Separators
+set -g window-status-separator " | "
+```
+</CodeGroup>
+
+### Panes
+
+<CodeGroup>
+```bash Pane Borders
+set -g pane-border-style fg=white
+set -g pane-active-border-style fg=green,bold
+```
+
+```bash Pane Content
+set -g window-style bg=colour235
+set -g window-active-style bg=colour234
+```
+
+```bash Pane Indicators
+set -g display-panes-colour blue
+set -g display-panes-active-colour red
+```
+</CodeGroup>
+
+### Copy Mode
+
+```bash
+set -g mode-style bg=yellow,fg=black,bold
+set -g copy-mode-match-style bg=cyan,fg=black
+set -g copy-mode-current-match-style bg=magenta,fg=black,bold
+```
+
+## Inline Style Changes
+
+Use `#[style]` to change styles inline in format strings:
+
+<CodeGroup>
+```bash Color Changes
+set -g status-left "#[fg=green]Session: #[fg=yellow]#{session_name}"
+```
+
+```bash Attribute Changes
+set -g status-right "#[bold]#(date)#[nobold] | #H"
+```
+
+```bash Combined Changes
+set -g window-status-format "#[fg=white,bg=black] #I:#W "
+set -g window-status-current-format "#[fg=black,bg=green,bold] #I:#W "
+```
+
+```bash Reset to Default
+set -g status-left "Prefix #[default]Normal"
+# #[default] resets all styles
+```
+</CodeGroup>
+
+## Parsing Style Strings
+
+When tmux parses a style string:
+
+1. It splits on commas and whitespace
+2. Each token is checked against known attributes
+3. `fg=`, `bg=`, and `us=` set colors
+4. Named attributes enable features
+5. `no` prefix disables attributes
+6. `none` clears all attributes
+7. `default` resets to base style
+
+## Practical Examples
+
+<Accordion title="Modern Minimal Theme">
+```bash
+# Status bar
+set -g status-style bg=#2e3440,fg=#d8dee9
+set -g status-left-style fg=#88c0d0,bold
+set -g status-right-style fg=#81a1c1
+
+# Windows
+set -g window-status-style fg=#d8dee9,bg=default
+set -g window-status-current-style fg=#2e3440,bg=#88c0d0,bold
+set -g window-status-activity-style fg=#bf616a
+
+# Panes
+set -g pane-border-style fg=#3b4252
+set -g pane-active-border-style fg=#88c0d0,bold
+```
+</Accordion>
+
+<Accordion title="High Contrast Theme">
+```bash
+# Status bar with clear contrast
+set -g status-style bg=black,fg=white,bold
+set -g status-left-style fg=black,bg=green,bold
+set -g status-right-style fg=black,bg=cyan,bold
+
+# Active window stands out
+set -g window-status-style fg=white,bg=colour236
+set -g window-status-current-style fg=black,bg=yellow,bold
+
+# Alert colors
+set -g window-status-bell-style fg=white,bg=red,bold
+set -g window-status-activity-style fg=black,bg=magenta
+```
+</Accordion>
+
+<Accordion title="Solarized Dark Theme">
+```bash
+# Solarized dark colors
+# base03=#002b36 base0=#839496 yellow=#b58900 orange=#cb4b16
+# red=#dc322f magenta=#d33682 violet=#6c71c4 blue=#268bd2
+# cyan=#2aa198 green=#859900
+
+set -g status-style bg=#002b36,fg=#839496
+set -g status-left-style fg=#268bd2,bold
+set -g status-right-style fg=#859900
+
+set -g window-status-style fg=#839496,bg=default
+set -g window-status-current-style fg=#002b36,bg=#268bd2,bold
+
+set -g pane-border-style fg=#073642
+set -g pane-active-border-style fg=#268bd2
+
+set -g message-style bg=#b58900,fg=#002b36,bold
+```
+</Accordion>
+
+<Accordion title="Status with Conditional Colors">
+```bash
+# Change color based on prefix key
+set -g status-left "#{?client_prefix,#[bg=red]#[fg=white],#[bg=green]#[fg=black]} #{session_name} #[default] "
+
+# Highlight active window differently
+set -g window-status-format "#[fg=white] #I:#W "
+set -g window-status-current-format "#{?window_zoomed_flag,#[fg=red],#[fg=green]}#[bold] #I:#W #[default]"
+```
+</Accordion>
+
+## Style Options Reference
+
+### Global Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `status-style` | Status bar style | `bg=green,fg=black` |
+| `message-style` | Command message style | `bg=yellow,fg=black` |
+| `mode-style` | Copy/choice mode style | `bg=yellow,fg=black` |
+
+### Window Options
+
+| Option | Description |
+|--------|-------------|
+| `window-status-style` | Inactive window style |
+| `window-status-current-style` | Active window style |
+| `window-status-activity-style` | Window with activity |
+| `window-status-bell-style` | Window with bell |
+| `window-status-last-style` | Last active window |
+
+### Pane Options
+
+| Option | Description |
+|--------|-------------|
+| `pane-border-style` | Inactive pane border |
+| `pane-active-border-style` | Active pane border |
+| `window-style` | Inactive pane background |
+| `window-active-style` | Active pane background |
+
+## Converting Colors to RGB
+
+Use the `#{c:color}` format to convert tmux colors to hexadecimal RGB:
+
+```bash
+display-message -p "#{c:red}"        # Outputs: #ff0000
+display-message -p "#{c:colour123}"  # Outputs hex RGB value
+```
+
+<Note>
+Not all terminals support all style features. Features like `overline`, `strikethrough`, and RGB colors depend on terminal capabilities. Use the `terminal-features` option to configure supported features.
+</Note>
+
+## Testing Styles
+
+Test styles interactively:
+
+<CodeGroup>
+```bash Test Status Style
+set -g status-style bg=blue,fg=white,bold
+```
+
+```bash Test Message Style  
+display-message "Test message"
+set -g message-style bg=red,fg=white,bold
+display-message "Styled message"
+```
+
+```bash Show Current Styles
+show-options -g | grep style
+show-options -w | grep style
+```
+</CodeGroup>
+
+## Style Inheritance
+
+Styles can be built incrementally using the `-a` flag:
+
+```bash
+set -g status-style bg=red
+set -ag status-style fg=blue    # Adds fg=blue, keeps bg=red
+```
+
+Without `-a`, the new style replaces the old one:
+
+```bash
+set -g status-style bg=red
+set -g status-style fg=blue     # Only fg=blue, bg is reset to default
+```

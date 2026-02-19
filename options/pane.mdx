@@ -1,0 +1,399 @@
+---
+title: 'Pane Options'
+description: 'Pane-specific options for individual pane behavior'
+---
+
+# Pane Options
+
+Pane options control the behavior of individual panes within a window. These are window options that can also be set per-pane using the `-p` flag. Set with `set-option -p` or `set -p`.
+
+## What Are Pane Options?
+
+Pane options are a subset of window options that have the scope `OPTIONS_TABLE_WINDOW|OPTIONS_TABLE_PANE` in tmux's source code. This means they can be set globally for all windows, for a specific window, or for individual panes.
+
+<Note>
+When a pane option is not set at the pane level, it inherits the value from the window level.
+</Note>
+
+## Setting Pane Options
+
+```bash
+# Set for all panes globally
+set -g option-name value
+
+# Set for specific window
+set -w -t:1 option-name value
+
+# Set for specific pane
+set -p -t:.2 option-name value
+
+# Set for current pane
+set -p option-name value
+```
+
+## Terminal Behavior
+
+### allow-passthrough
+
+**Type:** Choice | **Scope:** Window/Pane | **Default:** `off` | **Choices:** `off`, `on`, `all`
+
+Whether applications are allowed to use escape sequences to bypass tmux:
+- `off`: Disallowed
+- `on`: Allowed if the pane is visible
+- `all`: Allowed even if the pane is invisible
+
+```bash
+# Allow passthrough for visible panes
+set -g allow-passthrough on
+
+# Allow for specific pane
+set -p -t:.1 allow-passthrough all
+```
+
+<Tip>
+Use caution with `all` as it allows invisible panes to execute passthrough sequences, which could be a security concern.
+</Tip>
+
+### allow-rename
+
+**Type:** Flag | **Scope:** Window/Pane | **Default:** `off`
+
+Whether applications can use escape sequences to rename windows.
+
+```bash
+# Prevent applications from renaming windows
+set -g allow-rename off
+```
+
+### allow-set-title
+
+**Type:** Flag | **Scope:** Window/Pane | **Default:** `on`
+
+Whether applications can use escape sequences to set the pane title.
+
+```bash
+set -g allow-set-title on
+```
+
+### alternate-screen
+
+**Type:** Flag | **Scope:** Window/Pane | **Default:** `on`
+
+Whether applications can use the alternate screen buffer (used by editors like vim).
+
+```bash
+# Disable alternate screen
+set -g alternate-screen off
+```
+
+## Pane Display
+
+### remain-on-exit
+
+**Type:** Choice | **Scope:** Window/Pane | **Default:** `off` | **Choices:** `off`, `on`, `failed`
+
+Whether panes remain after the program exits:
+- `off`: Pane is automatically killed
+- `on`: Pane remains
+- `failed`: Pane remains only if program exited with non-zero status
+
+```bash tmux.conf
+# Keep panes around after they exit
+set -g remain-on-exit on
+
+# Only keep failed panes
+set -g remain-on-exit failed
+```
+
+From example_tmux.conf:
+```bash
+set -g remain-on-exit on
+```
+
+### remain-on-exit-format
+
+**Type:** String (format) | **Scope:** Window/Pane | **Default:** Complex format
+
+Message shown after a program exits when `remain-on-exit` is enabled.
+
+```bash
+set -g remain-on-exit-format "Pane dead (status #{pane_dead_status})"
+```
+
+**Default:**
+```
+Pane is dead (#{?#{!=:#{pane_dead_status},},status #{pane_dead_status},}#{?#{!=:#{pane_dead_signal},},signal #{pane_dead_signal},}, #{t:pane_dead_time})
+```
+
+### scroll-on-clear
+
+**Type:** Flag | **Scope:** Window/Pane | **Default:** `on`
+
+Whether screen contents are scrolled into history when clearing the whole screen.
+
+```bash
+set -g scroll-on-clear off
+```
+
+## Synchronization
+
+### synchronize-panes
+
+**Type:** Flag | **Scope:** Window/Pane | **Default:** `off`
+
+Whether typing is sent to all panes in the window simultaneously.
+
+```bash
+# Enable synchronized input
+set -w synchronize-panes on
+
+# Toggle with key binding
+bind y set synchronize-panes
+```
+
+From example_tmux.conf:
+```bash
+bind y set synchronize-panes\; display 'synchronize-panes #{?synchronize-panes,on,off}'
+```
+
+<Note>
+When `synchronize-panes` is on, the active pane border is typically shown in red (see `pane-active-border-style` default format).
+</Note>
+
+## Styling
+
+### window-style
+
+**Type:** Style | **Scope:** Window/Pane | **Default:** `"default"`
+
+Default style of inactive panes.
+
+```bash
+set -g window-style "bg=colour236"
+```
+
+### window-active-style
+
+**Type:** Style | **Scope:** Window/Pane | **Default:** `"default"`
+
+Style of the active pane.
+
+```bash tmux.conf
+# Highlight active pane
+set -g window-style "fg=colour247,bg=colour236"
+set -g window-active-style "fg=colour250,bg=black"
+```
+
+### cursor-colour
+
+**Type:** Colour | **Scope:** Window/Pane | **Default:** `-1` (terminal default)
+
+Color of the cursor.
+
+```bash
+set -g cursor-colour red
+```
+
+### cursor-style
+
+**Type:** Choice | **Scope:** Window/Pane | **Default:** `default` | **Choices:** `default`, `blinking-block`, `block`, `blinking-underline`, `underline`, `blinking-bar`, `bar`
+
+Style of the cursor.
+
+```bash
+set -g cursor-style blinking-bar
+```
+
+### pane-colours
+
+**Type:** Array (Colour) | **Scope:** Window/Pane | **Default:** `""`
+
+Default color palette for colors 0-255. Used to customize terminal colors.
+
+```bash
+# Set specific palette colors
+set -g pane-colours[1] "#ff0000"
+set -g pane-colours[2] "#00ff00"
+set -g pane-colours[3] "#0000ff"
+```
+
+### pane-scrollbars-style
+
+**Type:** Style | **Scope:** Window/Pane | **Default:** `"bg=black,fg=white,width=1,pad=0"`
+
+Style of pane scrollbars including width and padding.
+
+```bash
+set -g pane-scrollbars-style "bg=blue,fg=white,width=2,pad=1"
+```
+
+## Border Format
+
+### pane-border-format
+
+**Type:** String (format) | **Scope:** Window/Pane | **Default:** Complex format
+
+Format of text in pane status lines (when `pane-border-status` is not `off`).
+
+```bash
+set -g pane-border-format " #P: #{pane_current_command} "
+```
+
+**Default:**
+```
+#{?pane_active,#[reverse],}#{pane_index}#[default] \"#{pane_title}\"
+```
+
+## Copy Mode Position
+
+### copy-mode-position-format
+
+**Type:** String (format) | **Scope:** Window/Pane | **Default:** Complex format
+
+Format of the position indicator in copy mode.
+
+```bash
+set -g copy-mode-position-format "[#{scroll_position}/#{history_size}]"
+```
+
+**Default:**
+```
+#[align=right]#{t/p:top_line_time}#{?#{e|>:#{top_line_time},0}, ,}[#{scroll_position}/#{history_size}]#{?search_timed_out, (timed out),#{?search_count, (#{search_count}#{?search_count_partial,+,} results),}}
+```
+
+## Practical Examples
+
+### Different Behavior Per Pane
+
+```bash
+# Create window with 3 panes, each with different settings
+tmux new-window
+tmux split-window -h
+tmux split-window -v
+
+# First pane (0): keep on exit
+tmux set -p -t:.0 remain-on-exit on
+
+# Second pane (1): synchronize input
+tmux set -p -t:.1 synchronize-panes on
+
+# Third pane (2): custom cursor
+tmux set -p -t:.2 cursor-style blinking-bar
+tmux set -p -t:.2 cursor-colour green
+```
+
+### Temporary Pane Settings
+
+```bash
+# Start a command in a pane that remains when done
+tmux respawn-pane -k -t:.1 "long-running-command"
+tmux set -p -t:.1 remain-on-exit on
+```
+
+### Visual Feedback
+
+```bash
+# Different background for monitoring pane
+tmux set -p -t:.2 window-style "bg=colour234"
+tmux set -p -t:.2 remain-on-exit failed
+```
+
+## Configuration Example
+
+```bash tmux.conf
+# Global defaults for all panes
+set -g allow-rename off
+set -g allow-set-title on
+set -g alternate-screen on
+set -g remain-on-exit failed
+set -g scroll-on-clear on
+
+# Highlight active pane
+set -g window-style "fg=colour244,bg=colour234"
+set -g window-active-style "fg=colour255,bg=colour232"
+
+# Cursor appearance
+set -g cursor-style blinking-block
+set -g cursor-colour cyan
+
+# Pane border format
+set -g pane-border-format " #{pane_index} #{pane_current_path} "
+
+# Scrollbar style
+set -g pane-scrollbars-style "bg=colour237,fg=colour248,width=1"
+```
+
+## Common Use Cases
+
+<AccordionGroup>
+  <Accordion title="Keep Failed Commands Visible" icon="exclamation">
+    Useful for debugging - panes only remain if command failed:
+    
+    ```bash
+    set -g remain-on-exit failed
+    ```
+  </Accordion>
+
+  <Accordion title="Broadcast Input to Multiple Panes" icon="broadcast-tower">
+    Send same input to all panes (useful for cluster management):
+    
+    ```bash
+    # Toggle with key binding
+    bind S set synchronize-panes
+    ```
+  </Accordion>
+
+  <Accordion title="Visual Distinction for Panes" icon="eye">
+    Make active pane more visible:
+    
+    ```bash
+    set -g window-style "bg=colour235"
+    set -g window-active-style "bg=colour232"
+    ```
+  </Accordion>
+
+  <Accordion title="Prevent Terminal Manipulation" icon="lock">
+    Stop applications from changing titles or using passthrough:
+    
+    ```bash
+    set -g allow-rename off
+    set -g allow-set-title off
+    set -g allow-passthrough off
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Viewing Pane Options
+
+```bash
+# Show all options for current pane
+tmux show-options -p
+
+# Show specific option for pane
+tmux show-options -pv remain-on-exit
+
+# Show options for specific pane
+tmux show-options -p -t:.2
+```
+
+## Unsetting Pane Options
+
+To revert a pane option to inherit from the window level:
+
+```bash
+# Unset pane-specific option
+tmux set -u -p -t:.1 remain-on-exit
+
+# Now pane .1 inherits remain-on-exit from window
+```
+
+## Related
+
+<CardGroup cols={2}>
+  <Card title="Window Options" icon="grid-2" href="/options/window">
+    Parent scope for pane options
+  </Card>
+  <Card title="Options Overview" icon="list" href="/options/overview">
+    Understanding the options system
+  </Card>
+</CardGroup>

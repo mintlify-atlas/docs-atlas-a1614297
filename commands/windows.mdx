@@ -1,0 +1,728 @@
+---
+title: 'Window Commands'
+description: 'Commands for managing tmux windows'
+---
+
+## Overview
+
+Windows are containers for one or more panes within a session. Each window occupies the entire screen and can be split into multiple panes.
+
+## Creating Windows
+
+### new-window
+
+Create a new window.
+
+```bash
+tmux new-window [-abdkPS] [-c start-directory] [-e environment] \
+                [-F format] [-n window-name] [-t target-window] \
+                [shell-command [argument ...]]
+```
+
+**Alias:** `neww`
+
+<ParamField path="-a" type="flag">
+Insert new window at next index after target-window
+</ParamField>
+
+<ParamField path="-b" type="flag">
+Insert new window at next index before target-window
+</ParamField>
+
+<ParamField path="-d" type="flag">
+Do not make the new window the current window
+</ParamField>
+
+<ParamField path="-k" type="flag">
+Destroy target window if it already exists
+</ParamField>
+
+<ParamField path="-P" type="flag">
+Print information about the new window after creation
+</ParamField>
+
+<ParamField path="-S" type="flag">
+Do not wrap searches for this window
+</ParamField>
+
+<ParamField path="-c" type="string">
+Specify working directory for the new window
+</ParamField>
+
+<ParamField path="-e" type="string">
+Set environment variable (format: `VARIABLE=value`). Can be repeated.
+</ParamField>
+
+<ParamField path="-F" type="string">
+Format string for output when `-P` is used
+</ParamField>
+
+<ParamField path="-n" type="string">
+Name for the new window
+</ParamField>
+
+<ParamField path="-t" type="string">
+Target location for the new window
+</ParamField>
+
+<CodeGroup>
+```bash Basic
+# Create new window
+tmux new-window
+
+# Create window with name
+tmux new-window -n editor
+
+# Create window with command
+tmux new-window -n logs 'tail -f /var/log/app.log'
+```
+
+```bash Advanced
+# Create window in specific directory
+tmux new-window -c ~/projects/myapp
+
+# Create detached window
+tmux new-window -d -n background
+
+# Create with environment variable
+tmux new-window -e NODE_ENV=development npm start
+
+# Create at specific index
+tmux new-window -t :5 -n monitoring
+```
+
+```bash Multiple Arguments
+# Run command without shell
+tmux new-window vim ~/.tmux.conf
+
+# With multiple arguments
+tmux new-window python -m http.server 8080
+```
+</CodeGroup>
+
+## Navigating Windows
+
+### select-window
+
+Select a window.
+
+```bash
+tmux select-window [-lnpT] [-t target-window]
+```
+
+**Alias:** `selectw`
+
+<ParamField path="-l" type="flag">
+Select last (previously selected) window
+</ParamField>
+
+<ParamField path="-n" type="flag">
+Select next window
+</ParamField>
+
+<ParamField path="-p" type="flag">
+Select previous window
+</ParamField>
+
+<ParamField path="-T" type="flag">
+No action if already selected
+</ParamField>
+
+```bash
+# Select window by index
+tmux select-window -t :2
+
+# Select window by name
+tmux select-window -t editor
+
+# Navigate windows
+tmux select-window -n  # next
+tmux select-window -p  # previous
+tmux select-window -l  # last
+
+# Use special tokens
+tmux select-window -t:{next}
+tmux select-window -t:{previous}
+tmux select-window -t:{last}
+```
+
+### next-window
+
+Select the next window.
+
+```bash
+tmux next-window [-a] [-t target-session]
+```
+
+**Alias:** `next`
+
+<ParamField path="-a" type="flag">
+Move to next window with alert (bell, activity, or silence)
+</ParamField>
+
+```bash
+# Move to next window
+tmux next-window
+
+# Move to next window with alert
+tmux next-window -a
+```
+
+### previous-window
+
+Select the previous window.
+
+```bash
+tmux previous-window [-a] [-t target-session]
+```
+
+**Alias:** `prev`
+
+<ParamField path="-a" type="flag">
+Move to previous window with alert
+</ParamField>
+
+```bash
+# Move to previous window
+tmux previous-window
+
+# Move to previous window with alert
+tmux previous-window -a
+```
+
+### last-window
+
+Select the last (previously selected) window.
+
+```bash
+tmux last-window [-t target-session]
+```
+
+**Alias:** `last`
+
+```bash
+# Switch to last window
+tmux last-window
+
+# Switch to last window in specific session
+tmux last-window -t dev
+```
+
+## Managing Windows
+
+### rename-window
+
+Rename a window.
+
+```bash
+tmux rename-window [-t target-window] new-name
+```
+
+**Alias:** `renamew`
+
+```bash
+# Rename current window
+tmux rename-window editor
+
+# Rename specific window
+tmux rename-window -t :2 logs
+```
+
+### move-window
+
+Move a window to another location.
+
+```bash
+tmux move-window [-abrdk] [-s src-window] [-t dst-window]
+```
+
+**Alias:** `movew`
+
+<ParamField path="-a" type="flag">
+Move to next index after dst-window
+</ParamField>
+
+<ParamField path="-b" type="flag">
+Move to next index before dst-window
+</ParamField>
+
+<ParamField path="-r" type="flag">
+Renumber all windows in sequential order
+</ParamField>
+
+<ParamField path="-d" type="flag">
+Do not make the moved window current
+</ParamField>
+
+<ParamField path="-k" type="flag">
+Kill dst-window if it exists
+</ParamField>
+
+```bash
+# Move current window to index 5
+tmux move-window -t :5
+
+# Move window between sessions
+tmux move-window -s dev:1 -t prod:5
+
+# Renumber all windows
+tmux move-window -r
+
+# Move and kill existing
+tmux move-window -s :1 -t :3 -k
+```
+
+### link-window
+
+Link a window to another session.
+
+```bash
+tmux link-window [-abdk] [-s src-window] [-t dst-window]
+```
+
+**Alias:** `linkw`
+
+<ParamField path="-a" type="flag">
+Insert at next index after dst-window
+</ParamField>
+
+<ParamField path="-b" type="flag">
+Insert at next index before dst-window
+</ParamField>
+
+<ParamField path="-d" type="flag">
+Do not make the linked window current
+</ParamField>
+
+<ParamField path="-k" type="flag">
+Kill dst-window if it exists
+</ParamField>
+
+```bash
+# Link window to another session
+tmux link-window -s dev:1 -t staging:1
+
+# Link and make current
+tmux link-window -s work:editor -t dev:
+```
+
+<Note>
+Linked windows appear in multiple sessions. Changes in one session affect all linked sessions.
+</Note>
+
+### unlink-window
+
+Unlink a window from the current session.
+
+```bash
+tmux unlink-window [-k] [-t target-window]
+```
+
+**Alias:** `unlinkw`
+
+<ParamField path="-k" type="flag">
+Kill window if it's not linked elsewhere
+</ParamField>
+
+```bash
+# Unlink window from current session
+tmux unlink-window -t :2
+
+# Unlink and kill if last link
+tmux unlink-window -k -t :2
+```
+
+### swap-window
+
+Swap two windows.
+
+```bash
+tmux swap-window [-d] [-s src-window] [-t dst-window]
+```
+
+**Alias:** `swapw`
+
+<ParamField path="-d" type="flag">
+Do not change the current window
+</ParamField>
+
+```bash
+# Swap window 1 and 2
+tmux swap-window -s :1 -t :2
+
+# Swap current with next
+tmux swap-window -t :+1
+
+# Swap current with previous
+tmux swap-window -t :-1
+```
+
+## Destroying Windows
+
+### kill-window
+
+Destroy a window.
+
+```bash
+tmux kill-window [-a] [-t target-window]
+```
+
+**Alias:** `killw`
+
+<ParamField path="-a" type="flag">
+Kill all windows except target-window
+</ParamField>
+
+```bash
+# Kill current window
+tmux kill-window
+
+# Kill specific window
+tmux kill-window -t :3
+
+# Kill all except current
+tmux kill-window -a
+```
+
+### respawn-window
+
+Respawn a window (restart the command).
+
+```bash
+tmux respawn-window [-k] [-c start-directory] [-e environment] \
+                    [-t target-window] [shell-command]
+```
+
+**Alias:** `respawnw`
+
+<ParamField path="-k" type="flag">
+Kill existing process before respawning
+</ParamField>
+
+<ParamField path="-c" type="string">
+Set working directory
+</ParamField>
+
+<ParamField path="-e" type="string">
+Set environment variable (can be repeated)
+</ParamField>
+
+```bash
+# Respawn current window
+tmux respawn-window
+
+# Respawn with new command
+tmux respawn-window -k 'npm start'
+
+# Respawn in new directory
+tmux respawn-window -c ~/newproject
+```
+
+## Window Information
+
+### list-windows
+
+List windows in a session.
+
+```bash
+tmux list-windows [-ar] [-F format] [-f filter] \
+                  [-O sort-order] [-t target-session]
+```
+
+**Alias:** `lsw`
+
+<ParamField path="-a" type="flag">
+List all windows on the server
+</ParamField>
+
+<ParamField path="-r" type="flag">
+Reverse sort order
+</ParamField>
+
+<ParamField path="-F" type="string">
+Format string for output
+</ParamField>
+
+<ParamField path="-f" type="string">
+Filter expression
+</ParamField>
+
+<ParamField path="-O" type="string">
+Sort order: `index`, `name`, `size`, `creation`, or `activity`
+</ParamField>
+
+```bash
+# List windows in current session
+tmux list-windows
+
+# List with custom format
+tmux list-windows -F "#{window_index}: #{window_name}"
+
+# List all windows on server
+tmux list-windows -a
+
+# List sorted by activity
+tmux list-windows -O activity
+```
+
+### find-window
+
+Search for windows.
+
+```bash
+tmux find-window [-iCNrTZ] [-t target-pane] match-string
+```
+
+**Alias:** `findw`
+
+<ParamField path="-i" type="flag">
+Case-insensitive search
+</ParamField>
+
+<ParamField path="-C" type="flag">
+Match only window contents
+</ParamField>
+
+<ParamField path="-N" type="flag">
+Match only window names
+</ParamField>
+
+<ParamField path="-T" type="flag">
+Match only window titles
+</ParamField>
+
+<ParamField path="-r" type="flag">
+Use regular expression instead of glob pattern
+</ParamField>
+
+<ParamField path="-Z" type="flag">
+Zoom the pane
+</ParamField>
+
+```bash
+# Find windows by name
+tmux find-window editor
+
+# Case-insensitive search
+tmux find-window -i ERROR
+
+# Search only in content
+tmux find-window -C "function main"
+
+# Regular expression search
+tmux find-window -r '^test.*\.js$'
+```
+
+## Window Layouts
+
+### select-layout
+
+Set the window layout.
+
+```bash
+tmux select-layout [-Enop] [-t target-window] [layout-name]
+```
+
+**Alias:** `selectl`
+
+<ParamField path="-E" type="flag">
+Spread panes evenly
+</ParamField>
+
+<ParamField path="-n" type="flag">
+Apply next layout
+</ParamField>
+
+<ParamField path="-o" type="flag">
+Apply previous layout
+</ParamField>
+
+<ParamField path="-p" type="flag">
+Apply previous layout used in this window
+</ParamField>
+
+**Layout Names:**
+- `even-horizontal`: Panes spread evenly left to right
+- `even-vertical`: Panes spread evenly top to bottom
+- `main-horizontal`: Large pane on top, others below
+- `main-horizontal-mirrored`: Large pane on bottom
+- `main-vertical`: Large pane on left, others right
+- `main-vertical-mirrored`: Large pane on right
+- `tiled`: Panes spread evenly in grid
+
+```bash
+# Apply even-horizontal layout
+tmux select-layout even-horizontal
+
+# Cycle to next layout
+tmux select-layout -n
+
+# Apply main-vertical layout
+tmux select-layout main-vertical
+
+# Apply saved layout
+tmux select-layout 'bb62,159x48,0,0{79x48,0,0,79x48,80,0}'
+```
+
+### next-layout
+
+Cycle to the next layout.
+
+```bash
+tmux next-layout [-t target-window]
+```
+
+**Alias:** `nextl`
+
+```bash
+# Cycle layout
+tmux next-layout
+```
+
+### previous-layout
+
+Cycle to the previous layout.
+
+```bash
+tmux previous-layout [-t target-window]
+```
+
+**Alias:** `prevl`
+
+```bash
+# Cycle backwards through layouts
+tmux previous-layout
+```
+
+### rotate-window
+
+Rotate panes in the window.
+
+```bash
+tmux rotate-window [-DUZ] [-t target-window]
+```
+
+**Alias:** `rotatew`
+
+<ParamField path="-D" type="flag">
+Rotate downward/rightward
+</ParamField>
+
+<ParamField path="-U" type="flag">
+Rotate upward/leftward
+</ParamField>
+
+<ParamField path="-Z" type="flag">
+Keep window zoomed if it was zoomed
+</ParamField>
+
+```bash
+# Rotate panes forward
+tmux rotate-window
+
+# Rotate panes backward
+tmux rotate-window -U
+```
+
+## Interactive Window Selection
+
+### choose-tree
+
+Interactive session, window, and pane selector.
+
+```bash
+tmux choose-tree [-GNrswyZ] [-F format] [-f filter] \
+                 [-K key-format] [-O sort-order] \
+                 [-t target-pane] [template]
+```
+
+<ParamField path="-G" type="flag">
+Include all sessions in session groups
+</ParamField>
+
+<ParamField path="-N" type="flag">
+Start without preview
+</ParamField>
+
+<ParamField path="-r" type="flag">
+Reverse sort order
+</ParamField>
+
+<ParamField path="-s" type="flag">
+Start with sessions collapsed
+</ParamField>
+
+<ParamField path="-w" type="flag">
+Start with windows collapsed
+</ParamField>
+
+<ParamField path="-y" type="flag">
+Disable confirmation prompts
+</ParamField>
+
+<ParamField path="-Z" type="flag">
+Zoom the pane
+</ParamField>
+
+<ParamField path="-O" type="string">
+Sort order: `index`, `name`, or `activity`
+</ParamField>
+
+```bash
+# Interactive tree mode
+tmux choose-tree
+
+# Start with windows collapsed
+tmux choose-tree -w
+
+# With custom template
+tmux choose-tree 'switch-client -t "%%"'
+```
+
+## Window Examples
+
+<Accordion title="Create Multi-Window Session">
+```bash
+#!/bin/bash
+# Create session with multiple windows
+
+tmux new-session -d -s workspace -n code
+tmux send-keys -t workspace:code 'cd ~/project && vim' C-m
+
+tmux new-window -t workspace -n server
+tmux send-keys -t workspace:server 'npm run dev' C-m
+
+tmux new-window -t workspace -n shell
+
+tmux select-window -t workspace:code
+tmux attach -t workspace
+```
+</Accordion>
+
+<Accordion title="Window Management Script">
+```bash
+# Function to create named windows
+create_dev_windows() {
+    local session="$1"
+    tmux new-window -t "$session" -n editor
+    tmux new-window -t "$session" -n terminal
+    tmux new-window -t "$session" -n logs
+    tmux select-window -t "$session:editor"
+}
+
+create_dev_windows mysession
+```
+</Accordion>
+
+<Accordion title="Link Windows Between Sessions">
+```bash
+# Share a monitoring window between sessions
+tmux new-session -d -s session1
+tmux new-window -t session1 -n monitor 'htop'
+
+tmux new-session -d -s session2
+tmux link-window -s session1:monitor -t session2:
+
+# Both sessions now have the monitor window
+```
+</Accordion>

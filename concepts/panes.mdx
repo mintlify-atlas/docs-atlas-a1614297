@@ -1,0 +1,557 @@
+---
+title: "Panes"
+description: "Understanding tmux panes - splitting windows, layouts, and pseudo terminals"
+---
+
+## What is a Pane?
+
+A **pane** is a separate pseudo terminal (pty) within a window. Each pane takes up a rectangular area of the display and runs its own shell or command independently.
+
+<Info>
+From window.c:36-53: "Each window is attached to a number of panes, each of which is a pty. A pane has two buffers attached, these are filled and emptied by the main server poll loop."
+</Info>
+
+## Pane Architecture
+
+From tmux.h:1182-1272, a pane contains:
+
+```c
+struct window_pane {
+    u_int        id;              // Unique pane ID (prefixed with %)
+    u_int        active_point;    // MRU tracking
+    struct window *window;        // Parent window
+    struct options *options;      // Pane-specific options
+    
+    u_int        sx, sy;          // Size in cells
+    u_int        xoff, yoff;      // Offset within window
+    
+    int          fd;              // PTY file descriptor
+    struct bufferevent *event;    // I/O event handling
+    
+    struct screen *screen;        // Virtual screen
+    struct screen base;           // Base screen state
+    
+    pid_t        pid;             // Child process PID
+    char         tty[TTY_NAME_MAX]; // PTY device name
+    
+    struct input_ctx *ictx;       // Input parser context
+    
+    int          flags;           // State flags
+};
+```
+
+### Key Components
+
+<Accordion title="Pane Components Explained">
+
+**Pseudo Terminal (PTY)**
+- Managed via `fd` file descriptor
+- Creates a virtual terminal for the shell/command
+- Bidirectional I/O through bufferevent
+
+**Virtual Screen**
+- Stores terminal state (grid of cells)
+- Maintains scrollback history
+- Supports alternate screen mode
+
+**Input Context**
+- Parses escape sequences
+- Handles terminal input/output
+- Manages cursor positioning
+
+**Process Management**
+- Tracks child process via PID
+- Monitors exit status
+- Handles SIGCHLD signals
+
+</Accordion>
+
+## Creating Panes
+
+From window.c:930-974, panes are created with `window_pane_create()`:
+
+```c
+static struct window_pane *
+window_pane_create(struct window *w, u_int sx, u_int sy, u_int hlimit)
+{
+    struct window_pane *wp;
+    
+    wp = xcalloc(1, sizeof *wp);
+    wp->window = w;
+    wp->options = options_create(w->options);
+    wp->flags = PANE_STYLECHANGED;
+    
+    wp->id = next_window_pane_id++;
+    RB_INSERT(window_pane_tree, &all_window_panes, wp);
+    
+    wp->fd = -1;
+    wp->sx = sx;
+    wp->sy = sy;
+    
+    // Initialize screen with history limit
+    screen_init(&wp->base, sx, sy, hlimit);
+    wp->screen = &wp->base;
+    
+    // Initialize color palette
+    colour_palette_init(&wp->palette);
+    
+    return (wp);
+}
+```
+
+<Tabs>
+  <Tab title="Commands">
+    ```bash
+    # Split horizontally (top/bottom)
+    tmux split-window
+    
+    # Split vertically (left/right)
+    tmux split-window -h
+    
+    # Split with specific size
+    tmux split-window -l 20
+    
+    # Split and run command
+    tmux split-window -h "vim"
+    
+    # Split before current pane
+    tmux split-window -b
+    ```
+  </Tab>
+  <Tab title="Default Keys">
+    - `Prefix "` - Split horizontally
+    - `Prefix %` - Split vertically
+    - `Prefix x` - Kill current pane
+    - `Prefix z` - Toggle pane zoom
+  </Tab>
+</Tabs>
+
+## Pane Lifecycle
+
+### Initialization
+
+From window.c:1065-1077, panes are set up for I/O:
+
+```c
+void window_pane_set_event(struct window_pane *wp) {
+    setblocking(wp->fd, 0);
+    
+    // Create bufferevent for async I/O
+    wp->event = bufferevent_new(wp->fd, 
+        window_pane_read_callback,
+        NULL, 
+        window_pane_error_callback, 
+        wp);
+    
+    // Initialize input parser
+    wp->ictx = input_init(wp, wp->event, &wp->palette, NULL);
+    
+    bufferevent_enable(wp->event, EV_READ|EV_WRITE);
+}
+```
+
+### I/O Handling
+
+From window.c:1024-1063, panes handle data asynchronously:
+
+```c
+static void
+window_pane_read_callback(__unused struct bufferevent *bufev, void *data)
+{
+    struct window_pane *wp = data;
+    struct evbuffer *evb = wp->event->input;
+    size_t size = EVBUFFER_LENGTH(evb);
+    
+    // Handle pipe output if enabled
+    if (wp->pipe_fd != -1) {
+        new_data = window_pane_get_new_data(wp, wpo, &new_size);
+        if (new_size > 0) {
+            bufferevent_write(wp->pipe_event, new_data, new_size);
+        }
+    }
+    
+    // Parse input for display
+    input_parse_pane(wp);
+    bufferevent_disable(wp->event, EV_READ);
+}
+```
+
+<Note>
+Panes use non-blocking I/O with libevent for efficient handling of multiple terminals.
+</Note>
+
+### Destruction
+
+From window.c:976-1022, `window_pane_destroy()` cleans up:
+
+```c
+static void
+window_pane_destroy(struct window_pane *wp)
+{
+    window_pane_reset_mode_all(wp);
+    free(wp->searchstr);
+    
+    if (wp->fd != -1) {
+        bufferevent_free(wp->event);
+        close(wp->fd);
+    }
+    
+    if (wp->ictx != NULL)
+        input_free(wp->ictx);
+    
+    screen_free(&wp->status_screen);
+    screen_free(&wp->base);
+    
+    if (wp->pipe_fd != -1) {
+        bufferevent_free(wp->pipe_event);
+        close(wp->pipe_fd);
+    }
+    
+    RB_REMOVE(window_pane_tree, &all_window_panes, wp);
+    options_free(wp->options);
+    colour_palette_free(&wp->palette);
+    free(wp);
+}
+```
+
+## Pane Flags
+
+From tmux.h:1198-1214, panes track various states:
+
+```c
+#define PANE_REDRAW 0x1          // Needs redraw
+#define PANE_FOCUSED 0x4         // Has focus
+#define PANE_INPUTOFF 0x40       // Input disabled
+#define PANE_CHANGED 0x80        // Content changed
+#define PANE_EXITED 0x100        // Process exited
+#define PANE_STATUSREADY 0x200   // Exit status ready
+#define PANE_EMPTY 0x800         // No child process
+#define PANE_STYLECHANGED 0x1000 // Style changed
+```
+
+<Accordion title="Pane State Flags">
+
+**PANE_REDRAW** - Marks pane for screen refresh
+- Set when content changes
+- Cleared after redraw
+- Used by rendering engine
+
+**PANE_FOCUSED** - Indicates active pane
+- Only one pane per window has focus
+- Controls cursor visibility
+- Affects pane border style
+
+**PANE_EXITED** - Child process terminated
+- Set on SIGCHLD
+- Status code stored in `wp->status`
+- Pane may remain visible if configured
+
+**PANE_INPUTOFF** - Input disabled
+- Pane doesn't accept keyboard input
+- Used for read-only panes
+- Can be toggled with `pipe-pane`
+
+</Accordion>
+
+## Pane Selection
+
+From window.c:1387-1610, tmux provides directional pane finding:
+
+### Navigation Functions
+
+```c
+// Find adjacent panes
+struct window_pane *window_pane_find_up(struct window_pane *wp);
+struct window_pane *window_pane_find_down(struct window_pane *wp);
+struct window_pane *window_pane_find_left(struct window_pane *wp);
+struct window_pane *window_pane_find_right(struct window_pane *wp);
+```
+
+<Info>
+These functions build a list of candidate panes based on edge alignment, then select the most recently used (MRU) pane using `active_point` tracking.
+</Info>
+
+### MRU Selection
+
+From window.c:1335-1351, panes are selected by recency:
+
+```c
+static struct window_pane *
+window_pane_choose_best(struct window_pane **list, u_int size)
+{
+    struct window_pane *next, *best;
+    u_int i;
+    
+    if (size == 0)
+        return (NULL);
+    
+    best = list[0];
+    for (i = 1; i < size; i++) {
+        next = list[i];
+        if (next->active_point > best->active_point)
+            best = next;
+    }
+    return (best);
+}
+```
+
+<Tabs>
+  <Tab title="Commands">
+    ```bash
+    # Select pane directionally
+    tmux select-pane -U  # Up
+    tmux select-pane -D  # Down
+    tmux select-pane -L  # Left
+    tmux select-pane -R  # Right
+    
+    # Select by target
+    tmux select-pane -t :.+  # Next pane
+    tmux select-pane -t :.-  # Previous pane
+    tmux select-pane -t :.1  # Pane 1
+    ```
+  </Tab>
+  <Tab title="Default Keys">
+    - `Prefix ↑` - Select pane above
+    - `Prefix ↓` - Select pane below
+    - `Prefix ←` - Select pane left
+    - `Prefix →` - Select pane right
+    - `Prefix o` - Cycle through panes
+    - `Prefix ;` - Last active pane
+  </Tab>
+</Tabs>
+
+## Pane Resizing
+
+From window.c:1080-1106, panes can be resized dynamically:
+
+```c
+void
+window_pane_resize(struct window_pane *wp, u_int sx, u_int sy)
+{
+    if (sx == wp->sx && sy == wp->sy)
+        return;
+    
+    // Queue resize for async processing
+    r = xmalloc(sizeof *r);
+    r->sx = sx;
+    r->sy = sy;
+    r->osx = wp->sx;
+    r->osy = wp->sy;
+    TAILQ_INSERT_TAIL(&wp->resize_queue, r, entry);
+    
+    wp->sx = sx;
+    wp->sy = sy;
+    
+    // Resize screen buffer
+    screen_resize(&wp->base, sx, sy, wp->base.saved_grid == NULL);
+    
+    // Notify mode if active
+    wme = TAILQ_FIRST(&wp->modes);
+    if (wme != NULL && wme->mode->resize != NULL)
+        wme->mode->resize(wme, sx, sy);
+}
+```
+
+### Resize Queue
+
+From tmux.h:1159-1169, resizes are queued:
+
+```c
+struct window_pane_resize {
+    u_int sx, sy;      // New size
+    u_int osx, osy;    // Old size
+    TAILQ_ENTRY(window_pane_resize) entry;
+};
+```
+
+<Tip>
+Resize operations are queued and processed asynchronously to avoid overwhelming the terminal with rapid size changes.
+</Tip>
+
+## Pane Modes
+
+From tmux.h:1256, panes support different modes:
+
+```c
+TAILQ_HEAD(, window_mode_entry) modes;
+```
+
+### Common Modes
+
+<Accordion title="Pane Mode Types">
+
+**Normal Mode**
+- Direct terminal access
+- Forwards input to child process
+- Default mode for interactive shells
+
+**Copy Mode** (window.c:1775-1783)
+```c
+#define WINDOW_PANE_COPY_MODE 1
+```
+- Browse scrollback history
+- Copy text to paste buffers
+- Search terminal output
+- Vi or Emacs key bindings
+
+**View Mode** (window.c:1775-1783)
+```c
+#define WINDOW_PANE_VIEW_MODE 2
+```
+- Read-only output viewing
+- Used for command output
+- Automatic scrolling
+
+</Accordion>
+
+### Mode Management
+
+From window.c:1108-1186, modes are managed via stack:
+
+```c
+int
+window_pane_set_mode(struct window_pane *wp, struct window_pane *swp,
+    const struct window_mode *mode, struct cmd_find_state *fs,
+    struct args *args)
+{
+    struct window_mode_entry *wme;
+    
+    // Check if already in mode
+    if (!TAILQ_EMPTY(&wp->modes) && 
+        TAILQ_FIRST(&wp->modes)->mode == mode)
+        return (1);
+    
+    // Create or reorder mode entry
+    wme = xcalloc(1, sizeof *wme);
+    wme->wp = wp;
+    wme->mode = mode;
+    TAILQ_INSERT_HEAD(&wp->modes, wme, entry);
+    wme->screen = wme->mode->init(wme, fs, args);
+    
+    wp->screen = wme->screen;
+    wp->flags |= (PANE_REDRAW|PANE_CHANGED);
+    
+    return (0);
+}
+```
+
+## Pane Synchronization
+
+From window.c:1189-1220, panes support synchronized input:
+
+```c
+static void
+window_pane_copy_key(struct window_pane *wp, key_code key)
+{
+    struct window_pane *loop;
+    
+    // Send key to all synchronized panes
+    TAILQ_FOREACH(loop, &wp->window->panes, entry) {
+        if (loop != wp &&
+            TAILQ_EMPTY(&loop->modes) &&
+            loop->fd != -1 &&
+            (~loop->flags & PANE_INPUTOFF) &&
+            window_pane_visible(loop) &&
+            options_get_number(loop->options, "synchronize-panes"))
+            input_key_pane(loop, key, NULL);
+    }
+}
+```
+
+<Info>
+The `synchronize-panes` option broadcasts input to all visible panes in the window, useful for controlling multiple servers simultaneously.
+</Info>
+
+## Scrollback
+
+From window.c:1786-1797, panes track scrollbar state:
+
+```c
+// Scrollbar position and size
+u_int sb_slider_y;
+u_int sb_slider_h;
+
+// Scrollback viewing
+int window_pane_show_scrollbar(struct window_pane *wp, int sb_option)
+{
+    if (SCREEN_IS_ALTERNATE(&wp->base))
+        return (0);
+    if (sb_option == PANE_SCROLLBARS_ALWAYS ||
+        (sb_option == PANE_SCROLLBARS_MODAL &&
+         window_pane_mode(wp) != WINDOW_PANE_NO_MODE))
+        return (1);
+    return (0);
+}
+```
+
+<Note>
+Scrollback is not available in alternate screen mode (used by applications like vim or less).
+</Note>
+
+## Pane Identification
+
+From tmux.1:847-878, panes can be identified by:
+
+1. **Pane ID**: `%0`, `%1`, etc. (unique and persistent)
+2. **Pane Index**: Numeric position in window
+3. **Special Tokens**:
+   - `{last}` or `!` - Previously active pane
+   - `{next}` or `+` - Next pane by number
+   - `{previous}` or `-` - Previous pane by number
+   - `{top}` - Topmost pane
+   - `{bottom}` - Bottom pane
+   - `{left}` - Leftmost pane
+   - `{right}` - Rightmost pane
+   - `{top-left}` - Top-left corner pane
+   - `{up-of}` - Pane above active pane
+   - `{down-of}` - Pane below active pane
+   - `{active}` or `@` - Currently active pane
+
+## Common Pane Commands
+
+| Command | Description | Key Binding |
+|---------|-------------|-------------|
+| `split-window` | Create new pane | `Prefix "` or `%` |
+| `select-pane` | Focus different pane | `Prefix ↑↓←→` |
+| `resize-pane` | Change pane size | `Prefix M-↑↓←→` |
+| `kill-pane` | Destroy pane | `Prefix x` |
+| `swap-pane` | Exchange pane positions | `Prefix {` or `}` |
+| `break-pane` | Move pane to new window | `Prefix !` |
+| `display-panes` | Show pane numbers | `Prefix q` |
+| `rotate-window` | Rotate panes | `Prefix C-o` |
+
+## Best Practices
+
+<Accordion title="Pane Management Tips">
+
+**Layout Planning**
+- Plan pane layouts before splitting
+- Use preset layouts for common arrangements
+- Save custom layouts with `select-layout`
+- Consider terminal size when splitting
+
+**Resource Management**
+- Each pane runs a separate process
+- Close unused panes to free resources
+- Monitor pane count in large windows
+- Use `pane-base-index` for consistent numbering
+
+**Productivity**
+- Use directional selection for faster navigation
+- Leverage `synchronize-panes` for parallel operations
+- Mark important panes for quick access
+- Use zoom to focus on single panes
+
+**Terminal Compatibility**
+- Be aware of alternate screen mode limitations
+- Test applications in panes before deploying
+- Configure `history-limit` appropriately
+- Use proper TERM settings for applications
+
+</Accordion>
+
+## See Also
+
+- [Windows](/concepts/windows) - Understanding window management
+- [Sessions](/concepts/sessions) - Managing sessions
+- [Client-Server Architecture](/concepts/client-server) - How panes fit in the architecture

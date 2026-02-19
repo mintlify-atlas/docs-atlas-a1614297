@@ -1,0 +1,441 @@
+---
+title: 'Hook System'
+description: 'Automate tmux with hooks that run commands on events'
+---
+
+## Overview
+
+tmux hooks allow you to run commands automatically when specific events occur. Hooks can be attached to sessions, windows, or panes, and are triggered by both user actions and system events.
+
+## Hook Basics
+
+Hooks are stored as array options and executed in order when triggered:
+
+```bash
+# Set a hook (basic syntax)
+set-hook after-split-window "display-message 'Pane split!'"
+
+# Set a hook with array syntax
+set-option -g after-new-window[0] "select-layout tiled"
+set-option -g after-new-window[1] "display-message 'Window created'"
+```
+
+## Setting Hooks
+
+<CodeGroup>
+```bash Global Hooks
+set-hook -g after-new-window "display-message 'New window created'"
+set-hook -g pane-focus-in "set -w window-active-style bg=black"
+```
+
+```bash Session Hooks
+set-hook -t mysession after-select-window "refresh-client -S"
+```
+
+```bash Window/Pane Hooks
+set-hook -w -t mywindow after-split-window "select-layout even-vertical"
+set-hook -p -t %1 pane-exited "display-message 'Pane exited'"
+```
+
+```bash Unsetting Hooks
+set-hook -u after-new-window      # Remove hook
+set-hook -gu pane-focus-in        # Remove global hook
+```
+</CodeGroup>
+
+## Array Syntax
+
+Hooks use array syntax for multiple commands:
+
+```bash
+# Clear and set first element
+set-hook pane-mode-changed "set -g status-left-style bg=red"
+
+# Add to specific index
+set-hook pane-mode-changed[10] "display-message 'Mode changed'"
+set-hook pane-mode-changed[20] "refresh-client"
+
+# Equivalent to set-option
+set-option -g pane-mode-changed[42] "set -g status-left-style bg=red"
+```
+
+<Note>
+Setting a hook without an array index clears the hook and sets the first member of the array.
+</Note>
+
+## Running Hooks Manually
+
+Execute a hook immediately with the `-R` flag:
+
+```bash
+set-hook -R after-select-window    # Run the hook now
+```
+
+## Available Hooks
+
+### Session Hooks
+
+<CodeGroup>
+```bash Session Lifecycle
+session-created          # After session is created
+session-closed           # After session is destroyed
+session-renamed          # After session is renamed
+```
+
+```bash Session State
+session-window-changed   # After active window changes in session
+```
+</CodeGroup>
+
+### Window Hooks
+
+<CodeGroup>
+```bash Window Lifecycle
+window-linked            # After window is linked to session
+window-unlinked          # After window is unlinked from session
+window-renamed           # After window is renamed
+```
+
+```bash Window Layout
+window-layout-changed    # After window layout changes
+window-resized           # After window is resized
+```
+</CodeGroup>
+
+### Pane Hooks
+
+<CodeGroup>
+```bash Pane Lifecycle
+pane-died                # Process exited but remain-on-exit is on
+pane-exited              # After process in pane exits
+```
+
+```bash Pane State
+pane-mode-changed        # After pane mode changes
+pane-focus-in            # Focus enters pane (requires focus-events)
+pane-focus-out           # Focus exits pane (requires focus-events)
+pane-set-clipboard       # Terminal clipboard is set via escape sequence
+```
+</CodeGroup>
+
+### Client Hooks
+
+<CodeGroup>
+```bash Client Connections
+client-attached          # After client attaches
+client-detached          # After client detaches
+```
+
+```bash Client Activity
+client-active            # Client becomes latest active client
+client-resized           # After client is resized
+client-session-changed   # Client's attached session changes
+```
+
+```bash Client Focus
+client-focus-in          # Focus enters client
+client-focus-out         # Focus exits client
+```
+
+```bash Client Theme
+client-light-theme       # Client switches to light theme
+client-dark-theme        # Client switches to dark theme
+```
+</CodeGroup>
+
+### Alert Hooks
+
+<CodeGroup>
+```bash Activity Alerts
+alert-activity           # Window has activity (see monitor-activity)
+alert-bell               # Window received a bell (see monitor-bell)
+alert-silence            # Window has been silent (see monitor-silence)
+```
+</CodeGroup>
+
+### Command Hooks
+
+<CodeGroup>
+```bash After Hooks
+after-{command}          # After any tmux command completes
+# Examples:
+after-split-window
+after-new-window
+after-select-pane
+after-kill-pane
+```
+
+```bash Special Hooks
+command-error            # After any command fails
+```
+</CodeGroup>
+
+<Note>
+Most tmux commands have an `after-` hook that runs after the command completes, except when the command is run as part of a hook itself.
+</Note>
+
+## Hook Context
+
+Hooks have access to format variables providing context:
+
+<CodeGroup>
+```bash Hook Variables
+#{hook}                  # Name of running hook
+#{hook_client}           # Client where hook ran
+#{hook_session}          # Session ID where hook ran
+#{hook_session_name}     # Session name where hook ran
+#{hook_window}           # Window ID where hook ran
+#{hook_window_name}      # Window name where hook ran
+#{hook_pane}             # Pane ID where hook ran
+```
+
+```bash Using Hook Context
+set-hook pane-focus-in "display-message 'Focused pane #{hook_pane}'"
+set-hook after-select-window "display-message 'Window #{hook_window_name}'"
+```
+</CodeGroup>
+
+## Practical Examples
+
+<Accordion title="Auto-arrange Panes After Split">
+```bash
+# Always use even-vertical layout after splitting
+set-hook -g after-split-window "select-layout even-vertical"
+
+# Or choose layout based on pane count
+set-hook -g after-split-window "if-shell '[ #{window_panes} -gt 2 ]' 'select-layout tiled' 'select-layout even-vertical'"
+```
+</Accordion>
+
+<Accordion title="Status Line Changes on Mode">
+```bash
+# Change status bar color when entering copy mode
+set-hook -g pane-mode-changed[0] "if-shell '[ #{pane_in_mode} -eq 1 ]' 'set -g status-style bg=red'"
+set-hook -g pane-mode-changed[1] "if-shell '[ #{pane_in_mode} -eq 0 ]' 'set -g status-style bg=green'"
+```
+</Accordion>
+
+<Accordion title="Automatic Logging">
+```bash
+# Start logging when a new pane is created
+set-hook -g after-split-window "pipe-pane -o 'cat >> ~/tmux-logs/pane-#{pane_id}.log'"
+
+# Log pane exit with timestamp
+set-hook -g pane-exited "run-shell 'echo \"[$(date)] Pane #{hook_pane} exited\" >> ~/tmux.log'"
+```
+</Accordion>
+
+<Accordion title="Focus Highlighting">
+```bash
+# Highlight active pane with different background
+set-hook -g pane-focus-in "set -w window-active-style bg=colour234"
+set-hook -g pane-focus-out "set -w window-active-style bg=colour235"
+
+# Or just update the pane border
+set-hook -g pane-focus-in "set -w pane-active-border-style fg=green,bold"
+```
+</Accordion>
+
+<Accordion title="Error Logging">
+```bash
+# Log all command errors to a file
+set-hook -g command-error "run-shell 'echo \"[$(date)] Command failed in #{hook_session_name}\" >> ~/tmux-errors.log'"
+
+# Display error notification
+set-hook -g command-error "display-message -d 5000 'Command failed!'"
+```
+</Accordion>
+
+<Accordion title="Session Initialization">
+```bash
+# Setup new sessions automatically
+set-hook -g session-created[0] "set -t #{hook_session} status-style bg=blue"
+set-hook -g session-created[1] "new-window -t #{hook_session}"
+set-hook -g session-created[2] "display-message 'Session #{hook_session_name} ready'"
+```
+</Accordion>
+
+<Accordion title="Window Cleanup">
+```bash
+# Rename window after last pane exits
+set-hook -g pane-exited "if-shell '[ #{window_panes} -eq 1 ]' 'rename-window \"empty\"'"
+
+# Auto-kill window if all panes died
+set-hook -g pane-died "if-shell '[ #{window_panes} -eq 1 ]' 'kill-window'"
+```
+</Accordion>
+
+<Accordion title="Synchronize Panes on Split">
+```bash
+# Automatically synchronize panes after splitting
+set-hook -g after-split-window "setw synchronize-panes on"
+
+# Toggle based on window name
+set-hook -g after-split-window "if-shell '[ \"#{window_name}\" = \"sync\" ]' 'setw synchronize-panes on'"
+```
+</Accordion>
+
+<Accordion title="Theme Switching">
+```bash
+# Automatically switch status bar colors based on client theme
+set-hook -g client-light-theme "set -g status-style bg=white,fg=black"
+set-hook -g client-dark-theme "set -g status-style bg=black,fg=white"
+```
+</Accordion>
+
+## Notification Hooks
+
+All notifications from control mode are also available as hooks:
+
+<CodeGroup>
+```bash Control Mode Notifications
+%client-detached
+%client-session-changed
+%continue
+%extended-output
+%layout-change
+%output
+%pane-mode-changed
+%paste-buffer-changed
+%paste-buffer-deleted
+%pause
+%session-changed
+%session-renamed
+%session-window-changed
+%sessions-changed
+%subscription-changed
+%unlinked-window-add
+%unlinked-window-close
+%unlinked-window-renamed
+%window-add
+%window-close
+%window-pane-changed
+%window-renamed
+```
+
+```bash Using as Hooks
+set-hook -g client-session-changed "display-message 'Session changed'"
+set-hook -g window-pane-changed "refresh-client"
+```
+</CodeGroup>
+
+<Note>
+The `%exit` notification is not available as a hook.
+</Note>
+
+## Advanced Hook Patterns
+
+### Conditional Execution
+
+```bash
+# Only run for specific sessions
+set-hook -g after-new-window "if-shell '[ #{session_name} = prod ]' 'setw monitor-activity on'"
+
+# Run based on pane count
+set-hook -g after-kill-pane "if-shell '[ #{window_panes} -eq 1 ]' 'select-layout main-vertical'"
+
+# Check window properties
+set-hook -g window-layout-changed "if-shell '[ #{window_zoomed_flag} -eq 1 ]' 'set status off' 'set status on'"
+```
+
+### Chaining Commands
+
+```bash
+# Multiple commands in sequence
+set-hook -g after-split-window "select-layout even-vertical ; resize-pane -Z"
+
+# With command grouping
+set-hook -g session-created {
+    set -t #{hook_session} status-style bg=blue
+    new-window -t #{hook_session}
+    display-message "Session ready"
+}
+```
+
+### Hook Scope
+
+```bash
+# Global hook (all sessions/windows/panes)
+set-hook -g pane-focus-in "display-message 'Focus in'"
+
+# Session-specific hook
+set-hook -t mysession pane-focus-in "display-message 'Session focus'"
+
+# Window-specific hook
+set-hook -wt @1 pane-focus-in "display-message 'Window focus'"
+
+# Pane-specific hook  
+set-hook -pt %5 pane-exited "display-message 'Pane exited'"
+```
+
+## Debugging Hooks
+
+<CodeGroup>
+```bash Show All Hooks
+show-hooks -g           # Show global hooks
+show-hooks -t mysession # Show session hooks
+```
+
+```bash Show Specific Hook
+show-hooks after-split-window
+```
+
+```bash Hook Execution Logging
+# Hooks log to server log when verbose logging is enabled
+# Start tmux with: tmux -v
+# Or enable logging: kill -USR2 <tmux-server-pid>
+```
+</CodeGroup>
+
+## Managing Hooks
+
+<CodeGroup>
+```bash List All Hooks
+show-options -H         # Show hooks with options
+show-hooks              # Show just hooks
+```
+
+```bash Copy Hooks
+show-options -v hook-name > hooks.conf
+source-file hooks.conf
+```
+
+```bash Clear All Hooks
+set-hook -ug after-split-window
+# Repeat for each hook type
+```
+</CodeGroup>
+
+## Best Practices
+
+<Warning>
+**Avoid Recursive Hooks**: Be careful not to create hooks that trigger themselves. For example, a `after-select-window` hook that runs `select-window` will create an infinite loop.
+</Warning>
+
+<Note>
+**Hook Execution**: After hooks don't run when a command is executed as part of another hook. This prevents recursive execution.
+</Note>
+
+Tips for effective hook usage:
+
+1. **Use specific hooks**: Prefer `after-split-window` over `pane-mode-changed` when you only care about splits
+2. **Check conditions**: Use `if-shell` to conditionally execute hook commands
+3. **Keep hooks simple**: Complex logic should be in shell scripts called via `run-shell`
+4. **Use array indices**: Organize related hook commands with array indices for clarity
+5. **Test thoroughly**: Hooks run automatically, so test them in a separate session first
+6. **Document your hooks**: Add comments explaining why each hook exists
+
+## Performance Considerations
+
+- Hooks execute synchronously and can slow down operations if they take too long
+- Use `run-shell` for long-running operations to avoid blocking
+- Avoid expensive operations in frequently-triggered hooks like `pane-focus-in`
+- Consider using `display-message -d 0` to suppress output in background hooks
+
+```bash
+# Good: Non-blocking
+set-hook -g pane-exited "run-shell 'echo exited >> ~/log &'"
+
+# Bad: Blocking
+set-hook -g pane-exited "run-shell 'sleep 5 ; echo exited'"
+```

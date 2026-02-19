@@ -1,122 +1,109 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
-  "name": "tmux/tmux Docs",
+  "name": "tmux",
+  "theme": "aspen",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#1BB91F",
+    "light": "#1BB91F",
+    "dark": "#1BB91F"
   },
-  "favicon": "/favicon.svg",
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/tmux/tmux"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/tmux/tmux"
+    }
+  },
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "Documentation",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "Get Started",
             "pages": [
-              "index",
-              "quickstart",
-              "development"
+              "introduction",
+              "installation",
+              "quickstart"
             ]
           },
           {
-            "group": "Customization",
+            "group": "Core Concepts",
             "pages": [
-              "essentials/settings",
-              "essentials/navigation"
+              "concepts/sessions",
+              "concepts/windows",
+              "concepts/panes",
+              "concepts/client-server"
             ]
           },
           {
-            "group": "Writing content",
+            "group": "Guides",
             "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
+              "guides/key-bindings",
+              "guides/configuration",
+              "guides/status-line",
+              "guides/copy-mode",
+              "guides/mouse-support",
+              "guides/scripting"
             ]
           },
           {
-            "group": "AI tools",
+            "group": "Advanced",
             "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
+              "advanced/formats",
+              "advanced/styles",
+              "advanced/hooks",
+              "advanced/control-mode"
             ]
           }
         ]
       },
       {
-        "tab": "API reference",
+        "tab": "Commands",
         "groups": [
           {
-            "group": "API documentation",
+            "group": "Command Reference",
             "pages": [
-              "api-reference/introduction"
+              "commands/overview",
+              "commands/sessions",
+              "commands/windows",
+              "commands/panes",
+              "commands/key-bindings",
+              "commands/options",
+              "commands/buffers",
+              "commands/miscellaneous"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Configuration",
+        "groups": [
+          {
+            "group": "Options Reference",
+            "pages": [
+              "options/overview",
+              "options/server",
+              "options/session",
+              "options/window",
+              "options/pane"
             ]
           },
           {
-            "group": "Endpoint examples",
+            "group": "Examples",
             "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
+              "examples/basic-config",
+              "examples/advanced-config",
+              "examples/plugins",
+              "examples/use-cases"
             ]
           }
         ]
       }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
-  },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
-  },
-  "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
-      }
-    ],
-    "primary": {
-      "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
-    }
-  },
-  "contextual": {
-    "options": [
-      "copy",
-      "view",
-      "chatgpt",
-      "claude",
-      "perplexity",
-      "mcp",
-      "cursor",
-      "vscode"
     ]
-  },
-  "footer": {
-    "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
-    }
   }
 }

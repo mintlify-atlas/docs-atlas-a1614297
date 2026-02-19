@@ -1,0 +1,258 @@
+---
+title: 'Options System Overview'
+description: 'Understanding tmux options, scopes, and how to set them'
+---
+
+# Options System Overview
+
+tmux has a comprehensive options system that controls server, session, window, and pane behavior. Options are stored in a hierarchical tree structure with inheritance between scopes.
+
+## Option Scopes
+
+Options in tmux are organized into four scopes:
+
+<AccordionGroup>
+  <Accordion title="Server Options" icon="server">
+    Server options apply globally to the entire tmux server instance. They affect all sessions, windows, and panes.
+    
+    **Examples**: `escape-time`, `default-terminal`, `history-file`
+    
+    Set with: `set-option -s` or `set -s`
+  </Accordion>
+
+  <Accordion title="Session Options" icon="window">
+    Session options apply to individual sessions and are inherited by all windows in that session.
+    
+    **Examples**: `status-style`, `prefix`, `base-index`
+    
+    Set with: `set-option -g` (global) or `set-option -t session-name` (specific session)
+  </Accordion>
+
+  <Accordion title="Window Options" icon="grid-2">
+    Window options apply to individual windows. Some window options can also be set per-pane.
+    
+    **Examples**: `mode-keys`, `monitor-activity`, `aggressive-resize`
+    
+    Set with: `set-window-option` or `set -w`
+  </Accordion>
+
+  <Accordion title="Pane Options" icon="square">
+    Pane options apply to individual panes within a window. These are a subset of window options marked with scope `OPTIONS_TABLE_WINDOW|OPTIONS_TABLE_PANE`.
+    
+    **Examples**: `allow-passthrough`, `remain-on-exit`, `synchronize-panes`
+    
+    Set with: `set-option -p` or `set -p`
+  </Accordion>
+</AccordionGroup>
+
+## Setting Options
+
+### Basic Syntax
+
+```bash
+set-option [-gswp] [-t target] option value
+```
+
+### Command Flags
+
+| Flag | Scope | Description |
+|------|-------|-------------|
+| `-s` | Server | Set a server option |
+| `-g` | Global | Set the global session or window option |
+| `-w` | Window | Set a window option |
+| `-p` | Pane | Set a pane option |
+| `-t` | Target | Specify target session, window, or pane |
+| `-u` | Unset | Remove the option (inherit from parent) |
+| `-a` | Append | Append to string/array options |
+
+### Examples from Configuration
+
+```bash tmux.conf
+# Server option - applies to entire tmux instance
+set -s escape-time 10
+set -s default-terminal "tmux-256color"
+
+# Global session options - default for all sessions
+set -g status-style "bg=green,fg=black"
+set -g prefix C-a
+set -g mouse on
+
+# Window option - for a specific window
+set -w -t:1 monitor-activity on
+set -w -t:0 aggressive-resize on
+
+# Pane option - for specific pane
+set -p -t:.1 remain-on-exit on
+```
+
+## Option Types
+
+tmux supports several option types:
+
+<CardGroup cols={2}>
+  <Card title="String" icon="text">
+    Text values like `"value"` or `format-string`
+    
+    Example: `status-left "[#{session_name}] "`
+  </Card>
+  
+  <Card title="Number" icon="hashtag">
+    Integer values with optional min/max ranges
+    
+    Example: `history-limit 2000`
+  </Card>
+  
+  <Card title="Flag" icon="toggle-on">
+    Boolean values: `on`/`off` or `1`/`0`
+    
+    Example: `mouse on`
+  </Card>
+  
+  <Card title="Choice" icon="list">
+    Select from predefined list of values
+    
+    Example: `status-position top`
+  </Card>
+  
+  <Card title="Colour" icon="palette">
+    Color names or hex values
+    
+    Example: `status-bg cyan` or `#00ff00`
+  </Card>
+  
+  <Card title="Style" icon="paintbrush">
+    Combination of attributes and colors
+    
+    Example: `"bg=yellow,fg=black,bold"`
+  </Card>
+  
+  <Card title="Key" icon="keyboard">
+    Key binding specification
+    
+    Example: `prefix C-b`
+  </Card>
+  
+  <Card title="Array" icon="brackets">
+    Multiple values separated by commas
+    
+    Example: `terminal-features "xterm*:RGB"`
+  </Card>
+</CardGroup>
+
+## Viewing Options
+
+### Show All Options
+
+```bash
+# Show all server options
+tmux show-options -s
+
+# Show all global session options
+tmux show-options -g
+
+# Show all global window options
+tmux show-options -gw
+
+# Show specific option value
+tmux show-options -gv status-style
+```
+
+### Show Options for Target
+
+```bash
+# Show options for specific session
+tmux show-options -t mysession
+
+# Show options for specific window
+tmux show-options -wt :1
+
+# Show options for specific pane
+tmux show-options -pt :.2
+```
+
+## Option Inheritance
+
+Options follow a hierarchical inheritance model:
+
+```
+Server Options (global)
+  └─> Session Options (per-session or global)
+        └─> Window Options (per-window or global)
+              └─> Pane Options (per-pane)
+```
+
+<Note>
+When an option is not set at a specific level, tmux inherits the value from the parent scope. Use `set-option -u` to unset an option and revert to the inherited value.
+</Note>
+
+## User Options
+
+You can create custom options prefixed with `@`:
+
+```bash
+# Set custom user option
+set -g @my-plugin-setting "value"
+
+# Access in formats
+set -g status-right "#{@my-plugin-setting}"
+```
+
+<Tip>
+User options are commonly used by tmux plugins to store configuration without conflicting with built-in options.
+</Tip>
+
+## Array Options
+
+Some options accept multiple values as arrays:
+
+```bash
+# Set array with multiple values (comma-separated)
+set -s terminal-features "xterm*:RGB,screen*:title"
+
+# Append to array
+set -sa terminal-overrides ",xterm*:Tc"
+
+# Set array items by index
+set -s command-alias[0] "split-pane=split-window"
+set -s command-alias[1] "splitp=split-window"
+```
+
+## Configuration File
+
+Options are typically set in `~/.tmux.conf` or `~/.config/tmux/tmux.conf`:
+
+```bash tmux.conf
+# Example configuration
+set -g default-terminal "tmux-256color"
+set -g status-position top
+set -g status-style "bg=blue,fg=white"
+set -g mouse on
+set -g history-limit 10000
+set -g base-index 1
+set -g pane-base-index 1
+```
+
+Reload configuration with:
+
+```bash
+tmux source-file ~/.tmux.conf
+```
+
+## Next Steps
+
+Explore options by scope:
+
+<CardGroup cols={2}>
+  <Card title="Server Options" icon="server" href="/options/server">
+    Global server-wide settings
+  </Card>
+  <Card title="Session Options" icon="window" href="/options/session">
+    Session behavior and status line
+  </Card>
+  <Card title="Window Options" icon="grid-2" href="/options/window">
+    Window appearance and behavior
+  </Card>
+  <Card title="Pane Options" icon="square" href="/options/pane">
+    Per-pane settings
+  </Card>
+</CardGroup>

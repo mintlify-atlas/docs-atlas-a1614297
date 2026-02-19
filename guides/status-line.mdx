@@ -1,0 +1,634 @@
+---
+title: Status Line
+description: Customizing the tmux status line
+---
+
+## Overview
+
+The status line displays information about your tmux session at the top or bottom of the screen. It's highly customizable using format strings, styles, and dynamic updates.
+
+## Status Line Architecture
+
+From `status.c:227-264`, the status line system:
+
+<Tabs>
+  <Tab title="Structure">
+    The status line consists of multiple components:
+    
+    - **Position** - Top or bottom of screen
+    - **Lines** - Single or multiple status lines
+    - **Left section** - Session information (default)
+    - **Center/Windows** - Window list
+    - **Right section** - Time/date (default)
+    - **Style** - Colors and attributes
+  </Tab>
+
+  <Tab title="Update Mechanism">
+    ```c
+    void status_timer_start(struct client *c)
+    {
+        struct session *s = c->session;
+
+        if (event_initialized(&c->status.timer))
+            evtimer_del(&c->status.timer);
+        else
+            evtimer_set(&c->status.timer, status_timer_callback, c);
+
+        if (s != NULL && options_get_number(s->options, "status"))
+            status_timer_callback(-1, 0, c);
+    }
+    ```
+    
+    The status line updates automatically based on the `status-interval` option.
+  </Tab>
+</Tabs>
+
+## Basic Configuration
+
+### Enable/Disable Status Line
+
+```bash
+# Enable status line (default: on)
+set -g status on
+
+# Disable status line
+set -g status off
+
+# Number of status lines (1-5)
+set -g status 2
+```
+
+### Position
+
+```bash
+# Position at bottom (default)
+set -g status-position bottom
+
+# Position at top
+set -g status-position top
+```
+
+### Update Interval
+
+From `status.c:195`, the interval controls refresh rate:
+
+```bash
+# Update every second
+set -g status-interval 1
+
+# Update every 5 seconds (default)
+set -g status-interval 5
+
+# Disable automatic updates (0)
+set -g status-interval 0
+```
+
+## Status Line Components
+
+### Status Left
+
+<CodeGroup>
+
+```bash Default
+# Show session name
+set -g status-left "[#S] "
+```
+
+```bash With Colors
+# Colored session name
+set -g status-left "#[fg=green,bold]#S #[default]"
+```
+
+```bash With Background
+# Session name with background
+set -g status-left "#[fg=black,bg=green,bold] #S #[default]"
+```
+
+```bash Length Control
+# Set maximum length (default: 10)
+set -g status-left-length 20
+```
+
+</CodeGroup>
+
+### Status Right
+
+From `example_tmux.conf:8`:
+
+<CodeGroup>
+
+```bash Simple Time
+# Just show time
+set -g status-right "%H:%M"
+```
+
+```bash Date and Time
+# Show date and time
+set -g status-right "%Y-%m-%d %H:%M"
+```
+
+```bash System Info
+# Show hostname and load
+set -g status-right "#H | Load: #(uptime | awk '{print $(NF-2)}') | %H:%M"
+```
+
+```bash Length Control
+# Set maximum length (default: 40)
+set -g status-right-length 60
+```
+
+</CodeGroup>
+
+### Window Status
+
+<Steps>
+
+<Step title="Window Status Format">
+```bash
+# Format for inactive windows
+set -g window-status-format " #I:#W#F "
+
+# Format for active window
+set -g window-status-current-format " #I:#W#F "
+```
+</Step>
+
+<Step title="Window Status Style">
+From `example_tmux.conf:9`:
+```bash
+# Style for current window
+set -g window-status-current-style "underscore"
+
+# Or with full style specification
+set -g window-status-current-style "fg=black,bg=green,bold"
+
+# Style for inactive windows
+set -g window-status-style "fg=white,bg=default"
+```
+</Step>
+
+<Step title="Activity and Bells">
+```bash
+# Highlight windows with activity
+set -g window-status-activity-style "fg=red,bg=default"
+
+# Highlight windows with bell
+set -g window-status-bell-style "fg=white,bg=red,bold"
+```
+</Step>
+
+</Steps>
+
+## Styling
+
+### Colors
+
+<Accordion title="Color Options">
+
+**Named colors:**
+- black, red, green, yellow, blue, magenta, cyan, white
+- brightred, brightgreen, brightyellow, etc.
+- default (terminal default)
+
+**Numbered colors:**
+- colour0 to colour255 (256-color palette)
+- Use `#RRGGBB` for true color (requires terminal support)
+
+**Example:**
+```bash
+set -g status-style "fg=colour136,bg=colour235"
+```
+
+</Accordion>
+
+### Attributes
+
+<CodeGroup>
+
+```bash Text Attributes
+# Single attribute
+set -g status-style "bold"
+
+# Multiple attributes (comma-separated)
+set -g status-style "bold,underscore"
+
+# Available attributes:
+# - bold
+# - dim
+# - underscore (or underline)
+# - blink
+# - reverse
+# - italics
+# - strikethrough
+```
+
+```bash Combined Style
+# Foreground, background, and attributes
+set -g status-style "fg=white,bg=black,bold"
+
+# With default values
+set -g status-style "fg=default,bg=colour235,none"
+```
+
+</CodeGroup>
+
+### Status Styling Options
+
+From `status.c:406-417`:
+
+```bash
+# Main status line style
+set -g status-style "bg=black,fg=white"
+
+# Legacy color options (still supported)
+set -g status-fg colour136
+set -g status-bg colour235
+
+# Status line alignment
+set -g status-justify left    # left, centre, right
+```
+
+## Format Strings
+
+### Common Variables
+
+<Tabs>
+  <Tab title="Session">
+    ```bash
+    #S    # Session name
+    #D    # Session ID
+    #{session_attached}    # Number of attached clients
+    #{session_created}     # Session creation time
+    #{session_windows}     # Number of windows
+    ```
+  </Tab>
+
+  <Tab title="Window">
+    ```bash
+    #I    # Window index
+    #W    # Window name
+    #T    # Window title
+    #F    # Window flags (*, -, Z, etc.)
+    #{window_id}           # Window ID (@1, @2, etc.)
+    #{window_panes}        # Number of panes
+    #{window_active}       # 1 if window is active
+    ```
+  </Tab>
+
+  <Tab title="Pane">
+    ```bash
+    #P    # Pane index
+    #{pane_id}             # Pane ID (%1, %2, etc.)
+    #{pane_current_path}   # Current directory
+    #{pane_current_command}# Running command
+    #{pane_title}          # Pane title
+    #{pane_width}          # Pane width
+    #{pane_height}         # Pane height
+    ```
+  </Tab>
+
+  <Tab title="Host/Time">
+    ```bash
+    #H    # Hostname
+    #h    # Hostname (short)
+    %Y    # Year (4 digits)
+    %m    # Month (01-12)
+    %d    # Day (01-31)
+    %H    # Hour (00-23)
+    %M    # Minute (00-59)
+    %S    # Second (00-59)
+    %a    # Weekday (short)
+    %A    # Weekday (full)
+    ```
+  </Tab>
+</Tabs>
+
+### Format Conditionals
+
+From the format system:
+
+<CodeGroup>
+
+```bash Equality Check
+# Show different text based on condition
+#{?#{==:#{host},myhost},Local,Remote}
+```
+
+```bash Boolean Check
+# Check if value is true
+#{?synchronize-panes,SYNC,}
+```
+
+```bash Nested Conditionals
+# Multiple conditions
+#{?#{||:#{pane_in_mode},#{pane_synchronized}},*,}
+```
+
+```bash With Styles
+# Conditional styling
+#[fg=#{?window_zoomed_flag,red,green}]#I#[default]
+```
+
+</CodeGroup>
+
+### Format Functions
+
+<Accordion title="Format Function Examples">
+
+```bash
+# String length
+#{l:#{session_name}}
+
+# Truncate string
+#{=10:#{pane_current_command}}
+
+# Pad string
+#{p10:#{window_index}}
+
+# Substring
+#{s/old/new/:#{window_name}}
+
+# Conditional
+#{?window_zoomed_flag,Z,}
+
+# Equality
+#{==:#{host},myhost}
+
+# Comparison
+#{>:#{window_panes},1}
+
+# Logical OR
+#{||:#{pane_in_mode},#{window_zoomed_flag}}
+
+# Logical AND
+#{&&:#{window_active},#{pane_synchronized}}
+```
+
+</Accordion>
+
+## Practical Examples
+
+### Minimal Status Line
+
+```bash
+# Simple and clean
+set -g status-style "bg=default,fg=white"
+set -g status-left "#S "
+set -g status-right "%H:%M"
+set -g window-status-format " #I:#W "
+set -g window-status-current-format " #I:#W "
+set -g window-status-current-style "bold"
+```
+
+### Powerline-style Status
+
+```bash
+# Powerline-inspired status line
+set -g status-style "bg=colour234,fg=colour137"
+set -g status-left "#[fg=colour232,bg=colour154,bold] #S #[fg=colour154,bg=colour238,nobold]#[fg=colour222,bg=colour238] #(whoami) #[fg=colour238,bg=colour234,nobold]"
+set -g status-right "#[fg=colour238,bg=colour234]#[fg=colour222,bg=colour238] %H:%M #[fg=colour154,bg=colour238]#[fg=colour232,bg=colour154,bold] #H "
+set -g window-status-format "#[fg=colour234,bg=colour238]#[fg=white,bg=colour238] #I #[fg=white,bg=colour238]#W #[fg=colour238,bg=colour234]"
+set -g window-status-current-format "#[fg=colour234,bg=colour39]#[fg=colour232,bg=colour39,noreverse,bold] #I #[fg=colour232,bg=colour39,bold]#W #[fg=colour39,bg=colour234,nobold]"
+```
+
+### Information-Rich Status
+
+```bash
+# Show comprehensive information
+set -g status-left-length 40
+set -g status-right-length 80
+
+set -g status-left "#[fg=green]#S #[fg=yellow]#I:#P "
+set -g status-right "#[fg=cyan]#(tmux-mem-cpu-load --interval 2) #[fg=yellow]%Y-%m-%d #[fg=green]%H:%M:%S"
+
+set -g window-status-format "#I:#W#{?window_flags,#{window_flags}, }"
+set -g window-status-current-format "#[fg=black,bg=green]#I:#W#{?window_flags,#{window_flags}, }"
+```
+
+### Conditional Nested Status
+
+From `example_tmux.conf:11-14`:
+
+```bash
+# Red status bar if running inside tmux
+%if #{TMUX}
+set -g status-bg red
+%endif
+
+# Different colors per host
+%if #{==:#{host},laptop}
+set -g status-bg blue
+%elif #{==:#{host},desktop}
+set -g status-bg green
+%else
+set -g status-bg black
+%endif
+```
+
+## Multi-Line Status
+
+<Steps>
+
+<Step title="Enable Multiple Lines">
+```bash
+# Set 2 or more status lines
+set -g status 2
+
+# Or up to 5 lines
+set -g status 3
+```
+</Step>
+
+<Step title="Configure Each Line">
+```bash
+# First status line (status-format[0])
+set -g status-format[0] "#[align=left]#S #[align=centre]Windows #[align=right]%H:%M"
+
+# Second status line (status-format[1])
+set -g status-format[1] "#[align=centre]#{window_index}:#{window_name}"
+```
+</Step>
+
+<Step title="Style Per Line">
+```bash
+# Different styles for each line
+set -g status-format[0] "#[bg=green,fg=black]Line 1"
+set -g status-format[1] "#[bg=blue,fg=white]Line 2"
+```
+</Step>
+
+</Steps>
+
+## Dynamic Updates
+
+### Running Shell Commands
+
+```bash
+# Run command and display output
+set -g status-right "#(uptime | cut -d',' -f 3-)"
+
+# With refresh interval
+set -g status-interval 2
+set -g status-right "Load: #(cat /proc/loadavg | cut -d' ' -f1)"
+
+# Multiple commands
+set -g status-right "CPU: #(top -bn1 | grep 'Cpu' | cut -d',' -f1 | awk '{print $2}')% | Mem: #(free -h | awk '/^Mem:/ {print $3"/"$2}')"
+```
+
+<Tip>
+Shell commands in status-right/status-left run every status-interval seconds. Keep them lightweight to avoid performance issues.
+</Tip>
+
+### Custom Scripts
+
+```bash
+# Use custom script for status
+set -g status-right "#(~/.tmux/scripts/status.sh)"
+
+# Script example: ~/.tmux/scripts/status.sh
+#!/bin/bash
+load=$(uptime | awk '{print $(NF-2)}' | sed 's/,//')
+mem=$(free -h | awk '/^Mem:/ {print $3"/"$2}')
+echo "Load: $load | Mem: $mem | %H:%M"
+```
+
+## Alignment
+
+### Status Justify
+
+```bash
+# Align window list left (default)
+set -g status-justify left
+
+# Center window list
+set -g status-justify centre
+
+# Align window list right
+set -g status-justify right
+```
+
+### Inline Alignment
+
+From `status.c:456-462`:
+
+```bash
+# Align within format string
+set -g status-format[0] "#[align=left]Left#[align=centre]Center#[align=right]Right"
+
+# Example with content
+set -g status-format[0] "#[align=left]Session: #S #[align=right]%H:%M"
+```
+
+## Window Flags
+
+<Accordion title="Window Flag Meanings">
+
+| Flag | Meaning |
+|------|----------|
+| `*` | Current window |
+| `-` | Last window |
+| `#` | Window activity |
+| `!` | Window bell |
+| `~` | Window silence |
+| `M` | Marked window |
+| `Z` | Window zoomed |
+
+Customize display:
+```bash
+# Show flags after window name
+set -g window-status-format "#I:#W#F"
+
+# Custom flag format
+#{?window_zoomed_flag,🔍,}
+```
+
+</Accordion>
+
+## Troubleshooting
+
+### Status Line Not Updating
+
+<Steps>
+
+<Step title="Check Interval">
+```bash
+# Verify status-interval is not 0
+tmux show-options -g status-interval
+
+# Set interval if needed
+tmux set -g status-interval 5
+```
+</Step>
+
+<Step title="Force Refresh">
+```bash
+# Manually refresh
+tmux refresh-client -S
+```
+</Step>
+
+<Step title="Check Status Enabled">
+```bash
+# Verify status is on
+tmux show-options -g status
+```
+</Step>
+
+</Steps>
+
+### Format String Errors
+
+```bash
+# Test format string
+tmux display-message -p "#{session_name}"
+
+# Show all format variables
+tmux list-keys -T copy-mode | head -1
+tmux display-message -p "#{?window_active,active,inactive}"
+```
+
+### Shell Command Not Working
+
+<Accordion title="Shell Command Debugging">
+
+```bash
+# Test command independently
+$ uptime | cut -d',' -f 3-
+
+# Check shell in tmux
+tmux show-options -g default-shell
+
+# Verify command output
+tmux set -g status-right "#(echo test)"
+
+# Check command execution
+# Commands run with: /bin/sh -c "command"
+```
+
+</Accordion>
+
+## Performance Tips
+
+<Tip>
+**Optimize Status Line Performance:**
+
+1. Increase `status-interval` to reduce updates
+2. Minimize shell command complexity
+3. Cache expensive operations
+4. Use format strings over shell commands when possible
+5. Limit status-left-length and status-right-length
+
+```bash
+# Good: Native format
+set -g status-right "#{session_windows} windows | %H:%M"
+
+# Less efficient: Shell command every interval
+set -g status-right "#(tmux list-windows | wc -l) windows | %H:%M"
+```
+</Tip>
+
+## See Also
+
+- [Configuration](/guides/configuration) - General configuration options
+- [Scripting](/guides/scripting) - Advanced status line automation
+- [Key Bindings](/guides/key-bindings) - Toggle status line visibility

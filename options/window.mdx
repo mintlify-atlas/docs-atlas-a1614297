@@ -1,0 +1,609 @@
+---
+title: 'Window Options'
+description: 'Window-level options for appearance, behavior, and layouts'
+---
+
+# Window Options
+
+Window options control the behavior and appearance of individual windows. Set with `set-window-option` or `set -w`. Use `-g` for global window options that apply to all windows.
+
+## Window Behavior
+
+### aggressive-resize
+
+**Type:** Flag | **Default:** `off`
+
+When `window-size` is `smallest`, this controls whether the maximum size is the smallest attached session where it's current (`on`), or the smallest session it's linked to (`off`).
+
+```bash tmux.conf
+set -g aggressive-resize on
+```
+
+### automatic-rename
+
+**Type:** Flag | **Default:** `on`
+
+Whether windows are automatically renamed based on the running program.
+
+```bash tmux.conf
+# Disable automatic window renaming
+set -g automatic-rename off
+```
+
+### automatic-rename-format
+
+**Type:** String (format) | **Default:** Complex format
+
+Format used to automatically rename windows.
+
+```bash
+set -g automatic-rename-format "#{pane_current_command}"
+```
+
+**Default:**
+```
+#{?pane_in_mode,[tmux],#{pane_current_command}}#{?pane_dead,[dead],}
+```
+
+### window-size
+
+**Type:** Choice | **Default:** `latest` | **Choices:** `largest`, `smallest`, `manual`, `latest`
+
+How window size is calculated:
+- `latest`: Size of most recently used client
+- `largest`: Size of largest client
+- `smallest`: Size of smallest client
+- `manual`: Size set by `resize-window` command
+
+```bash
+set -g window-size latest
+```
+
+### monitor-activity
+
+**Type:** Flag | **Default:** `off`
+
+Whether to trigger an alert when activity occurs in the window.
+
+```bash
+# Monitor activity in specific window
+set -w -t:1 monitor-activity on
+```
+
+### monitor-bell
+
+**Type:** Flag | **Default:** `on`
+
+Whether to trigger an alert on terminal bell.
+
+```bash
+set -g monitor-bell on
+```
+
+### monitor-silence
+
+**Type:** Number (seconds) | **Default:** `0` | **Range:** 0 to INT_MAX
+
+Time after which an alert is triggered by silence. Zero means no alert.
+
+```bash
+# Alert after 30 seconds of silence
+set -w monitor-silence 30
+```
+
+## Copy Mode
+
+### mode-keys
+
+**Type:** Choice | **Default:** `emacs` | **Choices:** `emacs`, `vi`
+
+Key bindings used in copy mode.
+
+```bash tmux.conf
+# Use vi key bindings in copy mode
+set -g mode-keys vi
+```
+
+### mode-style
+
+**Type:** Style | **Default:** `"noattr,bg=yellow,fg=black"`
+
+Style of indicators and highlighting in modes (copy mode, choose mode).
+
+```bash
+set -g mode-style "bg=cyan,fg=black"
+```
+
+### copy-mode-match-style
+
+**Type:** Style | **Default:** `"bg=cyan,fg=black"`
+
+Style of search matches in copy mode.
+
+```bash
+set -g copy-mode-match-style "bg=yellow,fg=black"
+```
+
+### copy-mode-current-match-style
+
+**Type:** Style | **Default:** `"bg=magenta,fg=black"`
+
+Style of the current (active) search match in copy mode.
+
+```bash
+set -g copy-mode-current-match-style "bg=red,fg=white,bold"
+```
+
+### copy-mode-mark-style
+
+**Type:** Style | **Default:** `"bg=red,fg=black"`
+
+Style of the marked line in copy mode.
+
+```bash
+set -g copy-mode-mark-style "bg=green,fg=white"
+```
+
+### copy-mode-selection-style
+
+**Type:** Style | **Default:** `"#{E:mode-style}"`
+
+Style of text selection in copy mode.
+
+```bash
+set -g copy-mode-selection-style "bg=blue,fg=white"
+```
+
+### wrap-search
+
+**Type:** Flag | **Default:** `on`
+
+Whether searching in copy mode wraps at top or bottom.
+
+```bash
+set -g wrap-search on
+```
+
+## Clock Mode
+
+### clock-mode-colour
+
+**Type:** Colour | **Default:** `4` (blue)
+
+Color of the clock in clock mode (`clock-mode` command).
+
+```bash
+set -g clock-mode-colour green
+```
+
+### clock-mode-style
+
+**Type:** Choice | **Default:** `24` | **Choices:** `12`, `24`, `12-with-seconds`, `24-with-seconds`
+
+Time format of the clock.
+
+```bash
+set -g clock-mode-style 12
+```
+
+## Pane Borders
+
+### pane-border-style
+
+**Type:** Style | **Default:** `"default"`
+
+Style of inactive pane borders.
+
+```bash
+set -g pane-border-style "fg=white"
+```
+
+### pane-active-border-style
+
+**Type:** Style | **Default:** Complex format
+
+Style of the active pane border.
+
+```bash tmux.conf
+set -g pane-active-border-style "fg=green"
+```
+
+**Default:**
+```
+#{?pane_in_mode,fg=yellow,#{?synchronize-panes,fg=red,fg=green}}
+```
+
+### pane-border-lines
+
+**Type:** Choice | **Default:** `single` | **Choices:** `single`, `double`, `heavy`, `simple`, `number`, `spaces`
+
+Type of characters used to draw pane borders. Some require UTF-8 support.
+
+```bash
+set -g pane-border-lines double
+```
+
+### pane-border-indicators
+
+**Type:** Choice | **Default:** `colour` | **Choices:** `off`, `colour`, `arrows`, `both`
+
+How to indicate the active pane:
+- `off`: No indication
+- `colour`: Use different color (via `pane-active-border-style`)
+- `arrows`: Display arrow markers
+- `both`: Both color and arrows
+
+```bash
+set -g pane-border-indicators arrows
+```
+
+### pane-border-status
+
+**Type:** Choice | **Default:** `off` | **Choices:** `off`, `top`, `bottom`
+
+Position of pane status lines.
+
+```bash
+set -g pane-border-status top
+```
+
+### pane-base-index
+
+**Type:** Number | **Default:** `0` | **Range:** 0 to USHRT_MAX
+
+Starting index for pane numbers in each window.
+
+```bash
+set -g pane-base-index 1
+```
+
+## Pane Scrollbars
+
+### pane-scrollbars
+
+**Type:** Choice | **Default:** `off` | **Choices:** `off`, `modal`, `on`
+
+Scrollbar display state:
+- `off`: No scrollbars
+- `modal`: Show only in copy mode
+- `on`: Always show
+
+```bash
+set -g pane-scrollbars modal
+```
+
+### pane-scrollbars-position
+
+**Type:** Choice | **Default:** `right` | **Choices:** `right`, `left`
+
+Position of pane scrollbars.
+
+```bash
+set -g pane-scrollbars-position left
+```
+
+## Window Status Line
+
+### window-status-style
+
+**Type:** Style | **Default:** `"default"`
+
+Style of windows in the status line (except current and last).
+
+```bash
+set -g window-status-style "fg=white"
+```
+
+### window-status-current-style
+
+**Type:** Style | **Default:** `"default"`
+
+Style of the current window in the status line.
+
+```bash tmux.conf
+set -g window-status-current-style "fg=yellow,bold"
+```
+
+### window-status-last-style
+
+**Type:** Style | **Default:** `"default"`
+
+Style of the last window in the status line.
+
+```bash
+set -g window-status-last-style "fg=cyan"
+```
+
+### window-status-format
+
+**Type:** String (format) | **Default:** `"#I:#W#{?window_flags,#{window_flags}, }"`
+
+Format of windows in the status line (except current).
+
+```bash
+set -g window-status-format "#I:#W"
+```
+
+### window-status-current-format
+
+**Type:** String (format) | **Default:** `"#I:#W#{?window_flags,#{window_flags}, }"`
+
+Format of the current window in the status line.
+
+```bash
+set -g window-status-current-format "#I:#W#F"
+```
+
+### window-status-separator
+
+**Type:** String | **Default:** `" "` (space)
+
+Separator between windows in the status line.
+
+```bash
+set -g window-status-separator " | "
+```
+
+### window-status-activity-style
+
+**Type:** Style | **Default:** `"reverse"`
+
+Style of windows with activity alerts in the status line.
+
+```bash
+set -g window-status-activity-style "fg=red"
+```
+
+### window-status-bell-style
+
+**Type:** Style | **Default:** `"reverse"`
+
+Style of windows with bell alerts in the status line.
+
+```bash
+set -g window-status-bell-style "fg=yellow,bold"
+```
+
+## Layouts
+
+### main-pane-width
+
+**Type:** String | **Default:** `"80"`
+
+Width of the main pane in `main-vertical` layout. Can be a percentage.
+
+```bash
+set -g main-pane-width "50%"
+```
+
+### main-pane-height
+
+**Type:** String | **Default:** `"24"`
+
+Height of the main pane in `main-horizontal` layout. Can be a percentage.
+
+```bash
+set -g main-pane-height "60%"
+```
+
+### other-pane-width
+
+**Type:** String | **Default:** `"0"`
+
+Width of other panes in `main-vertical` layout. Can be a percentage.
+
+```bash
+set -g other-pane-width "20%"
+```
+
+### other-pane-height
+
+**Type:** String | **Default:** `"0"`
+
+Height of other panes in `main-horizontal` layout. Can be a percentage.
+
+```bash
+set -g other-pane-height "20%"
+```
+
+### tiled-layout-max-columns
+
+**Type:** Number | **Default:** `0` | **Range:** 0 to USHRT_MAX
+
+Maximum number of columns in the `tiled` layout. Zero means no limit.
+
+```bash
+set -g tiled-layout-max-columns 4
+```
+
+## Menus
+
+### menu-style
+
+**Type:** Style | **Default:** `"default"`
+
+Default style of menus.
+
+```bash
+set -g menu-style "bg=black,fg=white"
+```
+
+### menu-selected-style
+
+**Type:** Style | **Default:** `"bg=yellow,fg=black"`
+
+Style of selected menu items.
+
+```bash
+set -g menu-selected-style "bg=blue,fg=white"
+```
+
+### menu-border-style
+
+**Type:** Style | **Default:** `"default"`
+
+Style of menu borders.
+
+```bash
+set -g menu-border-style "fg=cyan"
+```
+
+### menu-border-lines
+
+**Type:** Choice | **Default:** `single` | **Choices:** `single`, `double`, `heavy`, `simple`, `rounded`, `padded`, `none`
+
+Type of characters for menu borders.
+
+```bash
+set -g menu-border-lines rounded
+```
+
+## Popups
+
+### popup-style
+
+**Type:** Style | **Default:** `"default"`
+
+Default style of popup windows.
+
+```bash
+set -g popup-style "bg=black,fg=white"
+```
+
+### popup-border-style
+
+**Type:** Style | **Default:** `"default"`
+
+Style of popup borders.
+
+```bash
+set -g popup-border-style "fg=green"
+```
+
+### popup-border-lines
+
+**Type:** Choice | **Default:** `single` | **Choices:** `single`, `double`, `heavy`, `simple`, `rounded`, `padded`, `none`
+
+Type of characters for popup borders.
+
+```bash
+set -g popup-border-lines rounded
+```
+
+## Display
+
+### fill-character
+
+**Type:** String | **Default:** `""`
+
+Character used to fill unused parts of window.
+
+```bash
+set -g fill-character "."
+```
+
+## Status Lines
+
+### pane-status-style
+
+**Type:** Style | **Default:** `"default"`
+
+Style of panes in multi-pane status line (except current).
+
+```bash
+set -g pane-status-style "fg=white"
+```
+
+### pane-status-current-style
+
+**Type:** Style | **Default:** `"default"`
+
+Style of the current pane in multi-pane status line.
+
+```bash
+set -g pane-status-current-style "fg=green,bold"
+```
+
+### session-status-style
+
+**Type:** Style | **Default:** `"default"`
+
+Style of sessions in multi-session status line (except current).
+
+```bash
+set -g session-status-style "fg=white"
+```
+
+### session-status-current-style
+
+**Type:** Style | **Default:** `"default"`
+
+Style of current session in multi-session status line.
+
+```bash
+set -g session-status-current-style "fg=yellow,bold"
+```
+
+## Example Configuration
+
+```bash tmux.conf
+# Window behavior
+set -g automatic-rename on
+set -g automatic-rename-format "#{pane_current_command}"
+set -g aggressive-resize on
+set -g renumber-windows on
+
+# Copy mode
+set -g mode-keys vi
+set -g mode-style "bg=black,fg=yellow"
+
+# Pane borders
+set -g pane-border-style "fg=colour238"
+set -g pane-active-border-style "fg=green"
+set -g pane-border-lines heavy
+set -g pane-border-status top
+set -g pane-border-format " #{pane_index} #{pane_title} "
+
+# Status line windows
+set -g window-status-style "fg=white"
+set -g window-status-current-style "fg=yellow,bold"
+set -g window-status-format "#I:#W"
+set -g window-status-current-format "#I:#W*"
+
+# Clock
+set -g clock-mode-style 24
+set -g clock-mode-colour cyan
+
+# Layouts
+set -g main-pane-width "60%"
+set -g main-pane-height "60%"
+```
+
+## Example from example_tmux.conf
+
+From the tmux source repository:
+
+```bash tmux.conf
+# Some tweaks to the status line
+set -g window-status-current-style "underscore"
+
+# Keys to toggle monitoring activity in a window
+bind m set monitor-activity
+
+# Create windows with specific settings
+set -t0:0 monitor-activity on
+set -t0:0 aggressive-resize on
+setw -t0:1 aggressive-resize on
+setw -t0:2 aggressive-resize on
+```
+
+## Related
+
+<CardGroup cols={2}>
+  <Card title="Pane Options" icon="square" href="/options/pane">
+    Per-pane specific options
+  </Card>
+  <Card title="Session Options" icon="window" href="/options/session">
+    Session-level settings
+  </Card>
+</CardGroup>

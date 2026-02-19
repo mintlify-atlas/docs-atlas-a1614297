@@ -1,0 +1,618 @@
+---
+title: 'Option Commands'
+description: 'Commands for managing tmux options and configuration'
+---
+
+## Overview
+
+Options control tmux behavior and appearance. Options exist at different scopes: server (global), session, window, and pane.
+
+## Setting Options
+
+### set-option
+
+Set a server, session, window, or pane option.
+
+```bash
+tmux set-option [-aFgopqsuUw] [-t target] option [value]
+```
+
+**Alias:** `set`
+
+<ParamField path="-a" type="flag">
+Append to string or array option (don't replace)
+</ParamField>
+
+<ParamField path="-F" type="flag">
+Expand formats in the value
+</ParamField>
+
+<ParamField path="-g" type="flag">
+Set global (server) option
+</ParamField>
+
+<ParamField path="-o" type="flag">
+Only set if option is not already set
+</ParamField>
+
+<ParamField path="-p" type="flag">
+Set pane option
+</ParamField>
+
+<ParamField path="-q" type="flag">
+Quiet mode (suppress errors)
+</ParamField>
+
+<ParamField path="-s" type="flag">
+Set session option
+</ParamField>
+
+<ParamField path="-u" type="flag">
+Unset option (revert to default)
+</ParamField>
+
+<ParamField path="-U" type="flag">
+Unset option completely (for user options)
+</ParamField>
+
+<ParamField path="-w" type="flag">
+Set window option
+</ParamField>
+
+<ParamField path="-t" type="string">
+Target session, window, or pane
+</ParamField>
+
+<CodeGroup>
+```bash Global Options
+# Set global/server options
+tmux set-option -g status on
+tmux set-option -g status-style bg=black,fg=white
+tmux set-option -g mouse on
+tmux set-option -g base-index 1
+```
+
+```bash Session Options
+# Set session options
+tmux set-option -s status-left "[#S] "
+tmux set-option -s -t mysession status-right "%H:%M"
+
+# Set for current session
+tmux set-option status-position top
+```
+
+```bash Window Options
+# Set window options
+tmux set-option -w monitor-activity on
+tmux set-option -w automatic-rename off
+tmux set-option -w -t :1 mode-keys vi
+```
+
+```bash Pane Options
+# Set pane options
+tmux set-option -p remain-on-exit on
+tmux set-option -p -t :.0 remain-on-exit off
+```
+</CodeGroup>
+
+### set-window-option
+
+Set a window option (shortcut for `set-option -w`).
+
+```bash
+tmux set-window-option [-aFgoqu] [-t target-window] option [value]
+```
+
+**Alias:** `setw`
+
+```bash
+# These are equivalent:
+tmux set-window-option mode-keys vi
+tmux set-option -w mode-keys vi
+tmux setw mode-keys vi
+
+# Set for specific window
+tmux setw -t :2 monitor-activity on
+```
+
+### Option Types
+
+<Accordion title="String Options">
+```bash
+# Simple string value
+tmux set-option -g status-left "[tmux]"
+tmux set-option -g default-shell /bin/zsh
+
+# With format expansion
+tmux set-option -g status-right "#{?client_prefix,PREFIX,}%H:%M"
+```
+</Accordion>
+
+<Accordion title="Number Options">
+```bash
+# Integer values
+tmux set-option -g history-limit 10000
+tmux set-option -g repeat-time 1000
+tmux set-option -w pane-base-index 1
+```
+</Accordion>
+
+<Accordion title="Boolean Options">
+```bash
+# on/off values
+tmux set-option -g mouse on
+tmux set-option -g visual-bell off
+tmux set-option -w monitor-activity on
+```
+</Accordion>
+
+<Accordion title="Array Options">
+```bash
+# Append to array
+tmux set-option -ga terminal-overrides ',xterm-256color:Tc'
+
+# Set array index
+tmux set-option -g command-alias[0] split='split-window'
+tmux set-option -g command-alias[1] zoom='resize-pane -Z'
+```
+</Accordion>
+
+<Accordion title="Style Options">
+```bash
+# Color and attribute styles
+tmux set-option -g status-style bg=colour235,fg=colour250
+tmux set-option -g pane-border-style fg=colour240
+tmux set-option -g pane-active-border-style fg=colour24
+
+# Multiple attributes
+tmux set-option -g message-style bg=colour235,fg=colour166,bold
+```
+</Accordion>
+
+<Accordion title="User Options">
+```bash
+# Custom options (must start with @)
+tmux set-option -g @my-plugin-option "value"
+tmux set-option -g @theme "dark"
+
+# Used by plugins and scripts
+tmux set-option -g @resurrect-dir "~/.tmux/resurrect"
+```
+</Accordion>
+
+## Showing Options
+
+### show-options
+
+Display option values.
+
+```bash
+tmux show-options [-AgHpqsvw] [-t target] [option]
+```
+
+**Alias:** `show`
+
+<ParamField path="-A" type="flag">
+Show array option items
+</ParamField>
+
+<ParamField path="-g" type="flag">
+Show global options
+</ParamField>
+
+<ParamField path="-H" type="flag">
+Show hooks only
+</ParamField>
+
+<ParamField path="-p" type="flag">
+Show pane options
+</ParamField>
+
+<ParamField path="-q" type="flag">
+Quiet mode (suppress errors)
+</ParamField>
+
+<ParamField path="-s" type="flag">
+Show session options
+</ParamField>
+
+<ParamField path="-v" type="flag">
+Show only the option value
+</ParamField>
+
+<ParamField path="-w" type="flag">
+Show window options
+</ParamField>
+
+<CodeGroup>
+```bash Show All Options
+# Show all global options
+tmux show-options -g
+
+# Show all session options
+tmux show-options -s
+
+# Show all window options
+tmux show-options -w
+
+# Show all pane options
+tmux show-options -p
+```
+
+```bash Show Specific Option
+# Show option with name and value
+tmux show-options -g status
+# Output: status on
+
+# Show only value
+tmux show-options -gv status
+# Output: on
+
+# Show option for target
+tmux show-options -w -t :2 mode-keys
+```
+
+```bash Show Arrays
+# Show array option items
+tmux show-options -gA terminal-overrides
+
+# Show specific array index
+tmux show-options -gv command-alias[0]
+```
+</CodeGroup>
+
+### show-window-options
+
+Show window options (shortcut for `show-options -w`).
+
+```bash
+tmux show-window-options [-gv] [-t target-window] [option]
+```
+
+**Alias:** `showw`
+
+```bash
+# Show all window options
+tmux show-window-options
+
+# Show specific window option
+tmux showw mode-keys
+
+# Show only value
+tmux showw -v monitor-activity
+```
+
+## Common Options
+
+### Server/Global Options
+
+```bash
+# Mouse support
+tmux set-option -g mouse on
+
+# History limit
+tmux set-option -g history-limit 10000
+
+# Start window/pane index at 1
+tmux set-option -g base-index 1
+tmux set-option -g pane-base-index 1
+
+# Faster command sequences
+tmux set-option -g escape-time 0
+
+# Repeat time for repeatable commands
+tmux set-option -g repeat-time 500
+
+# Default terminal
+tmux set-option -g default-terminal "screen-256color"
+
+# True color support
+tmux set-option -ga terminal-overrides ',xterm-256color:Tc'
+```
+
+### Session Options
+
+```bash
+# Status bar
+tmux set-option -g status on
+tmux set-option -g status-position top
+tmux set-option -g status-interval 5
+tmux set-option -g status-left "[#S] "
+tmux set-option -g status-right "%H:%M %d-%b-%y"
+tmux set-option -g status-left-length 20
+tmux set-option -g status-right-length 40
+
+# Status bar colors
+tmux set-option -g status-style bg=black,fg=white
+
+# Activity monitoring
+tmux set-option -g visual-activity on
+tmux set-option -g visual-bell off
+tmux set-option -g bell-action none
+
+# Working directory
+tmux set-option -g default-path "~"
+```
+
+### Window Options
+
+```bash
+# Vi or emacs mode
+tmux set-option -w mode-keys vi
+
+# Window naming
+tmux set-option -w automatic-rename on
+tmux set-option -w automatic-rename-format "#{pane_current_command}"
+
+# Activity monitoring
+tmux set-option -w monitor-activity on
+tmux set-option -w monitor-bell on
+tmux set-option -w monitor-silence 0
+
+# Pane borders
+tmux set-option -w pane-border-style fg=colour240
+tmux set-option -w pane-active-border-style fg=colour24
+
+# Window status
+tmux set-option -w window-status-current-style bg=colour24,fg=colour255,bold
+tmux set-option -w window-status-style fg=colour244
+```
+
+### Pane Options
+
+```bash
+# Keep pane open after command exits
+tmux set-option -p remain-on-exit on
+
+# Pane border format
+tmux set-option -p pane-border-format "#{pane_index} #{pane_title}"
+tmux set-option -p pane-border-status top
+```
+
+## Unsetting Options
+
+```bash
+# Unset option (revert to default)
+tmux set-option -u -g status-right
+
+# Unset window option
+tmux set-option -u -w mode-keys
+
+# Completely remove user option
+tmux set-option -U -g @my-option
+```
+
+## Hooks
+
+Hooks are special options that run commands on events.
+
+### set-hook
+
+Set a hook.
+
+```bash
+tmux set-hook [-agpRuw] [-t target] hook [command]
+```
+
+<ParamField path="-a" type="flag">
+Append to hook
+</ParamField>
+
+<ParamField path="-g" type="flag">
+Set global hook
+</ParamField>
+
+<ParamField path="-p" type="flag">
+Set pane hook
+</ParamField>
+
+<ParamField path="-R" type="flag">
+Run hook immediately
+</ParamField>
+
+<ParamField path="-u" type="flag">
+Unset hook
+</ParamField>
+
+<ParamField path="-w" type="flag">
+Set window hook
+</ParamField>
+
+### Available Hooks
+
+<CodeGroup>
+```bash Session Hooks
+# After new session created
+tmux set-hook -g after-new-session 'display "Session created"'
+
+# After session destroyed
+tmux set-hook -g session-closed 'display "Session closed"'
+
+# Session window changed
+tmux set-hook -g session-window-changed 'refresh-client -S'
+```
+
+```bash Window Hooks
+# After new window created
+tmux set-hook -g after-new-window 'rename-window ""'
+
+# Window linked/unlinked
+tmux set-hook -g window-linked 'display "Window linked"'
+
+# Window renamed
+tmux set-hook -g window-renamed 'refresh-client -S'
+```
+
+```bash Pane Hooks
+# After split pane
+tmux set-hook -g after-split-window 'select-pane -t:.+'
+
+# Pane died (process exited)
+tmux set-hook -g pane-died 'display "Pane #{pane_id} exited"'
+
+# Pane focus changed
+tmux set-hook -g pane-focus-in 'display "Focus: #{pane_title}"'
+```
+
+```bash Client Hooks
+# Client attached
+tmux set-hook -g client-attached 'display "Client attached"'
+
+# Client detached
+tmux set-hook -g client-detached 'display "Client detached"'
+
+# Client session changed
+tmux set-hook -g client-session-changed 'refresh-client -S'
+```
+</CodeGroup>
+
+### show-hooks
+
+Show hooks.
+
+```bash
+tmux show-hooks [-gpw] [-t target] [hook]
+```
+
+```bash
+# Show all global hooks
+tmux show-hooks -g
+
+# Show specific hook
+tmux show-hooks -g after-new-window
+
+# Show window hooks
+tmux show-hooks -w
+```
+
+## Configuration File
+
+Options are typically set in `~/.tmux.conf`:
+
+```bash
+# ~/.tmux.conf
+
+# Set prefix to Ctrl-a
+unbind C-b
+set-option -g prefix C-a
+bind-key C-a send-prefix
+
+# Enable mouse
+set-option -g mouse on
+
+# Start numbering at 1
+set-option -g base-index 1
+set-option -g pane-base-index 1
+
+# Renumber windows
+set-option -g renumber-windows on
+
+# Vi mode
+set-option -w mode-keys vi
+
+# Status bar
+set-option -g status-position top
+set-option -g status-style bg=colour235,fg=colour250
+set-option -g status-left "#[fg=colour24]#S "
+set-option -g status-right "#[fg=colour250]%H:%M"
+
+# Pane borders
+set-option -g pane-border-style fg=colour240
+set-option -g pane-active-border-style fg=colour24
+
+# Activity
+set-option -g monitor-activity on
+set-option -g visual-activity off
+
+# History
+set-option -g history-limit 10000
+
+# Terminal
+set-option -g default-terminal "screen-256color"
+set-option -ga terminal-overrides ',xterm-256color:Tc'
+
+# Escape time
+set-option -g escape-time 0
+
+# Repeat time
+set-option -g repeat-time 500
+```
+
+## Examples
+
+<Accordion title="Theme Configuration">
+```bash
+# Dark theme
+tmux set-option -g status-style bg=colour235,fg=colour250
+tmux set-option -g pane-border-style fg=colour240
+tmux set-option -g pane-active-border-style fg=colour24
+tmux set-option -g message-style bg=colour235,fg=colour166
+tmux set-option -w window-status-current-style bg=colour24,fg=colour255,bold
+
+# Light theme
+tmux set-option -g status-style bg=colour254,fg=colour240
+tmux set-option -g pane-border-style fg=colour250
+tmux set-option -g pane-active-border-style fg=colour33
+```
+</Accordion>
+
+<Accordion title="Status Bar Customization">
+```bash
+# Detailed status bar
+tmux set-option -g status-left-length 50
+tmux set-option -g status-right-length 100
+
+tmux set-option -g status-left "#[fg=colour24,bold]#S #[fg=colour240]| "
+
+tmux set-option -g status-right "#{?client_prefix,#[fg=colour166]PREFIX ,}"
+tmux set-option -ag status-right "#[fg=colour240]| #[fg=colour250]%H:%M #[fg=colour240]| "
+tmux set-option -ag status-right "#[fg=colour250]%d-%b-%y"
+
+# Window status format
+tmux set-option -w window-status-format " #I:#W#F "
+tmux set-option -w window-status-current-format " #I:#W#F "
+```
+</Accordion>
+
+<Accordion title="Per-Session Configuration">
+```bash
+# Development session
+tmux new-session -s dev
+tmux set-option -t dev status-style bg=colour22,fg=colour250
+tmux set-option -t dev status-left "[DEV] "
+
+# Production session
+tmux new-session -s prod
+tmux set-option -t prod status-style bg=colour52,fg=colour250
+tmux set-option -t prod status-left "[PROD] "
+```
+</Accordion>
+
+<Accordion title="Activity Monitoring">
+```bash
+# Enable activity monitoring
+tmux set-option -g monitor-activity on
+tmux set-option -g visual-activity off  # Use status bar instead
+
+# Silence monitoring (alert if no activity)
+tmux set-option -w monitor-silence 300  # 5 minutes
+
+# Bell actions
+tmux set-option -g bell-action any
+tmux set-option -g visual-bell on
+```
+</Accordion>
+
+## Tips
+
+<Note>
+**Option Inheritance**: Options set with `-g` (global) are defaults. Session/window/pane options override global options.
+</Note>
+
+<Note>
+**Format Strings**: Many options support format variables like `#{session_name}`, `#{window_index}`, `#{pane_title}`. Use `-F` flag to expand them.
+</Note>
+
+<Warning>
+**Escape Time**: Set `escape-time 0` for better vim/nvim experience, but may cause issues with older terminals.
+</Warning>

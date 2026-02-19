@@ -1,0 +1,543 @@
+---
+title: Advanced Configuration
+description: Advanced tmux configuration with status line customization, hooks, and formats
+---
+
+## Overview
+
+This page covers advanced tmux configuration techniques including dynamic status lines, hooks, format strings, and conditional logic.
+
+## Status Line Deep Dive
+
+### Format Variables
+
+tmux uses format variables to display dynamic information. Variables are referenced with `#{}`:
+
+```conf
+# Show session name, window index, and pane index
+set -g status-left "[#S:#I.#P]"
+
+# Show hostname and load average
+set -g status-right "#{host} | Load: #{load_average}"
+
+# Show current time with custom format
+set -g status-right "%a %b %d %H:%M"
+```
+
+### Common Format Variables
+
+| Variable | Description |
+|----------|-------------|
+| `#{session_name}` or `#S` | Current session name |
+| `#{window_index}` or `#I` | Current window index |
+| `#{window_name}` or `#W` | Current window name |
+| `#{pane_index}` or `#P` | Current pane index |
+| `#{pane_id}` | Current pane ID |
+| `#{host}` or `#H` | Hostname (short) |
+| `#{host_short}` or `#h` | Hostname (very short) |
+| `#{pane_current_path}` | Current working directory |
+| `#{pane_current_command}` | Current command running in pane |
+
+### Advanced Status Line Configuration
+
+<CodeGroup>
+
+```conf Comprehensive Status
+# Left side: session name and window info
+set -g status-left-length 40
+set -g status-left "#[fg=green]#S #[fg=yellow]#I #[fg=cyan]#P"
+
+# Right side: hostname, load, date/time
+set -g status-right-length 80
+set -g status-right "#[fg=cyan]#H #[fg=yellow]%d %b %R"
+
+# Center: window list
+set -g status-justify centre
+```
+
+```conf Minimal Status
+# Minimal configuration like the example
+set -g status-right "%H:%M"
+set -g status-left ""
+set -g window-status-current-style "underscore"
+```
+
+```conf Detailed Status
+# Show more information
+set -g status-left "#{?client_prefix,#[reverse],}[#S]#[noreverse] "
+set -g status-right "#{pane_current_command} | #{pane_current_path} | %H:%M %d-%b-%y"
+set -g status-interval 1
+```
+
+</CodeGroup>
+
+### Window Status Format
+
+Customize how windows appear in the status line:
+
+```conf
+# Default window title format
+set -g window-status-format "#I:#W#F"
+
+# Current window title format
+set -g window-status-current-format "#I:#W#F"
+
+# Add custom styling
+set -g window-status-current-style "bg=red,fg=white,bold"
+set -g window-status-style "fg=white"
+
+# Show window activity
+set -g window-status-activity-style "bg=yellow,fg=black"
+```
+
+### Window Flags
+
+tmux displays flags next to window names:
+
+| Flag | Meaning |
+|------|---------|
+| `*` | Current window |
+| `-` | Last window |
+| `#` | Activity detected |
+| `!` | Bell detected |
+| `~` | Silence detected |
+| `M` | Marked pane |
+| `Z` | Zoomed pane |
+
+## Conditional Formatting
+
+### Using Conditionals in Formats
+
+Format strings support conditional expressions:
+
+```conf
+# Show prefix indicator when prefix is pressed
+set -g status-left "#{?client_prefix,#[reverse]<Prefix>#[noreverse],}"
+
+# Show zoomed indicator
+set -g status-right "#{?window_zoomed_flag,🔍 ZOOMED ,}%H:%M"
+
+# Show synchronized panes indicator
+bind y set synchronize-panes\; display 'synchronize-panes #{?synchronize-panes,on,off}'
+```
+
+### Conditional Configuration
+
+Use `%if` directives for conditional configuration:
+
+<Tabs>
+<Tab title="By Hostname">
+```conf
+# Different colors for different hosts
+%if "#{==:#{host},production}"
+set -g status-style bg=red,fg=white
+%elif "#{==:#{host},staging}"
+set -g status-style bg=yellow,fg=black
+%else
+set -g status-style bg=green,fg=white
+%endif
+```
+</Tab>
+
+<Tab title="By Environment">
+```conf
+# Detect if inside another tmux session
+%if #{TMUX}
+set -g status-bg red
+set -g status-left "[NESTED] "
+%endif
+
+# Check for environment variables
+%if #{SSH_CONNECTION}
+set -g status-style bg=blue
+%endif
+```
+</Tab>
+
+<Tab title="By tmux Version">
+```conf
+# Feature available in newer versions only
+%if "#{>=:#{version},3.2}"
+set -g popup-border-lines rounded
+%endif
+```
+</Tab>
+</Tabs>
+
+## Hooks
+
+Hooks allow you to run commands when specific events occur:
+
+### Common Hooks
+
+```conf
+# Run command when a window is created
+set-hook -g after-new-window 'run-shell "echo New window created"'
+
+# Set window title automatically when pane changes
+set-hook -g after-select-pane 'set-window-option automatic-rename on'
+
+# Alert when a window is renamed
+set-hook -g after-rename-window 'display "Window renamed to #{window_name}"'
+
+# Log session creation
+set-hook -g session-created 'run-shell "date >> ~/.tmux-sessions.log"'
+
+# Adjust pane when window layout changes
+set-hook -g after-split-window 'select-layout even-horizontal'
+```
+
+### Hook Types
+
+<Accordion title="Available Hooks">
+
+| Hook | When Triggered |
+|------|----------------|
+| `after-bind-key` | After a key is bound |
+| `after-capture-pane` | After capturing a pane |
+| `after-copy-mode` | After entering copy mode |
+| `after-display-message` | After displaying a message |
+| `after-display-panes` | After displaying pane numbers |
+| `after-kill-pane` | After a pane is killed |
+| `after-list-keys` | After listing keys |
+| `after-list-panes` | After listing panes |
+| `after-list-windows` | After listing windows |
+| `after-new-session` | After creating a session |
+| `after-new-window` | After creating a window |
+| `after-rename-session` | After renaming a session |
+| `after-rename-window` | After renaming a window |
+| `after-resize-pane` | After resizing a pane |
+| `after-select-layout` | After selecting a layout |
+| `after-select-pane` | After selecting a pane |
+| `after-select-window` | After selecting a window |
+| `after-send-keys` | After sending keys |
+| `after-split-window` | After splitting a window |
+| `after-unbind-key` | After unbinding a key |
+| `alert-activity` | On activity in a window |
+| `alert-bell` | On bell in a window |
+| `alert-silence` | On silence in a window |
+| `client-attached` | When a client attaches |
+| `client-detached` | When a client detaches |
+| `client-resized` | When a client is resized |
+| `client-session-changed` | When client changes session |
+| `pane-died` | When a pane's process exits |
+| `pane-exited` | When a pane exits |
+| `pane-focus-in` | When a pane gains focus |
+| `pane-focus-out` | When a pane loses focus |
+| `pane-set-clipboard` | When pane sets clipboard |
+| `session-closed` | When a session closes |
+| `session-created` | When a session is created |
+| `session-renamed` | When a session is renamed |
+| `session-window-changed` | When session's window changes |
+| `window-add-format` | When formatting window list |
+| `window-linked` | When a window is linked |
+| `window-renamed` | When a window is renamed |
+| `window-unlinked` | When a window is unlinked |
+
+</Accordion>
+
+## Window and Pane Options
+
+### Window Size Management
+
+```conf
+# Aggressive resize - resize window to smallest client viewing it
+setw -g aggressive-resize on
+
+# Manual window size control
+setw -g window-size latest
+
+# Alternative: constrain to smallest session
+setw -g window-size smallest
+
+# Alternative: use largest possible
+setw -g window-size largest
+
+# Toggle between smallest and largest
+bind F set -w window-size
+```
+
+### Activity Monitoring
+
+```conf
+# Monitor for activity in windows
+setw -g monitor-activity on
+
+# Display message on activity
+set -g visual-activity on
+
+# Monitor for silence (30 seconds)
+setw -g monitor-silence 30
+
+# Monitor for bell
+set -g visual-bell on
+set -g bell-action other
+```
+
+### Copy Mode Settings
+
+<CodeGroup>
+
+```conf Vi Mode
+# Use vi key bindings in copy mode
+setw -g mode-keys vi
+
+# Vi-style copy bindings
+bind -T copy-mode-vi v send -X begin-selection
+bind -T copy-mode-vi y send -X copy-selection-and-cancel
+bind -T copy-mode-vi r send -X rectangle-toggle
+```
+
+```conf Emacs Mode
+# Use emacs key bindings (default)
+setw -g mode-keys emacs
+
+# Custom emacs bindings
+bind -T copy-mode M-w send -X copy-selection-and-cancel
+bind -T copy-mode C-w send -X copy-pipe-and-cancel
+```
+
+</CodeGroup>
+
+## Session Management
+
+### Creating Default Sessions
+
+You can create a default session layout in your config:
+
+```conf
+# Create a default session with multiple windows
+new-session -d -s0 -nirssi 'exec irssi'
+set -t0:0 monitor-activity on
+set -t0:0 aggressive-resize on
+
+neww -d -ntodo 'exec emacs ~/TODO'
+setw -t0:1 aggressive-resize on
+
+neww -d -nmutt 'exec mutt'
+setw -t0:2 aggressive-resize on
+
+neww -d
+neww -d
+neww -d
+```
+
+<Warning>
+When using this approach, start tmux with `tmux attach` instead of `tmux new` since a session is already created.
+</Warning>
+
+### Session Templates
+
+Create reusable session templates:
+
+```conf
+# Development session template
+bind D new-session -s dev \; \
+  rename-window editor \; \
+  split-window -h \; \
+  resize-pane -R 20 \; \
+  split-window -v \; \
+  select-pane -t 0 \; \
+  send-keys 'nvim .' C-m
+
+# Server monitoring template
+bind S new-session -s monitor \; \
+  rename-window top \; \
+  send-keys 'htop' C-m \; \
+  new-window -n logs \; \
+  send-keys 'tail -f /var/log/syslog' C-m \; \
+  new-window -n network \; \
+  send-keys 'nethogs' C-m \; \
+  select-window -t 0
+```
+
+## Advanced Key Binding Techniques
+
+### Key Tables
+
+Create custom key tables for modal bindings:
+
+```conf
+# Create a "resize" mode
+bind r switch-client -T resize
+
+bind -T resize h resize-pane -L 5
+bind -T resize j resize-pane -D 5
+bind -T resize k resize-pane -U 5
+bind -T resize l resize-pane -R 5
+
+bind -T resize Enter switch-client -T root
+bind -T resize Escape switch-client -T root
+```
+
+### Repeatable Bindings
+
+Allow keys to repeat without pressing prefix:
+
+```conf
+# Repeatable pane navigation
+bind -r h select-pane -L
+bind -r j select-pane -D
+bind -r k select-pane -U
+bind -r l select-pane -R
+
+# Repeatable window navigation
+bind -r C-h previous-window
+bind -r C-l next-window
+
+# Repeatable resize
+bind -r H resize-pane -L 5
+bind -r J resize-pane -D 5
+bind -r K resize-pane -U 5
+bind -r L resize-pane -R 5
+```
+
+### Command Sequences
+
+Chain multiple commands together:
+
+```conf
+# Split and sync
+bind S split-window -v \; \
+  select-layout even-vertical \; \
+  set synchronize-panes on
+
+# Create window and run command
+bind T new-window -n "Test" \; \
+  send-keys "cd ~/project && npm test" C-m
+
+# Zoom and copy mode
+bind C resize-pane -Z \; copy-mode
+```
+
+## Performance Optimization
+
+```conf
+# Increase scrollback buffer
+set -g history-limit 50000
+
+# Increase message display time
+set -g display-time 4000
+
+# Refresh status line every 5 seconds
+set -g status-interval 5
+
+# Faster command sequences
+set -g repeat-time 600
+
+# Reduce escape time for vim
+set -g escape-time 10
+
+# Focus events for vim/neovim
+set -g focus-events on
+```
+
+## Complete Advanced Configuration
+
+<Accordion title="View Complete Advanced Configuration">
+
+```conf
+# ~/.tmux.conf - Advanced tmux configuration
+
+# ========================================
+# Terminal and Color Support
+# ========================================
+set-option -sa terminal-features ",xterm*:RGB"
+set -g default-terminal "tmux-256color"
+
+# ========================================
+# Status Line
+# ========================================
+set -g status-interval 1
+set -g status-justify left
+set -g status-left-length 40
+set -g status-right-length 80
+
+set -g status-left "#{?client_prefix,#[reverse],}[#S]#[noreverse] "
+set -g status-right "#{?window_zoomed_flag,🔍 ,}#H | %H:%M:%S %d-%b-%y"
+
+set -g window-status-format "#I:#W#{?window_flags,#{window_flags}, }"
+set -g window-status-current-format "#I:#W#{?window_flags,#{window_flags}, }"
+set -g window-status-current-style "bg=red,fg=white,bold"
+
+# Conditional status color by hostname
+%if "#{==:#{host},production}"
+set -g status-style bg=red,fg=white
+%else
+set -g status-style bg=green,fg=black
+%endif
+
+# ========================================
+# Window Options
+# ========================================
+setw -g aggressive-resize on
+setw -g monitor-activity on
+set -g visual-activity off
+set -g bell-action none
+
+# ========================================
+# Key Bindings
+# ========================================
+set -g prefix C-a
+unbind C-b
+bind C-a send-prefix
+
+# Vi mode
+setw -g mode-keys vi
+bind -T copy-mode-vi v send -X begin-selection
+bind -T copy-mode-vi y send -X copy-selection-and-cancel
+
+# Pane navigation
+bind -r h select-pane -L
+bind -r j select-pane -D
+bind -r k select-pane -U
+bind -r l select-pane -R
+
+# Pane resizing
+bind -r H resize-pane -L 5
+bind -r J resize-pane -D 5
+bind -r K resize-pane -U 5
+bind -r L resize-pane -R 5
+
+# Utility bindings
+bind y set synchronize-panes\; display 'synchronize-panes #{?synchronize-panes,on,off}'
+bind m set monitor-activity
+bind F set -w window-size
+
+# ========================================
+# Hooks
+# ========================================
+set-hook -g after-new-window 'command-prompt -I "#W" "rename-window -- \"%%\""'
+set-hook -g after-split-window 'select-layout even-horizontal'
+set-hook -g pane-focus-in 'set -w window-status-current-style "bg=red,fg=white,bold"'
+
+# ========================================
+# Performance
+# ========================================
+set -g history-limit 50000
+set -g display-time 4000
+set -g escape-time 10
+set -g focus-events on
+```
+
+</Accordion>
+
+## Next Steps
+
+<CardGroup cols={2}>
+<Card title="Basic Configuration" icon="sliders" href="/examples/basic-config">
+Review fundamental tmux configuration options
+</Card>
+
+<Card title="Plugins" icon="puzzle-piece" href="/examples/plugins">
+Extend tmux with popular plugins
+</Card>
+
+<Card title="Use Cases" icon="lightbulb" href="/examples/use-cases">
+Real-world workflows and usage patterns
+</Card>
+
+<Card title="Format Strings" icon="code" href="/advanced/formats">
+Complete list of format variables
+</Card>
+</CardGroup>

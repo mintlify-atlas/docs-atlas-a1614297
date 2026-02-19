@@ -1,0 +1,358 @@
+---
+title: 'Server Options'
+description: 'Global tmux server options that apply to all sessions'
+---
+
+# Server Options
+
+Server options control the behavior of the tmux server itself and apply globally to all sessions, windows, and panes. Set server options using `set-option -s` or `set -s`.
+
+## Input and Keyboard
+
+### backspace
+
+**Type:** Key | **Default:** `^?` (ASCII 127)
+
+The key sent when backspace is pressed.
+
+```bash
+set -s backspace ^?
+```
+
+### escape-time
+
+**Type:** Number (milliseconds) | **Default:** `10` | **Range:** 0 to INT_MAX
+
+Time to wait before assuming a key press is the Escape key rather than part of a function or meta key sequence. Reducing this improves vi mode responsiveness.
+
+```bash
+# Recommended for Neovim/Vim users
+set -s escape-time 0
+```
+
+<Tip>
+Setting `escape-time` to 0 eliminates delays when pressing Escape in applications like Vim, but may cause issues with some terminals.
+</Tip>
+
+### extended-keys
+
+**Type:** Choice | **Default:** `off` | **Choices:** `off`, `on`, `always`
+
+Whether to request extended key sequences from terminals that support them. Extended keys allow tmux to distinguish between more key combinations.
+
+```bash
+set -s extended-keys on
+```
+
+### extended-keys-format
+
+**Type:** Choice | **Default:** `xterm` | **Choices:** `csi-u`, `xterm`
+
+The format of emitted extended key sequences.
+
+```bash
+set -s extended-keys-format csi-u
+```
+
+### focus-events
+
+**Type:** Flag | **Default:** `off`
+
+Whether to send focus events to applications when the tmux pane gains or loses focus.
+
+```bash
+# Enable focus events for Vim/Neovim
+set -s focus-events on
+```
+
+### user-keys
+
+**Type:** Array (String) | **Default:** `""`
+
+Define custom key sequences that tmux will recognize. Each sequence is translated into User0, User1, etc.
+
+```bash
+set -s user-keys[0] "\e[5;5~"
+```
+
+## Terminal Settings
+
+### default-terminal
+
+**Type:** String | **Default:** `"tmux-256color"` (or system TMUX_TERM)
+
+Default value for the `TERM` environment variable. This tells applications what terminal capabilities are available.
+
+```bash tmux.conf
+# 256 color support
+set -g default-terminal "tmux-256color"
+
+# Or use screen-256color for compatibility
+set -g default-terminal "screen-256color"
+```
+
+<Note>
+Make sure the terminal type is present in your system's terminfo database. Use `infocmp tmux-256color` to verify.
+</Note>
+
+### terminal-features
+
+**Type:** Array (String) | **Default:** Multiple entries
+
+List of terminal features used when they cannot be automatically detected. Features include RGB colors, clipboard support, cursor styles, focus events, and title setting.
+
+```bash
+# Enable RGB colors for xterm
+set -sa terminal-features ",xterm*:RGB"
+
+# Enable true color support
+set -sa terminal-features ",alacritty:RGB"
+```
+
+**Default value:**
+```
+xterm*:clipboard:ccolour:cstyle:focus:title,
+screen*:title,
+rxvt*:ignorefkeys
+```
+
+### terminal-overrides
+
+**Type:** Array (String) | **Default:** `"linux*:AX@"`
+
+List of terminal capability overrides. Use this to fix terminal quirks or enable features.
+
+```bash
+# Enable true color (Tc) capability
+set -sa terminal-overrides ",xterm-256color:Tc"
+
+# Fix cursor shape
+set -sa terminal-overrides ",*:Ss=\eE[%p1%d q:Se=\eE[2 q"
+```
+
+### codepoint-widths
+
+**Type:** Array (String) | **Default:** `""`
+
+Override widths for Unicode codepoints. Useful for fixing character width issues with emoji or special characters.
+
+```bash
+set -s codepoint-widths "0x2500-0x257F:2"
+```
+
+### variation-selector-always-wide
+
+**Type:** Flag | **Default:** `on`
+
+If the Unicode VS16 codepoint should always be treated as a wide character (width 2).
+
+```bash
+set -s variation-selector-always-wide on
+```
+
+## Clipboard
+
+### set-clipboard
+
+**Type:** Choice | **Default:** `external` | **Choices:** `off`, `external`, `on`
+
+Controls clipboard integration:
+- `off`: No clipboard integration
+- `external`: Attempt to set system clipboard, but don't allow applications to create paste buffers
+- `on`: Full clipboard integration (allows applications to create paste buffers)
+
+```bash
+set -s set-clipboard on
+```
+
+### get-clipboard
+
+**Type:** Choice | **Default:** `buffer` | **Choices:** `off`, `buffer`, `request`, `both`
+
+When an application requests the clipboard:
+- `off`: Ignore the request
+- `buffer`: Respond with the newest buffer
+- `request`: Request clipboard from the terminal
+- `both`: Request clipboard and create a buffer
+
+```bash
+set -s get-clipboard both
+```
+
+### copy-command
+
+**Type:** String | **Default:** `""`
+
+Shell command to run when text is copied. If empty, no command is run.
+
+```bash
+# Copy to system clipboard on Linux
+set -s copy-command "xclip -selection clipboard"
+
+# Copy to system clipboard on macOS
+set -s copy-command "pbcopy"
+```
+
+## Server Behavior
+
+### exit-empty
+
+**Type:** Flag | **Default:** `on`
+
+Whether the server should exit when there are no sessions.
+
+```bash
+# Keep server running even with no sessions
+set -s exit-empty off
+```
+
+### exit-unattached
+
+**Type:** Flag | **Default:** `off`
+
+Whether the server should exit when there are no attached clients.
+
+```bash
+set -s exit-unattached off
+```
+
+### buffer-limit
+
+**Type:** Number | **Default:** `50` | **Range:** 1 to INT_MAX
+
+Maximum number of automatic paste buffers. When this limit is reached, the oldest buffer is deleted.
+
+```bash
+set -s buffer-limit 20
+```
+
+### message-limit
+
+**Type:** Number | **Default:** `1000` | **Range:** 0 to INT_MAX
+
+Maximum number of server messages to keep. View messages with `show-messages`.
+
+```bash
+set -s message-limit 500
+```
+
+### prompt-history-limit
+
+**Type:** Number | **Default:** `100` | **Range:** 0 to INT_MAX
+
+Maximum number of commands to keep in command prompt history.
+
+```bash
+set -s prompt-history-limit 1000
+```
+
+### prefix-timeout
+
+**Type:** Number (milliseconds) | **Default:** `0` | **Range:** 0 to INT_MAX
+
+Timeout for the prefix key if no subsequent key is pressed. Zero means disabled (wait indefinitely).
+
+```bash
+# Wait 1 second after prefix before timeout
+set -s prefix-timeout 1000
+```
+
+## Command Aliases
+
+### command-alias
+
+**Type:** Array (String) | **Default:** Multiple aliases
+
+Define command aliases. Each entry is an alias name and command separated by `=`.
+
+```bash
+set -s command-alias[0] "split-pane=split-window"
+set -s command-alias[1] "splitp=split-window"
+```
+
+**Default aliases:**
+```
+split-pane=split-window
+splitp=split-window
+server-info=show-messages -JT
+info=show-messages -JT
+choose-window=choose-tree -w
+choose-session=choose-tree -s
+```
+
+### default-client-command
+
+**Type:** Command | **Default:** `"new-session"`
+
+Default command to run when tmux is started without a command.
+
+```bash
+set -s default-client-command "attach-session"
+```
+
+## Files and History
+
+### history-file
+
+**Type:** String | **Default:** `""`
+
+Location of command prompt history file. Empty string means no history file is written.
+
+```bash
+set -s history-file "~/.tmux_history"
+```
+
+### editor
+
+**Type:** String | **Default:** `"/usr/bin/vi"` (or system _PATH_VI)
+
+Editor to use when editing files (e.g., in tmux command mode).
+
+```bash
+set -s editor "nvim"
+```
+
+### input-buffer-size
+
+**Type:** Number (bytes) | **Default:** 16384 | **Range:** 16384 to UINT_MAX
+
+Number of bytes accepted in a single input before dropping. Protects against flooding.
+
+```bash
+set -s input-buffer-size 32768
+```
+
+## Example Configuration
+
+Here's a complete server options configuration:
+
+```bash tmux.conf
+# Terminal and colors
+set -s default-terminal "tmux-256color"
+set -sa terminal-features ",xterm-256color:RGB"
+set -sa terminal-overrides ",*:Tc"
+
+# Keyboard responsiveness
+set -s escape-time 0
+set -s focus-events on
+set -s extended-keys on
+
+# Clipboard integration
+set -s set-clipboard on
+set -s copy-command "xclip -selection clipboard"
+
+# Server behavior
+set -s buffer-limit 50
+set -s history-file "~/.tmux_history"
+```
+
+## Related
+
+<CardGroup cols={2}>
+  <Card title="Session Options" icon="window" href="/options/session">
+    Per-session settings and status line
+  </Card>
+  <Card title="Window Options" icon="grid-2" href="/options/window">
+    Window-specific options
+  </Card>
+</CardGroup>

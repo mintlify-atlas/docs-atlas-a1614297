@@ -1,0 +1,468 @@
+---
+title: "Windows"
+description: "Understanding tmux windows - creation, management, and pane organization"
+---
+
+## What is a Window?
+
+A **window** in tmux occupies the entire screen and may be split into rectangular panes. Each window is a separate pseudo terminal (pty) container that can hold one or more panes.
+
+<Info>
+Windows are stored in a global array and wrapped in winlink structures to be linked onto session trees. Multiple sessions can link to the same window through winlinks.
+</Info>
+
+## Window Architecture
+
+From window.c:36-53, windows are designed as containers:
+
+```c
+/*
+ * Each window is attached to a number of panes, each of which is a pty.
+ * Windows are stored directly on a global array and wrapped in any number of
+ * winlink structs to be linked onto local session RB trees. A reference count
+ * is maintained and a window removed from the global list and destroyed when
+ * it reaches zero.
+ */
+```
+
+### Window Structure
+
+From tmux.h:1276-1332, a window contains:
+
+- **Unique ID**: Prefixed with `@` (e.g., `@0`, `@1`)
+- **Name**: User-defined or auto-generated
+- **Panes**: TAILQ of window panes
+- **Active Pane**: Pointer to currently active pane
+- **Layout**: Root layout cell defining pane arrangement
+- **Size**: Width (`sx`), height (`sy`), and pixel dimensions
+- **Reference Count**: Tracks winlink connections
+- **Options**: Window-specific settings
+- **Activity Tracking**: Creation and activity timestamps
+
+```c
+struct window {
+    u_int            id;
+    char            *name;
+    struct window_pane   *active;
+    struct window_panes  panes;
+    struct layout_cell  *layout_root;
+    u_int            sx;
+    u_int            sy;
+    int              flags;
+    struct options  *options;
+    u_int            references;
+    TAILQ_HEAD(, winlink) winlinks;
+};
+```
+
+## Creating Windows
+
+From window.c:294-339, `window_create()` initializes a window:
+
+```c
+struct window *
+window_create(u_int sx, u_int sy, u_int xpixel, u_int ypixel)
+{
+    struct window *w;
+    
+    w = xcalloc(1, sizeof *w);
+    w->name = xstrdup("");
+    TAILQ_INIT(&w->panes);
+    TAILQ_INIT(&w->last_panes);
+    w->active = NULL;
+    w->sx = sx;
+    w->sy = sy;
+    w->xpixel = xpixel;
+    w->ypixel = ypixel;
+    w->options = options_create(global_w_options);
+    w->id = next_window_id++;
+    RB_INSERT(windows, &windows, w);
+    
+    return (w);
+}
+```
+
+<Tabs>
+  <Tab title="Commands">
+    ```bash
+    # Create new window
+    tmux new-window
+    
+    # Create with specific name
+    tmux new-window -n mywindow
+    
+    # Create and run command
+    tmux new-window -n editor vim
+    
+    # Create at specific index
+    tmux new-window -t :3
+    ```
+  </Tab>
+  <Tab title="Default Keys">
+    - `Prefix c` - Create new window
+    - `Prefix ,` - Rename current window
+    - `Prefix &` - Kill current window
+  </Tab>
+</Tabs>
+
+## Reference Counting
+
+Windows use reference counting for lifecycle management (window.c:390-404):
+
+```c
+void window_add_ref(struct window *w, const char *from) {
+    w->references++;
+    log_debug("%s: @%u %s, now %d", __func__, w->id, from, w->references);
+}
+
+void window_remove_ref(struct window *w, const char *from) {
+    w->references--;
+    log_debug("%s: @%u %s, now %d", __func__, w->id, from, w->references);
+    
+    if (w->references == 0)
+        window_destroy(w);
+}
+```
+
+<Note>
+A window is automatically destroyed when its reference count reaches zero, which happens when all winlinks to it are removed.
+</Note>
+
+## Winlinks
+
+From window.c:98-220, **winlinks** connect windows to sessions:
+
+### Winlink Structure
+
+```c
+struct winlink {
+    int          idx;        // Window index in session
+    struct session *session; // Parent session
+    struct window  *window;  // Target window
+    int          flags;      // Alert flags
+};
+```
+
+### Winlink Management
+
+<Accordion title="Core Winlink Functions">
+
+**Adding Winlinks** (window.c:165-181)
+```c
+struct winlink *winlink_add(struct winlinks *wwl, int idx)
+```
+Adds a new winlink at the specified index (or finds next free index).
+
+**Setting Window** (window.c:183-193)
+```c
+void winlink_set_window(struct winlink *wl, struct window *w)
+```
+Links a window to a winlink, managing reference counts.
+
+**Removing Winlinks** (window.c:195-207)
+```c
+void winlink_remove(struct winlinks *wwl, struct winlink *wl)
+```
+Removes winlink and decrements window reference count.
+
+**Finding Winlinks**
+- `winlink_find_by_window()` - Find by window pointer
+- `winlink_find_by_index()` - Find by index number
+- `winlink_find_by_window_id()` - Find by window ID
+
+</Accordion>
+
+## Window Navigation
+
+From window.c:209-241, winlinks support traversal:
+
+```c
+struct winlink *winlink_next(struct winlink *wl);
+struct winlink *winlink_previous(struct winlink *wl);
+struct winlink *winlink_next_by_number(struct winlink *wl, struct session *s, int n);
+struct winlink *winlink_previous_by_number(struct winlink *wl, struct session *s, int n);
+```
+
+<Tabs>
+  <Tab title="Commands">
+    ```bash
+    # Next window
+    tmux next-window
+    
+    # Previous window
+    tmux previous-window
+    
+    # Select by index
+    tmux select-window -t :2
+    
+    # Last window
+    tmux last-window
+    ```
+  </Tab>
+  <Tab title="Default Keys">
+    - `Prefix n` - Next window
+    - `Prefix p` - Previous window
+    - `Prefix 0-9` - Select window 0-9
+    - `Prefix l` - Last (previously selected) window
+  </Tab>
+</Tabs>
+
+## Pane Management
+
+### Adding Panes
+
+From window.c:730-757, `window_add_pane()` creates new panes:
+
+```c
+struct window_pane *
+window_add_pane(struct window *w, struct window_pane *other, u_int hlimit, int flags)
+{
+    struct window_pane *wp;
+    wp = window_pane_create(w, w->sx, w->sy, hlimit);
+    
+    // Insert based on flags (SPAWN_BEFORE, SPAWN_FULLSIZE)
+    if (TAILQ_EMPTY(&w->panes)) {
+        TAILQ_INSERT_HEAD(&w->panes, wp, entry);
+    } else if (flags & SPAWN_BEFORE) {
+        TAILQ_INSERT_BEFORE(other, wp, entry);
+    } else {
+        TAILQ_INSERT_AFTER(&w->panes, other, wp, entry);
+    }
+    return (wp);
+}
+```
+
+### Removing Panes
+
+From window.c:760-791, pane removal involves:
+
+1. **Lost Pane** (window.c:760-782) - Handle pane disappearance:
+   - Clear marked pane if necessary
+   - Remove from last-panes stack
+   - Update active pane pointer
+   - Send notifications
+
+2. **Remove Pane** (window.c:784-791) - Complete removal:
+   ```c
+   void window_remove_pane(struct window *w, struct window_pane *wp) {
+       window_lost_pane(w, wp);
+       TAILQ_REMOVE(&w->panes, wp, entry);
+       window_pane_destroy(wp);
+   }
+   ```
+
+### Active Pane
+
+From window.c:522-549, `window_set_active_pane()` manages focus:
+
+```c
+int window_set_active_pane(struct window *w, struct window_pane *wp, int notify) {
+    if (wp == w->active)
+        return (0);
+    
+    // Update last-panes stack
+    window_pane_stack_remove(&w->last_panes, wp);
+    window_pane_stack_push(&w->last_panes, w->active);
+    
+    w->active = wp;
+    w->active->active_point = next_active_point++;
+    w->active->flags |= PANE_CHANGED;
+    
+    // Update focus events if enabled
+    if (options_get_number(global_options, "focus-events")) {
+        window_pane_update_focus(w->active);
+    }
+    
+    if (notify)
+        notify_window("window-pane-changed", w);
+    return (1);
+}
+```
+
+## Window Sizing
+
+From window.c:414-431, `window_resize()` handles size changes:
+
+```c
+void window_resize(struct window *w, u_int sx, u_int sy, int xpixel, int ypixel) {
+    log_debug("%s: @%u resize %ux%u (%ux%u)", __func__, w->id, sx, sy,
+        xpixel, ypixel);
+    w->sx = sx;
+    w->sy = sy;
+    if (xpixel != -1)
+        w->xpixel = xpixel;
+    if (ypixel != -1)
+        w->ypixel = ypixel;
+}
+```
+
+<Info>
+Windows support both character-based sizing (sx, sy) and pixel-based sizing (xpixel, ypixel) for high-DPI displays.
+</Info>
+
+## Window Zoom
+
+From window.c:656-728, windows support zooming a single pane:
+
+### Zoom Function
+
+```c
+int window_zoom(struct window_pane *wp) {
+    struct window *w = wp->window;
+    
+    if (w->flags & WINDOW_ZOOMED)
+        return (-1);
+    if (window_count_panes(w) == 1)
+        return (-1);
+    if (w->active != wp)
+        window_set_active_pane(w, wp, 1);
+    
+    // Save layout for each pane
+    TAILQ_FOREACH(wp1, &w->panes, entry) {
+        wp1->saved_layout_cell = wp1->layout_cell;
+        wp1->layout_cell = NULL;
+    }
+    
+    w->saved_layout_root = w->layout_root;
+    layout_init(w, wp);  // Create single-pane layout
+    w->flags |= WINDOW_ZOOMED;
+    notify_window("window-layout-changed", w);
+    
+    return (0);
+}
+```
+
+<Tip>
+Zooming temporarily makes a single pane fill the entire window. The layout is saved and can be restored by unzooming.
+</Tip>
+
+### Unzoom Function
+
+```c
+int window_unzoom(struct window *w, int notify) {
+    if (!(w->flags & WINDOW_ZOOMED))
+        return (-1);
+    
+    w->flags &= ~WINDOW_ZOOMED;
+    layout_free(w);
+    w->layout_root = w->saved_layout_root;
+    
+    // Restore saved layout for each pane
+    TAILQ_FOREACH(wp, &w->panes, entry) {
+        wp->layout_cell = wp->saved_layout_cell;
+        wp->saved_layout_cell = NULL;
+    }
+    
+    return (0);
+}
+```
+
+## Window Flags
+
+From tmux.h:1313-1320, windows track various states:
+
+```c
+#define WINDOW_BELL 0x1       // Bell alert triggered
+#define WINDOW_ACTIVITY 0x2   // Activity detected
+#define WINDOW_SILENCE 0x4    // Silence detected
+#define WINDOW_ZOOMED 0x8     // Window is zoomed
+#define WINDOW_WASZOOMED 0x10 // Was zoomed before operation
+#define WINDOW_RESIZE 0x20    // Resize pending
+```
+
+<Accordion title="Alert Flags">
+
+**Bell** - Terminal bell was rung
+- Controlled by `monitor-bell` option
+- Displayed in window list with `!` flag
+
+**Activity** - Output detected in window
+- Controlled by `monitor-activity` option
+- Displayed in window list with `#` flag
+
+**Silence** - No output for specified duration
+- Controlled by `monitor-silence` option
+- Displayed in window list with `~` flag
+
+</Accordion>
+
+## Window Identification
+
+From tmux.1:787-845, windows can be identified by:
+
+1. **Window ID**: `@0`, `@1`, etc.
+2. **Window Index**: Numeric position in session
+3. **Window Name**: Exact or partial match
+4. **Glob Pattern**: Wildcard matching
+5. **Special Tokens**:
+   - `{start}` or `^` - Lowest-numbered window
+   - `{end}` or `$` - Highest-numbered window
+   - `{last}` or `!` - Previously current window
+   - `{next}` or `+` - Next window by number
+   - `{previous}` or `-` - Previous window by number
+
+## Common Window Commands
+
+| Command | Description | Key Binding |
+|---------|-------------|-------------|
+| `new-window` | Create new window | `Prefix c` |
+| `kill-window` | Destroy window | `Prefix &` |
+| `rename-window` | Change window name | `Prefix ,` |
+| `select-window` | Switch to window | `Prefix 0-9` |
+| `next-window` | Go to next window | `Prefix n` |
+| `previous-window` | Go to previous window | `Prefix p` |
+| `last-window` | Switch to last window | `Prefix l` |
+| `list-windows` | Show all windows | - |
+| `split-window` | Split into panes | `Prefix "` or `%` |
+
+## Window Names
+
+From window.c:406-412, window names are sanitized:
+
+```c
+void window_set_name(struct window *w, const char *new_name) {
+    free(w->name);
+    utf8_stravis(&w->name, new_name, VIS_OCTAL|VIS_CSTYLE|VIS_TAB|VIS_NL);
+    notify_window("window-renamed", w);
+}
+```
+
+<Note>
+Window names are automatically sanitized to escape special characters using visual encoding.
+</Note>
+
+## Best Practices
+
+<Accordion title="Window Management Tips">
+
+**Organization**
+- Name windows descriptively for easy identification
+- Use consistent numbering schemes
+- Group related windows in the same session
+- Use window flags to monitor activity
+
+**Performance**
+- Windows with many panes consume more resources
+- Zoom panes when focusing on single tasks
+- Close unused windows to free resources
+- Use `base-index` option for consistent numbering
+
+**Layout Management**
+- Save layouts before major reorganization
+- Use zoom for temporary full-screen focus
+- Be aware that zoom saves the entire layout
+- Unzoom restores the exact previous layout
+
+**Linking**
+- Windows can be linked to multiple sessions
+- Closing a linked window affects all sessions
+- Use `link-window` to share windows between sessions
+- Monitor `window_id` to track shared windows
+
+</Accordion>
+
+## See Also
+
+- [Sessions](/concepts/sessions) - Managing sessions
+- [Panes](/concepts/panes) - Working with panes
+- [Client-Server Architecture](/concepts/client-server) - Understanding the architecture

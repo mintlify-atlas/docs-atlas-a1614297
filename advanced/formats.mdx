@@ -1,0 +1,376 @@
+---
+title: 'Format Strings'
+description: 'Format string system for dynamic text generation in tmux'
+---
+
+## Overview
+
+tmux uses a powerful format string system to dynamically generate text for status lines, window names, and command output. Format variables are enclosed in `#{` and `}`, such as `#{session_name}`.
+
+## Basic Format Variables
+
+Format variables can be used anywhere that accepts the `-F` flag:
+
+```bash
+tmux display-message -F "Current session: #{session_name}"
+tmux list-windows -F "#{window_index}: #{window_name} (#{window_panes} panes)"
+```
+
+### Common Variables
+
+<CodeGroup>
+```bash Session Variables
+#{session_name}        # Name of session
+#{session_id}          # Unique session ID ($N format)
+#{session_attached}    # Number of clients attached
+#{session_created}     # Time session was created
+#{session_windows}     # Number of windows in session
+```
+
+```bash Window Variables
+#{window_name}         # Name of window
+#{window_id}           # Unique window ID (@N format)
+#{window_index}        # Index of window
+#{window_active}       # 1 if window is active
+#{window_panes}        # Number of panes in window
+#{window_layout}       # Current window layout
+```
+
+```bash Pane Variables
+#{pane_id}             # Unique pane ID (%N format)
+#{pane_index}          # Index of pane
+#{pane_current_path}   # Current path in pane
+#{pane_current_command}# Current command running
+#{pane_width}          # Width of pane
+#{pane_height}         # Height of pane
+#{pane_title}          # Pane title (can be set by application)
+```
+
+```bash Client Variables
+#{client_name}         # Name of client
+#{client_tty}          # Pseudo terminal of client
+#{client_width}        # Width of client
+#{client_height}       # Height of client
+#{client_session}      # Name of client's session
+```
+</CodeGroup>
+
+### Short Aliases
+
+Some variables have single-character aliases:
+
+| Alias | Variable | Description |
+|-------|----------|-------------|
+| `#D` | `pane_id` | Unique pane ID |
+| `#F` | `window_flags` | Window flags |
+| `#H` | `host` | Hostname of local host |
+| `#h` | `host_short` | Hostname (no domain) |
+| `#I` | `window_index` | Index of window |
+| `#P` | `pane_index` | Index of pane |
+| `#S` | `session_name` | Name of session |
+| `#T` | `pane_title` | Title of pane |
+| `#W` | `window_name` | Name of window |
+
+## Conditionals
+
+Use `#{?condition,true,false}` for conditional formatting:
+
+<CodeGroup>
+```bash Simple Conditional
+#{?session_attached,attached,not attached}
+```
+
+```bash Multiple Conditions
+#{?window_active,#[fg=green],#[fg=white]}#{window_name}
+```
+
+```bash Nested Conditionals
+#{?pane_in_mode,#{?pane_synchronized,SYNC-MODE,MODE},NORMAL}
+```
+
+```bash With Default Value
+#{?#{n:window_name},#{window_name} - ,}
+```
+</CodeGroup>
+
+## Comparisons
+
+Format strings support comparison operators:
+
+<CodeGroup>
+```bash Equality
+#{==:#{host},myhost}        # 1 if host equals myhost, 0 otherwise
+#{!=:#{session_name},test}  # 1 if not equal
+```
+
+```bash Numeric Comparisons
+#{<:#{window_index},5}      # 1 if window_index < 5
+#{>:#{pane_width},80}       # 1 if pane_width > 80
+#{<=:#{session_windows},10} # Less than or equal
+#{>=:#{pane_height},24}     # Greater than or equal
+```
+
+```bash Logical Operators
+#{||:#{pane_in_mode},#{alternate_on}}  # OR operator
+#{&&:#{window_active},#{pane_active}}  # AND operator
+#{!:#{pane_in_mode}}                   # NOT operator
+#{!!:non-empty string}                 # Convert to boolean (0 or 1)
+```
+</CodeGroup>
+
+## Pattern Matching
+
+Use `#{m:pattern,string}` for glob patterns or regular expressions:
+
+<CodeGroup>
+```bash Glob Patterns
+#{m:*foo*,#{host}}          # Match if host contains 'foo'
+#{m:prod-*,#{session_name}} # Match prefix
+```
+
+```bash Regular Expressions
+#{m/r:^foo,#{window_name}}  # Regex match (r flag)
+#{m/ri:^A,#{pane_title}}    # Case-insensitive (i flag)
+```
+
+```bash Content Search
+#{C:pattern}                # Search in pane content (glob)
+#{C/r:^Start}              # Regex search in pane content
+#{C/ri:error}              # Case-insensitive regex search
+```
+</CodeGroup>
+
+## Arithmetic Operations
+
+Perform calculations with `#{e|op:arg1,arg2}`:
+
+<CodeGroup>
+```bash Basic Math
+#{e|+:5,3}                  # Addition: 8
+#{e|-:10,3}                 # Subtraction: 7
+#{e|*:4,5}                  # Multiplication: 20
+#{e|/:10,3}                 # Division: 3
+#{e|%:10,3}                 # Modulus: 1
+```
+
+```bash Floating Point
+#{e|*|f|2:3.14,2}          # Float multiplication with 2 decimals: 6.28
+#{e|/|f|4:22,7}            # Float division with 4 decimals: 3.1429
+```
+
+```bash ASCII Conversion
+#{a:98}                     # Returns 'b' (ASCII 98)
+#{a:65}                     # Returns 'A' (ASCII 65)
+```
+
+```bash Color Conversion
+#{c:red}                    # Converts tmux color to hex RGB
+```
+</CodeGroup>
+
+## String Manipulation
+
+### Length and Width
+
+<CodeGroup>
+```bash Length Limits
+#{=5:pane_title}           # First 5 characters
+#{=-5:pane_title}          # Last 5 characters
+#{=/5/...:pane_title}      # Max 5 chars with '...' suffix
+```
+
+```bash Padding
+#{p10:pane_title}          # Pad left to width 10
+#{p-10:pane_title}         # Pad right to width 10
+```
+
+```bash Measurements
+#{n:window_name}           # Length of variable
+#{w:window_name}           # Display width of variable
+```
+
+```bash Repetition
+#{R:*,10}                  # Repeat '*' 10 times
+#{R:abc,3}                 # Results in 'abcabcabc'
+```
+</CodeGroup>
+
+### Substitution
+
+Use `#{s/pattern/replacement/:variable}` for search and replace:
+
+```bash
+# Simple substitution
+#{s/foo/bar/:window_name}
+
+# Regular expressions with capture groups
+#{s/a(.)/\1x/i:pane_title}    # 'abABab' becomes 'bxBxbx'
+
+# Alternative delimiter to avoid escaping
+#{s|foo/|bar/|:pane_path}     # Replace 'foo/' with 'bar/'
+```
+
+### Path Operations
+
+```bash
+#{b:pane_current_path}     # Basename: /home/user/file.txt -> file.txt
+#{d:pane_current_path}     # Dirname: /home/user/file.txt -> /home/user
+```
+
+### Quoting
+
+```bash
+#{q:window_name}           # Escape shell special characters
+#{q/h:pane_title}          # Escape hash characters (# -> ##)
+```
+
+## Time Formatting
+
+Convert timestamps to readable dates:
+
+<CodeGroup>
+```bash Basic Time
+#{t:window_activity}       # Sun Oct 25 09:25:02 2015
+#{t/p:session_created}     # Pretty format for past times
+```
+
+```bash Custom Format
+#{t/f/%H#:%M:window_activity}        # 09:25
+#{t/f/%Y-%m-%d:session_created}      # 2015-10-25
+#{t/f/%a %b %d:pane_dead_time}       # Sun Oct 25
+```
+</CodeGroup>
+
+<Note>
+Use `%%` to escape `%` in time formats that are also expanded by strftime, like in `status-left`.
+</Note>
+
+## Expansion Modifiers
+
+<CodeGroup>
+```bash Double Expansion
+#{E:status-left}           # Expand format in option value
+#{T:status-left}           # Expand format and strftime specifiers
+```
+
+```bash Literal Strings
+#{l:#{?pane_in_mode,yes,no}}  # Treat as literal, don't expand
+```
+</CodeGroup>
+
+## Loops
+
+Iterate over sessions, windows, panes, or clients:
+
+<CodeGroup>
+```bash Session Loop
+#{S:#{session_name} }       # List all sessions
+#{S/n:#{session_name} }     # Sort by name
+#{S/nr:#{session_name} }    # Sort by name reversed
+#{S/t:#{session_name} }     # Sort by activity time
+```
+
+```bash Window Loop
+#{W:#{window_index}:#{window_name} ,#{E:window-status-current-format} }
+# Two formats: normal and current window
+```
+
+```bash Pane Loop
+#{P:#{pane_index} }         # List all panes
+#{P/r:#{pane_index} }       # Reverse order
+```
+
+```bash Client Loop
+#{L:#{client_name} }        # List all clients
+```
+</CodeGroup>
+
+Sort options for loops:
+- `/i` - Sort by index
+- `/n` - Sort by name  
+- `/t` - Sort by last activity time
+- `/r` - Reverse sort order
+
+## Shell Commands
+
+Execute shell commands with `#()`:
+
+```bash
+#(uptime)                   # Insert system uptime
+#(whoami)                   # Current user
+#(df -h | grep /home)       # Disk usage
+```
+
+<Warning>
+tmux does not wait for `#()` commands to finish. It uses the previous result or a placeholder if the command hasn't run before. Commands are executed with the tmux global environment set.
+</Warning>
+
+## Name Existence Checks
+
+Check if a window or session name exists:
+
+```bash
+#{N/w:mywindow}            # 1 if window 'mywindow' exists
+#{N/s:mysession}           # 1 if session 'mysession' exists
+```
+
+## Combining Modifiers
+
+Multiple modifiers can be chained with semicolons:
+
+```bash
+#{T;=10:status-left}       # Expand strftime, limit to 10 chars
+#{E;p20:window-status-format}  # Expand format, pad to 20 chars
+#{t;s/foo/bar/:window_activity}  # Format time, substitute text
+```
+
+## Practical Examples
+
+<Accordion title="Status Line with Conditional Colors">
+```bash
+set -g status-left "#{?client_prefix,#[fg=red],#[fg=green]}[#{session_name}]#[default] "
+```
+Shows session name in red when prefix key is pressed, green otherwise.
+</Accordion>
+
+<Accordion title="Window List with Activity Indicators">
+```bash
+set -g window-status-format "#{?window_activity_flag,#[fg=yellow],}#I:#W"
+```
+Highlights window index and name in yellow if activity occurred.
+</Accordion>
+
+<Accordion title="Pane Title with Current Path">
+```bash
+set -g pane-border-format "#{pane_index} #{b:pane_current_path} (#{pane_current_command})"
+```
+Shows pane index, basename of current path, and running command.
+</Accordion>
+
+<Accordion title="Custom Time Display">
+```bash
+set -g status-right "#(date +'%H:%M') | #{t/f/%b %d:session_created}"
+```
+Shows current time and session creation date.
+</Accordion>
+
+## Complete Variable Reference
+
+<Note>
+For a complete list of all available format variables, run:
+```bash
+tmux show-options -gv | grep -E 'format|status'
+```
+Or check the tmux manual: `man tmux` and search for "FORMATS"
+</Note>
+
+Key variable categories:
+- **Session**: `session_*` - Session information
+- **Window**: `window_*` - Window properties
+- **Pane**: `pane_*` - Pane state and content
+- **Client**: `client_*` - Client connection details
+- **Buffer**: `buffer_*` - Paste buffer information
+- **Mouse**: `mouse_*` - Mouse event data
+- **Hook**: `hook_*` - Hook execution context
+- **Cursor**: `cursor_*` - Cursor position and style
+- **History**: `history_*` - Scrollback buffer info

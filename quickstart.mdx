@@ -1,80 +1,448 @@
 ---
 title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+description: "Get productive with tmux in 5 minutes"
 ---
 
-## Get started in three steps
+## Your First tmux Session
 
-Get your documentation site running locally and make your first customization.
+Start tmux with a single command:
 
-### Step 1: Set up your local environment
+```bash
+tmux
+```
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+You should see your terminal with a status bar at the bottom showing:
+- `[0] 0:bash*` - Session 0, window 0, running bash
 
-### Step 2: Deploy your changes
+<Tip>
+The default **prefix key** is `Ctrl-b`. All tmux commands start with this prefix. Press `Ctrl-b` then the command key.
+</Tip>
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
+## Essential Key Bindings
+
+All key bindings require pressing the **prefix key** (`Ctrl-b`) first, then the command key.
+
+### Session Management
+
+| Keys | Action |
+|------|--------|
+| `Ctrl-b d` | Detach from session |
+| `Ctrl-b $` | Rename session |
+| `Ctrl-b s` | List all sessions |
+| `Ctrl-b (` | Switch to previous session |
+| `Ctrl-b )` | Switch to next session |
+
+### Window Management
+
+| Keys | Action |
+|------|--------|
+| `Ctrl-b c` | Create new window |
+| `Ctrl-b ,` | Rename current window |
+| `Ctrl-b n` | Next window |
+| `Ctrl-b p` | Previous window |
+| `Ctrl-b 0-9` | Switch to window 0-9 |
+| `Ctrl-b w` | List all windows |
+| `Ctrl-b &` | Kill current window |
+
+### Pane Management
+
+| Keys | Action |
+|------|--------|
+| `Ctrl-b %` | Split pane vertically |
+| `Ctrl-b "` | Split pane horizontally |
+| `Ctrl-b ↑↓←→` | Navigate between panes |
+| `Ctrl-b o` | Go to next pane |
+| `Ctrl-b ;` | Go to last active pane |
+| `Ctrl-b x` | Kill current pane |
+| `Ctrl-b z` | Toggle pane zoom |
+| `Ctrl-b {` | Move pane left |
+| `Ctrl-b }` | Move pane right |
+| `Ctrl-b Space` | Cycle through layouts |
+
+### Other Useful Commands
+
+| Keys | Action |
+|------|--------|
+| `Ctrl-b ?` | Show all key bindings |
+| `Ctrl-b t` | Show clock |
+| `Ctrl-b [` | Enter copy mode |
+| `Ctrl-b ]` | Paste buffer |
+
+## 5-Minute Tutorial
+
+<Steps>
+  <Step title="Start a Named Session">
+    Create a session with a meaningful name:
+
+    ```bash
+    tmux new -s development
+    ```
+
+    This creates a session named "development".
+  </Step>
+
+  <Step title="Create Multiple Windows">
+    Create windows for different tasks:
+
+    ```bash
+    # Inside tmux, press Ctrl-b c to create new window
+    # Press Ctrl-b , to rename it to "editor"
+
+    # Create another window
+    # Ctrl-b c
+    # Ctrl-b , to rename it to "server"
+
+    # Create third window
+    # Ctrl-b c  
+    # Ctrl-b , to rename it to "terminal"
+    ```
+
+    Navigate between windows:
+    - `Ctrl-b n` - Next window
+    - `Ctrl-b p` - Previous window
+    - `Ctrl-b 0` - Go to window 0
+    - `Ctrl-b 1` - Go to window 1
+  </Step>
+
+  <Step title="Split Windows into Panes">
+    In your terminal window, create a layout:
+
+    ```bash
+    # Split horizontally (top and bottom)
+    # Ctrl-b "
+
+    # Split the bottom pane vertically (left and right)
+    # Ctrl-b ↓ (move to bottom pane)
+    # Ctrl-b %
+    ```
+
+    You now have 3 panes: one on top, two on bottom.
+
+    Navigate between panes:
+    - `Ctrl-b ↑↓←→` - Arrow keys to move
+    - `Ctrl-b o` - Cycle through panes
+    - `Ctrl-b q` - Show pane numbers
+
+    Resize panes:
+    - `Ctrl-b` then hold `Ctrl` and press `↑↓←→` repeatedly
+  </Step>
+
+  <Step title="Detach and Reattach">
+    Detach from your session (it keeps running):
+
+    ```bash
+    # Press Ctrl-b d
+    ```
+
+    You're back to your normal shell. List sessions:
+
+    ```bash
+    tmux ls
+    # Shows: development: 3 windows (created Tue Feb 19 10:30:00 2024)
+    ```
+
+    Reattach to your session:
+
+    ```bash
+    tmux attach -t development
+    # Or shorter:
+    tmux a -t development
+    ```
+
+    Everything is exactly as you left it!
+  </Step>
+
+  <Step title="Use Copy Mode">
+    Enter copy mode to scroll through history:
+
+    ```bash
+    # Press Ctrl-b [
+    # Use arrow keys or Page Up/Down to scroll
+    # Press q to exit
+    ```
+
+    To copy text (vi mode):
+    ```bash
+    # Ctrl-b [           Enter copy mode
+    # Use arrows to navigate to text
+    # Space             Start selection
+    # Arrows            Extend selection  
+    # Enter             Copy selection
+    # Ctrl-b ]          Paste
+    ```
+  </Step>
+</Steps>
+
+## Common Command-Line Usage
+
+### Session Management
+
+```bash
+# Create new session
+tmux new -s myproject
+
+# Create detached session
+tmux new -s background -d
+
+# Attach to existing session
+tmux attach -t myproject
+
+# Attach to most recent session
+tmux attach
+
+# Kill session
+tmux kill-session -t myproject
+
+# List all sessions
+tmux ls
+
+# Rename session from outside
+tmux rename-session -t old-name new-name
+```
+
+### Working with Multiple Sessions
+
+```bash
+# Create sessions for different projects
+tmux new -s frontend -d
+tmux new -s backend -d
+tmux new -s database -d
+
+# List them
+tmux ls
+
+# Attach to specific session
+tmux attach -t frontend
+
+# Switch between sessions (inside tmux)
+# Ctrl-b s (shows session list)
+# Or Ctrl-b ( and Ctrl-b ) to cycle
+```
+
+### Window Commands from Shell
+
+```bash
+# Create session with multiple windows
+tmux new -s dev -n editor
+tmux neww -t dev -n server
+tmux neww -t dev -n logs
+
+# Attach to it
+tmux attach -t dev
+```
+
+## Practical Workflow Examples
+
+### Development Setup
+
+```bash
+# Create session with descriptive name
+tmux new -s webapp
+
+# Window 1: Editor (already created)
+# Rename it
+# Ctrl-b , type "editor"
+
+# Window 2: Development server
+# Ctrl-b c
+# Ctrl-b , type "server"
+cd ~/projects/webapp
+npm run dev
+
+# Window 3: Git operations
+# Ctrl-b c
+# Ctrl-b , type "git"
+
+# Window 4: Terminal for ad-hoc commands
+# Ctrl-b c
+# Ctrl-b , type "terminal"
+
+# Split terminal window into 4 panes
+# Ctrl-b "
+# Ctrl-b %
+# Ctrl-b ↑
+# Ctrl-b %
+```
+
+### Remote Server Monitoring
+
+```bash
+# SSH to server
+ssh user@server
+
+# Start monitoring session
+tmux new -s monitor
+
+# Window 1: System resources
+htop
+
+# Window 2: Logs (Ctrl-b c)
+tail -f /var/log/syslog
+
+# Window 3: Application logs
+tail -f /var/log/myapp/error.log
+
+# Detach: Ctrl-b d
+# Logout from SSH
+exit
+
+# Later, reconnect
+ssh user@server
+tmux attach -t monitor
+```
+
+### Multi-Pane Layout
+
+```bash
+tmux new -s layout
+
+# Create 4-pane layout:
+# Split horizontally
+# Ctrl-b "
+
+# Split top vertically  
+# Ctrl-b ↑
+# Ctrl-b %
+
+# Split bottom vertically
+# Ctrl-b ↓
+# Ctrl-b %
+
+# Result:
+# +-------+-------+
+# |       |       |
+# |   1   |   2   |
+# |       |       |
+# +-------+-------+
+# |       |       |
+# |   3   |   4   |
+# |       |       |
+# +-------+-------+
+```
+
+## Mouse Support
+
+Enable mouse support for easier interaction:
+
+```bash
+# Inside tmux, press Ctrl-b : then type:
+set -g mouse on
+```
+
+Or add to `~/.tmux.conf`:
+
+```bash tmux.conf
+set -g mouse on
+```
+
+With mouse enabled:
+- Click to switch panes
+- Click window names to switch windows
+- Click and drag pane borders to resize
+- Scroll to navigate history
+- Right-click for context menu
+
+## Tips and Tricks
+
+<Accordion title="Make panes equal size">
+Press `Ctrl-b` then `Alt-1` (horizontal) or `Alt-2` (vertical)
 </Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
-
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 3: Go live
-
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
+<Accordion title="Find which pane is which">
+Press `Ctrl-b q` - Shows pane numbers briefly
 </Accordion>
 
-## Next steps
+<Accordion title="Maximize a pane temporarily">
+Press `Ctrl-b z` - Toggles pane zoom (full screen)
+</Accordion>
 
-Now that you have your docs running, explore these key features:
+<Accordion title="Synchronize input across panes">
+```bash
+# Inside tmux:
+# Ctrl-b :
+setw synchronize-panes on
+
+# Now typing goes to all panes in current window
+# Turn off with:
+setw synchronize-panes off
+```
+</Accordion>
+
+<Accordion title="Swap panes">
+- `Ctrl-b {` - Swap with previous pane
+- `Ctrl-b }` - Swap with next pane
+- `Ctrl-b Ctrl-o` - Rotate panes
+</Accordion>
+
+<Accordion title="Create custom key binding">
+```bash
+# Add to ~/.tmux.conf
+# Reload config with: Ctrl-b r
+bind r source-file ~/.tmux.conf \; display "Config reloaded!"
+```
+</Accordion>
+
+## Quick Configuration
+
+Create a basic `~/.tmux.conf`:
+
+```bash tmux.conf
+# Enable mouse
+set -g mouse on
+
+# Increase history
+set -g history-limit 10000
+
+# Start windows and panes at 1
+set -g base-index 1
+setw -g pane-base-index 1
+
+# Renumber windows when one is closed
+set -g renumber-windows on
+
+# Better colors
+set -g default-terminal "screen-256color"
+
+# Easier prefix (optional - changes Ctrl-b to Ctrl-a)
+# set -g prefix C-a
+# unbind C-b
+# bind C-a send-prefix
+
+# Easier splits
+bind | split-window -h
+bind - split-window -v
+
+# Quick reload
+bind r source-file ~/.tmux.conf \; display "Config reloaded!"
+```
+
+Load your configuration:
+
+```bash
+# Exit tmux if running
+tmux kill-server
+
+# Start fresh with new config
+tmux
+```
+
+## Getting Help
 
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+  <Card title="Key Bindings" icon="keyboard" href="/guides/key-bindings">
+    Complete reference of all key bindings
+  </Card>
+  <Card title="Commands" icon="terminal" href="/commands/overview">
+    Full command reference
+  </Card>
+  <Card title="Configuration" icon="gear" href="/guides/configuration">
+    Advanced configuration options
+  </Card>
+  <Card title="Concepts" icon="book" href="/concepts/sessions">
+    Deep dive into tmux concepts
+  </Card>
 </CardGroup>
 
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>
+<Tip>
+Press `Ctrl-b ?` inside tmux to see a searchable list of all key bindings!
+</Tip>

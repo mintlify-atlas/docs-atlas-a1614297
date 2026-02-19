@@ -1,0 +1,503 @@
+---
+title: 'Session Commands'
+description: 'Commands for managing tmux sessions'
+---
+
+## Overview
+
+Sessions are the highest level of organization in tmux. Each session has one or more windows and can have multiple clients attached.
+
+## Creating Sessions
+
+### new-session
+
+Create a new session and optionally attach to it.
+
+```bash
+tmux new-session [-AdDEPX] [-c start-directory] [-e environment] \
+                 [-F format] [-f flags] [-n window-name] \
+                 [-s session-name] [-t group-name] \
+                 [-x width] [-y height] [shell-command]
+```
+
+**Alias:** `new`
+
+<ParamField path="-A" type="flag">
+Attach to existing session if it already exists (like `attach-session`)
+</ParamField>
+
+<ParamField path="-d" type="flag">
+Detached mode - create session without attaching to it
+</ParamField>
+
+<ParamField path="-D" type="flag">
+With `-A`, behave like `-d` flag to `attach-session`
+</ParamField>
+
+<ParamField path="-E" type="flag">
+Do not apply `update-environment` option
+</ParamField>
+
+<ParamField path="-P" type="flag">
+Print session information after creation (uses format from `-F`)
+</ParamField>
+
+<ParamField path="-X" type="flag">
+With `-A`, behave like `-x` flag to `attach-session` (send SIGHUP)
+</ParamField>
+
+<ParamField path="-c" type="string">
+Specify working directory for the session
+</ParamField>
+
+<ParamField path="-e" type="string">
+Set environment variable (format: `VARIABLE=value`). Can be repeated.
+</ParamField>
+
+<ParamField path="-F" type="string">
+Format string for output when `-P` is used (default: `#{session_name}:`)
+</ParamField>
+
+<ParamField path="-f" type="string">
+Comma-separated list of client flags (see `attach-session`)
+</ParamField>
+
+<ParamField path="-n" type="string">
+Name for the initial window
+</ParamField>
+
+<ParamField path="-s" type="string">
+Name for the new session
+</ParamField>
+
+<ParamField path="-t" type="string">
+Session group name. Sessions in same group share windows.
+</ParamField>
+
+<ParamField path="-x" type="number">
+Width for detached sessions (use `-` for current client size)
+</ParamField>
+
+<ParamField path="-y" type="number">
+Height for detached sessions (use `-` for current client size)
+</ParamField>
+
+<CodeGroup>
+```bash Basic
+# Create session named 'dev'
+tmux new-session -s dev
+
+# Create detached session
+tmux new-session -d -s background
+
+# Create session with custom window name
+tmux new-session -s work -n editor
+```
+
+```bash Advanced
+# Create or attach to existing session
+tmux new-session -A -s main
+
+# Create with environment variable
+tmux new-session -s build -e NODE_ENV=production
+
+# Create in specific directory
+tmux new-session -s project -c ~/code/myproject
+
+# Create with specific size
+tmux new-session -d -s server -x 120 -y 40
+```
+
+```bash Groups
+# Create session group
+tmux new-session -t group1 -s session1
+tmux new-session -t group1 -s session2
+# session1 and session2 now share windows
+```
+</CodeGroup>
+
+## Attaching to Sessions
+
+### attach-session
+
+Attach to an existing session.
+
+```bash
+tmux attach-session [-dErx] [-c working-directory] \
+                    [-f flags] [-t target-session]
+```
+
+**Alias:** `attach`
+
+<ParamField path="-d" type="flag">
+Detach other clients attached to the session
+</ParamField>
+
+<ParamField path="-E" type="flag">
+Do not apply `update-environment` option
+</ParamField>
+
+<ParamField path="-r" type="flag">
+Read-only mode (alias for `-f read-only,ignore-size`)
+</ParamField>
+
+<ParamField path="-x" type="flag">
+Send SIGHUP to parent process when detaching, typically causing it to exit
+</ParamField>
+
+<ParamField path="-c" type="string">
+Set session working directory
+</ParamField>
+
+<ParamField path="-f" type="string">
+Comma-separated client flags:
+- `active-pane`: Independent active pane
+- `ignore-size`: Don't affect size of other clients
+- `no-detach-on-destroy`: Don't detach when session destroyed
+- `no-output`: No pane output in control mode
+- `pause-after=seconds`: Pause output in control mode
+- `read-only`: Read-only client
+- `wait-exit`: Wait before exiting control mode
+
+Prefix with `!` to turn off flag.
+</ParamField>
+
+<ParamField path="-t" type="string">
+Target session to attach to
+</ParamField>
+
+<CodeGroup>
+```bash Basic
+# Attach to most recent session
+tmux attach
+
+# Attach to specific session
+tmux attach -t dev
+
+# Attach and detach other clients
+tmux attach -d -t mysession
+```
+
+```bash Advanced
+# Attach in read-only mode
+tmux attach -r -t production
+
+# Attach with custom flags
+tmux attach -f read-only,ignore-size -t monitoring
+
+# Change working directory on attach
+tmux attach -t dev -c ~/new-project
+```
+</CodeGroup>
+
+## Managing Sessions
+
+### rename-session
+
+Rename a session.
+
+```bash
+tmux rename-session [-t target-session] new-name
+```
+
+**Alias:** `rename`
+
+```bash
+# Rename current session
+tmux rename-session newname
+
+# Rename specific session
+tmux rename-session -t old new
+```
+
+### has-session
+
+Check if a session exists.
+
+```bash
+tmux has-session [-t target-session]
+```
+
+**Alias:** `has`
+
+```bash
+# Check if session exists (exit code 0 if exists, 1 if not)
+tmux has-session -t mysession && echo "exists"
+```
+
+### switch-client
+
+Switch the current client to a different session.
+
+```bash
+tmux switch-client [-ElnprZ] [-c target-client] \
+                   [-O sort-order] [-t target-session] \
+                   [-T key-table]
+```
+
+**Alias:** `switchc`
+
+<ParamField path="-E" type="flag">
+Do not apply `update-environment` option
+</ParamField>
+
+<ParamField path="-l" type="flag">
+Switch to last session
+</ParamField>
+
+<ParamField path="-n" type="flag">
+Switch to next session
+</ParamField>
+
+<ParamField path="-p" type="flag">
+Switch to previous session
+</ParamField>
+
+<ParamField path="-r" type="flag">
+Toggle `read-only` and `ignore-size` flags
+</ParamField>
+
+<ParamField path="-Z" type="flag">
+Keep window zoomed if it was zoomed
+</ParamField>
+
+<ParamField path="-O" type="string">
+Sort order: `name`, `size`, `creation`, or `activity`
+</ParamField>
+
+<ParamField path="-T" type="string">
+Set client's key table for next key
+</ParamField>
+
+```bash
+# Switch to specific session
+tmux switch-client -t dev
+
+# Switch to next/previous session
+tmux switch-client -n
+tmux switch-client -p
+
+# Switch to last session
+tmux switch-client -l
+```
+
+## Destroying Sessions
+
+### kill-session
+
+Destroy a session.
+
+```bash
+tmux kill-session [-aC] [-t target-session]
+```
+
+<ParamField path="-a" type="flag">
+Kill all sessions except the specified one
+</ParamField>
+
+<ParamField path="-C" type="flag">
+Clear alerts (bell, activity, silence) in all windows
+</ParamField>
+
+```bash
+# Kill specific session
+tmux kill-session -t dev
+
+# Kill all except one
+tmux kill-session -a -t keep-this
+
+# Kill all sessions (from outside tmux)
+tmux kill-session -a
+```
+
+### kill-server
+
+Kill the tmux server and all sessions.
+
+```bash
+tmux kill-server
+```
+
+<Warning>
+This destroys all sessions and detaches all clients. Use with caution.
+</Warning>
+
+## Listing Sessions
+
+### list-sessions
+
+List all sessions.
+
+```bash
+tmux list-sessions [-r] [-F format] [-f filter] [-O sort-order]
+```
+
+**Alias:** `ls`
+
+<ParamField path="-F" type="string">
+Format string for output (see FORMATS section)
+</ParamField>
+
+<ParamField path="-f" type="string">
+Filter expression - only show matching sessions
+</ParamField>
+
+<ParamField path="-O" type="string">
+Sort order: `index`, `name`, `creation`, or `activity`
+</ParamField>
+
+<ParamField path="-r" type="flag">
+Reverse sort order
+</ParamField>
+
+```bash
+# List all sessions
+tmux list-sessions
+
+# List with custom format
+tmux list-sessions -F "#{session_name}: #{session_windows} windows"
+
+# List sorted by creation time
+tmux list-sessions -O creation
+
+# List and reverse sort
+tmux list-sessions -O activity -r
+```
+
+## Client Management
+
+### detach-client
+
+Detach a client from a session.
+
+```bash
+tmux detach-client [-aP] [-E shell-command] \
+                   [-s target-session] [-t target-client]
+```
+
+**Alias:** `detach`
+
+<ParamField path="-a" type="flag">
+Kill all clients except the one specified with `-t`
+</ParamField>
+
+<ParamField path="-P" type="flag">
+Send SIGHUP to parent process
+</ParamField>
+
+<ParamField path="-E" type="string">
+Run shell command to replace the client
+</ParamField>
+
+<ParamField path="-s" type="string">
+Detach all clients attached to target session
+</ParamField>
+
+```bash
+# Detach current client
+tmux detach-client
+
+# Detach all clients from session
+tmux detach-client -s mysession
+
+# Detach all except current
+tmux detach-client -a
+```
+
+### list-clients
+
+List all attached clients.
+
+```bash
+tmux list-clients [-r] [-F format] [-f filter] \
+                  [-O sort-order] [-t target-session]
+```
+
+**Alias:** `lsc`
+
+<ParamField path="-O" type="string">
+Sort order: `name`, `size`, `creation`, or `activity`
+</ParamField>
+
+```bash
+# List all clients
+tmux list-clients
+
+# List clients for specific session
+tmux list-clients -t dev
+
+# List with custom format
+tmux list-clients -F "#{client_name}: #{client_width}x#{client_height}"
+```
+
+## Server Commands
+
+### start-server
+
+Start the tmux server without creating sessions.
+
+```bash
+tmux start-server
+```
+
+**Alias:** `start`
+
+<Note>
+Useful when sessions are created in `~/.tmux.conf` or when `exit-empty` is off.
+</Note>
+
+### suspend-client
+
+Suspend a client.
+
+```bash
+tmux suspend-client [-t target-client]
+```
+
+**Alias:** `suspendc`
+
+```bash
+# Suspend current client (sends SIGTSTP)
+tmux suspend-client
+```
+
+## Session Examples
+
+<Accordion title="Development Workspace">
+```bash
+#!/bin/bash
+# Create development session with multiple windows
+
+tmux new-session -d -s dev -n editor
+tmux send-keys -t dev:editor 'nvim' C-m
+
+tmux new-window -t dev -n server
+tmux send-keys -t dev:server 'npm run dev' C-m
+
+tmux new-window -t dev -n git
+tmux send-keys -t dev:git 'git status' C-m
+
+tmux attach -t dev
+```
+</Accordion>
+
+<Accordion title="Session Groups">
+```bash
+# Create session group for pair programming
+tmux new-session -d -s pair1 -t coding-group
+tmux new-session -d -s pair2 -t coding-group
+
+# Both sessions share windows
+# Each can have independent current window
+```
+</Accordion>
+
+<Accordion title="Automated Session Creation">
+```bash
+# In ~/.tmux.conf
+# Create session on server start
+new-session -d -s main -n shell
+new-window -t main -n monitoring
+new-window -t main -n logs
+```
+</Accordion>

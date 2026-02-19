@@ -1,0 +1,692 @@
+---
+title: Mouse Support
+description: Enabling and using mouse support in tmux
+---
+
+## Overview
+
+tmux provides comprehensive mouse support for clicking panes, resizing, selecting text, and scrolling. When enabled, the mouse can be used alongside keyboard commands for a more flexible workflow.
+
+## Mouse Architecture
+
+From `key-bindings.c:442-489`, mouse events are handled through key bindings:
+
+<Tabs>
+  <Tab title="Mouse Events">
+    Mouse events are bound like keys:
+    ```c
+    // Mouse button 1 on pane
+    bind -n MouseDown1Pane { select-pane -t=; send -M }
+    
+    // Mouse drag on pane
+    bind -n MouseDrag1Pane {
+        if -F '#{||:#{pane_in_mode},#{mouse_any_flag}}' {
+            send -M
+        } {
+            copy-mode -M
+        }
+    }
+    
+    // Mouse wheel
+    bind -n WheelUpPane {
+        if -F '#{||:#{alternate_on},#{pane_in_mode},#{mouse_any_flag}}' {
+            send -M
+        } {
+            copy-mode -e
+        }
+    }
+    ```
+  </Tab>
+
+  <Tab title="Mouse Formats">
+    Mouse position is available through formats:
+    ```bash
+    #{mouse_x}          # Mouse X position
+    #{mouse_y}          # Mouse Y position
+    #{mouse_word}       # Word under mouse
+    #{mouse_line}       # Line under mouse
+    #{mouse_hyperlink}  # Hyperlink under mouse
+    #{mouse_any_flag}   # Mouse tracking enabled in app
+    ```
+  </Tab>
+</Tabs>
+
+## Enabling Mouse Support
+
+### Basic Configuration
+
+<CodeGroup>
+
+```bash Enable Mouse
+# Enable all mouse features
+set -g mouse on
+```
+
+```bash Disable Mouse
+# Disable mouse support
+set -g mouse off
+```
+
+```bash Toggle Mouse
+# Bind key to toggle mouse
+bind m set -g mouse \; display 'Mouse #{?mouse,ON,OFF}'
+```
+
+</CodeGroup>
+
+<Note>
+From `example_tmux.conf:33-36`, you can enable mouse but selectively disable certain features.
+</Note>
+
+### Selective Mouse Features
+
+From `example_tmux.conf:33-36`:
+
+```bash
+# Enable mouse but disable copy mode dragging
+set -g mouse on
+unbind -n MouseDrag1Pane
+unbind -Tcopy-mode MouseDrag1Pane
+
+# This allows:
+# - Clicking to select panes
+# - Scrolling with wheel
+# - Resizing panes
+# But disables:
+# - Dragging to copy text
+```
+
+## Mouse Operations
+
+### Pane Selection
+
+<Steps>
+
+<Step title="Click to Select">
+From `key-bindings.c:443-444`:
+```bash
+# Click anywhere in pane to select it
+bind -n MouseDown1Pane { select-pane -t=; send -M }
+
+# The mouse click is also sent to the application
+```
+</Step>
+
+<Step title="Swap Panes">
+```bash
+# Ctrl+Click to swap panes
+bind -n C-MouseDown1Pane { swap-pane -s@ }
+
+# @ refers to pane under mouse
+```
+</Step>
+
+</Steps>
+
+### Pane Resizing
+
+From `key-bindings.c:462`:
+
+```bash
+# Drag pane border to resize
+bind -n MouseDrag1Border { resize-pane -M }
+
+# The border becomes draggable when mouse is enabled
+# Simply drag the border line to resize adjacent panes
+```
+
+<Tip>
+Pane borders are draggable when mouse mode is on. Position your cursor on the border between panes and drag to resize.
+</Tip>
+
+### Scrolling
+
+<Tabs>
+  <Tab title="Wheel Scrolling">
+    From `key-bindings.c:450-451`:
+    ```bash
+    # Wheel up enters copy mode and scrolls
+    bind -n WheelUpPane {
+        if -F '#{||:#{alternate_on},#{pane_in_mode},#{mouse_any_flag}}' {
+            send -M       # Send to application
+        } {
+            copy-mode -e  # Enter copy mode
+        }
+    }
+    
+    # In copy mode, wheel scrolls history
+    bind -Tcopy-mode WheelUpPane {
+        select-pane
+        send -N5 -X scroll-up
+    }
+    bind -Tcopy-mode WheelDownPane {
+        select-pane
+        send -N5 -X scroll-down
+    }
+    ```
+  </Tab>
+
+  <Tab title="Scrollbar Support">
+    From `key-bindings.c:486-489`:
+    ```bash
+    # Click on scrollbar
+    bind -n MouseDown1ScrollbarUp {
+        if -Ft= '#{pane_in_mode}' {
+            send -X page-up
+        } {
+            copy-mode -u
+        }
+    }
+    
+    bind -n MouseDown1ScrollbarDown {
+        if -Ft= '#{pane_in_mode}' {
+            send -X page-down
+        } {
+            copy-mode -d
+        }
+    }
+    
+    # Drag scrollbar slider
+    bind -n MouseDrag1ScrollbarSlider {
+        if -Ft= '#{pane_in_mode}' {
+            send -X scroll-to-mouse
+        } {
+            copy-mode -S
+        }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### Text Selection and Copy
+
+<Steps>
+
+<Step title="Drag to Select">
+From `key-bindings.c:447`:
+```bash
+# Drag to select text (enters copy mode)
+bind -n MouseDrag1Pane {
+    if -F '#{||:#{pane_in_mode},#{mouse_any_flag}}' {
+        send -M
+    } {
+        copy-mode -M
+    }
+}
+```
+</Step>
+
+<Step title="Copy on Release">
+```bash
+# Release ends selection and copies
+bind -Tcopy-mode MouseDragEnd1Pane {
+    send -X copy-pipe-and-cancel
+}
+
+bind -Tcopy-mode-vi MouseDragEnd1Pane {
+    send -X copy-pipe-and-cancel
+}
+```
+</Step>
+
+<Step title="Double/Triple Click">
+From `key-bindings.c:456-459`:
+```bash
+# Double-click to select word
+bind -n DoubleClick1Pane {
+    select-pane -t=
+    if -F '#{||:#{pane_in_mode},#{mouse_any_flag}}' {
+        send -M
+    } {
+        copy-mode -H
+        send -X select-word
+        run -d0.3
+        send -X copy-pipe-and-cancel
+    }
+}
+
+# Triple-click to select line
+bind -n TripleClick1Pane {
+    select-pane -t=
+    if -F '#{||:#{pane_in_mode},#{mouse_any_flag}}' {
+        send -M
+    } {
+        copy-mode -H
+        send -X select-line
+        run -d0.3
+        send -X copy-pipe-and-cancel
+    }
+}
+```
+</Step>
+
+</Steps>
+
+### Middle-Click Paste
+
+From `key-bindings.c:453`:
+
+```bash
+# Middle-click (button 2) to paste
+bind -n MouseDown2Pane {
+    select-pane -t=
+    if -F '#{||:#{pane_in_mode},#{mouse_any_flag}}' {
+        send -M
+    } {
+        paste -p
+    }
+}
+```
+
+### Window Selection
+
+<Tabs>
+  <Tab title="Status Line Clicks">
+    ```bash
+    # Click window in status line to switch
+    bind -n MouseDown1Status { switch-client -t= }
+    
+    # Ctrl+Click to swap window
+    bind -n C-MouseDown1Status { swap-window -t@ }
+    ```
+  </Tab>
+
+  <Tab title="Scroll Through Windows">
+    From `key-bindings.c:469-472`:
+    ```bash
+    # Scroll down on status for next window
+    bind -n WheelDownStatus { next-window }
+    
+    # Scroll up on status for previous window
+    bind -n WheelUpStatus { previous-window }
+    ```
+  </Tab>
+</Tabs>
+
+## Context Menus
+
+From `key-bindings.c:474-484`, right-click displays context menus:
+
+<Tabs>
+  <Tab title="Pane Menu">
+    ```bash
+    # Right-click pane for menu
+    bind -n MouseDown3Pane {
+        if -Ft= '#{||:#{mouse_any_flag},#{&&:#{pane_in_mode},#{?#{m/r:(copy|view)-mode,#{pane_mode}},0,1}}}' {
+            select-pane -t=
+            send -M
+        } {
+            display-menu -t= -xM -yM -T '#[align=centre]#{pane_index} (#{pane_id})' \
+            'Horizontal Split' 'h' { split-window -h } \
+            'Vertical Split'   'v' { split-window -v } \
+            '' \
+            'Swap Up'    'u' { swap-pane -U } \
+            'Swap Down'  'd' { swap-pane -D } \
+            '' \
+            'Kill'       'X' { kill-pane } \
+            'Respawn'    'R' { respawn-pane -k } \
+            '#{?pane_marked,Unmark,Mark}' 'm' { select-pane -m } \
+            'Zoom'       'z' { resize-pane -Z }
+        }
+    }
+    ```
+  </Tab>
+
+  <Tab title="Window Menu">
+    ```bash
+    # Right-click status line for window menu
+    bind -n MouseDown3Status {
+        display-menu -t= -xW -yW \
+        -T '#[align=centre]#{window_index}:#{window_name}' \
+        'Swap Left'  'l' { swap-window -t:-1 } \
+        'Swap Right' 'r' { swap-window -t:+1 } \
+        '' \
+        'Kill'       'X' { kill-window } \
+        'Respawn'    'R' { respawn-window -k } \
+        'Rename'     'n' { command-prompt -FI "#W" ... }
+    }
+    ```
+  </Tab>
+
+  <Tab title="Session Menu">
+    ```bash
+    # Right-click status left for session menu
+    bind -n MouseDown3StatusLeft {
+        display-menu -t= -xM -yW \
+        -T '#[align=centre]#{session_name}' \
+        'Next'         'n' { switch-client -n } \
+        'Previous'     'p' { switch-client -p } \
+        '' \
+        'Rename'       'n' { command-prompt -I "#S" ... } \
+        '' \
+        'New Session'  's' { new-session } \
+        'New Window'   'w' { new-window }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Customization
+
+### Custom Mouse Bindings
+
+<CodeGroup>
+
+```bash Copy to Clipboard
+# Copy selection to system clipboard on drag end
+bind -Tcopy-mode-vi MouseDragEnd1Pane \
+    send -X copy-pipe-and-cancel "xclip -selection clipboard"
+
+# Or for macOS
+bind -Tcopy-mode-vi MouseDragEnd1Pane \
+    send -X copy-pipe-and-cancel "pbcopy"
+```
+
+```bash Custom Scroll Speed
+# Scroll 10 lines instead of 5
+bind -Tcopy-mode WheelUpPane { select-pane; send -N10 -X scroll-up }
+bind -Tcopy-mode WheelDownPane { select-pane; send -N10 -X scroll-down }
+```
+
+```bash Disable Specific Features
+# Disable drag to copy
+unbind -n MouseDrag1Pane
+
+# Disable double-click
+unbind -n DoubleClick1Pane
+
+# Disable right-click menu
+unbind -n MouseDown3Pane
+```
+
+```bash Custom Modifiers
+# Shift+Click for different action
+bind -n S-MouseDown1Pane {
+    select-pane -t=
+    display-message "Shift-clicked pane #{pane_id}"
+}
+
+# Alt+Drag for custom operation
+bind -n M-MouseDrag1Pane {
+    # Custom action
+}
+```
+
+</CodeGroup>
+
+### Mouse-Aware Configurations
+
+```bash
+# Different bindings based on mouse state
+if-shell '#{mouse}' {
+    # Mouse-specific bindings
+    bind -n WheelUpPane copy-mode -e
+} {
+    # Keyboard-only bindings
+    bind -n PageUp copy-mode -u
+}
+
+# Format showing mouse state
+set -g status-right "Mouse: #{?mouse,ON,OFF} | %H:%M"
+```
+
+## Mouse in Applications
+
+### Application Mouse Support
+
+From `key-bindings.c:450`, tmux detects when applications want mouse events:
+
+```bash
+# When #{mouse_any_flag} is true, mouse events are sent to app
+# Examples: vim, emacs, less, man
+
+# The condition:
+#{||:#{alternate_on},#{pane_in_mode},#{mouse_any_flag}}
+
+# Means:
+# - alternate_on: App uses alternate screen (vim, less)
+# - pane_in_mode: Copy mode is active
+# - mouse_any_flag: App requested mouse events
+```
+
+<Tip>
+When an application like vim is running, mouse clicks are passed to the application rather than selecting panes. Hold Shift to override and use tmux mouse features.
+</Tip>
+
+### Shift Modifier
+
+```bash
+# Hold Shift to bypass application mouse handling
+
+# In vim with mouse enabled:
+# - Click: vim receives click
+# - Shift+Click: tmux handles click
+
+# Use Shift for:
+# - Shift+Click: Select text (terminal selection)
+# - Shift+Drag: Select text
+# - Shift+Wheel: Scroll terminal buffer
+```
+
+## Mouse Formats
+
+### Using Mouse Position
+
+<Accordion title="Mouse Format Variables">
+
+```bash
+#{mouse_x}              # X coordinate
+#{mouse_y}              # Y coordinate
+#{mouse_word}           # Word under mouse
+#{mouse_line}           # Line under mouse
+#{mouse_hyperlink}      # Hyperlink under mouse
+#{mouse_status_line}    # On status line?
+#{mouse_status_range}   # Status range under mouse
+#{mouse_any_flag}       # App wants mouse?
+```
+
+**Example usage:**
+```bash
+# Display word under mouse
+bind -n MouseDown3Pane \
+    display-message "Word: #{mouse_word}"
+
+# Copy word under mouse
+bind -n C-MouseDown1Pane {
+    copy-mode -q
+    set-buffer -- "#{mouse_word}"
+}
+
+# Open hyperlink
+bind -n C-MouseDown1Pane {
+    if -F '#{mouse_hyperlink}' {
+        run-shell "xdg-open '#{mouse_hyperlink}'"
+    }
+}
+```
+
+</Accordion>
+
+## Practical Examples
+
+### Enhanced Text Selection
+
+From `key-bindings.c:27-72`, example menu system:
+
+```bash
+# Better copy with context menu
+bind -n MouseDown3Pane {
+    if -F '#{mouse_word}' {
+        display-menu -t= -xM -yM \
+            "Copy word" 'c' {
+                copy-mode -q
+                set-buffer -- "#{mouse_word}"
+            } \
+            "Search word" 's' {
+                copy-mode
+                send -X search-backward -- "#{mouse_word}"
+            } \
+            "Type word" 't' {
+                copy-mode -q
+                send-keys -l -- "#{mouse_word}"
+            }
+    }
+}
+```
+
+### Smart Wheel Scrolling
+
+```bash
+# Scroll faster when holding Shift
+bind -n WheelUpPane {
+    if -F '#{alternate_on}' {
+        send -M
+    } {
+        copy-mode -e
+    }
+}
+
+bind -n S-WheelUpPane {
+    if -F '#{pane_in_mode}' {
+        send -N10 -X scroll-up
+    } {
+        copy-mode -e
+        send -N10 -X scroll-up
+    }
+}
+```
+
+### Drag and Drop Windows
+
+```bash
+# Drag windows on status line to reorder
+bind -n MouseDrag1Status {
+    # Could implement window reordering
+    swap-window -t '{mouse}'
+}
+```
+
+## Troubleshooting
+
+<Accordion title="Common Mouse Issues">
+
+**Mouse not working:**
+```bash
+# Check mouse option
+tmux show-options -g mouse
+
+# Enable mouse
+tmux set -g mouse on
+
+# Check terminal mouse support
+echo $TERM
+# Should be: screen-256color, tmux-256color, etc.
+```
+
+**Mouse selection copies immediately:**
+```bash
+# Default behavior copies on drag end
+# To prevent automatic copy:
+unbind -Tcopy-mode MouseDragEnd1Pane
+unbind -Tcopy-mode-vi MouseDragEnd1Pane
+
+# Then copy manually with y or Enter
+```
+
+**Application not receiving mouse:**
+```bash
+# Check if events are being sent
+tmux list-keys -T root | grep -i mouse
+
+# Ensure mouse is sent to app in alternate screen:
+bind -n MouseDown1Pane { select-pane -t=; send -M }
+```
+
+**Wrong pane selected:**
+```bash
+# Pane borders may be confusing
+# Adjust pane border style for clarity:
+set -g pane-border-style fg=colour238
+set -g pane-active-border-style fg=colour154
+```
+
+**Scrolling not working:**
+```bash
+# Check wheel bindings
+tmux list-keys -T root | grep Wheel
+
+# May conflict with application scrollback
+# Try Shift+Wheel for terminal scrollback
+```
+
+</Accordion>
+
+## Best Practices
+
+<Steps>
+
+<Step title="Combine Mouse and Keyboard">
+```bash
+# Use mouse for quick operations
+# Use keyboard for precise control
+
+# Good practice:
+# - Mouse: Select panes, resize, quick scrolling
+# - Keyboard: Navigation, copy mode, complex operations
+```
+</Step>
+
+<Step title="Configure for Your Terminal">
+```bash
+# Test mouse features in your terminal
+# Some terminals have better mouse support than others
+
+# Recommended terminals:
+# - iTerm2 (macOS)
+# - Alacritty
+# - Kitty  
+# - GNOME Terminal
+# - Windows Terminal
+```
+</Step>
+
+<Step title="Disable What You Don't Use">
+```bash
+# Only enable features you need
+# From example_tmux.conf:
+
+set -g mouse on
+# But disable drag-to-copy if you prefer keyboard:
+unbind -n MouseDrag1Pane
+unbind -Tcopy-mode MouseDrag1Pane
+```
+</Step>
+
+</Steps>
+
+## Performance Considerations
+
+<Tip>
+**Mouse Performance Tips:**
+
+1. **Scrolling speed** - Adjust scroll speed based on your needs
+2. **Menu complexity** - Keep context menus simple
+3. **Format strings** - Minimize use of complex formats in mouse bindings
+4. **Application conflicts** - Be aware of apps with their own mouse handling
+
+```bash
+# Efficient scroll configuration
+bind -Tcopy-mode WheelUpPane { send -N5 -X scroll-up }
+# Scrolls 5 lines per wheel tick
+
+# Avoid complex operations on frequent events:
+# Bad: Running shell commands on every MouseMove
+# Good: Simple tmux commands on MouseDown/MouseUp
+```
+</Tip>
+
+## See Also
+
+- [Copy Mode](/guides/copy-mode) - Text selection and copying
+- [Key Bindings](/guides/key-bindings) - Customize mouse bindings
+- [Configuration](/guides/configuration) - Mouse-related options

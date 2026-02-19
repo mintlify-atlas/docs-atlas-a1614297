@@ -1,0 +1,584 @@
+---
+title: 'Miscellaneous Commands'
+description: 'Other useful tmux commands including source-file, if-shell, run-shell, and display-message'
+---
+
+## Configuration
+
+### source-file
+
+Execute commands from a file.
+
+```bash
+tmux source-file [-Fnqv] [-t target-pane] path ...
+```
+
+**Alias:** `source`
+
+<ParamField path="-F" type="flag">
+Expand path as a format string
+</ParamField>
+
+<ParamField path="-n" type="flag">
+Parse file but don't execute commands
+</ParamField>
+
+<ParamField path="-q" type="flag">
+Quiet mode - don't error if file doesn't exist
+</ParamField>
+
+<ParamField path="-v" type="flag">
+Verbose - show parsed commands and line numbers
+</ParamField>
+
+<CodeGroup>
+```bash Basic Usage
+# Source configuration file
+tmux source-file ~/.tmux.conf
+
+# Source from current directory
+tmux source-file ./local-config.conf
+
+# Source multiple files
+tmux source-file ~/.tmux.conf ~/.tmux.local.conf
+```
+
+```bash Advanced
+# Source with format expansion
+tmux source-file -F "~/.tmux/#{host}.conf"
+
+# Quiet mode (no error if missing)
+tmux source-file -q ~/.tmux.local.conf
+
+# Parse only (validate syntax)
+tmux source-file -n ~/.tmux.conf
+
+# Verbose output
+tmux source-file -v ~/.tmux.conf
+```
+
+```bash Reload Binding
+# Bind key to reload config
+tmux bind-key r source-file ~/.tmux.conf \; \
+    display-message "Config reloaded"
+
+# With error handling
+tmux bind-key R if-shell \
+    'tmux source-file ~/.tmux.conf' \
+    'display "Config reloaded"' \
+    'display "Error loading config"'
+```
+</CodeGroup>
+
+<Note>
+Configuration files support conditionals (`%if`, `%elif`, `%else`, `%endif`) and environment variables.
+</Note>
+
+## Shell Integration
+
+### run-shell
+
+Execute a shell command.
+
+```bash
+tmux run-shell [-bC] [-d delay] [-t target-pane] \
+               [shell-command] [argument ...]
+```
+
+**Alias:** `run`
+
+<ParamField path="-b" type="flag">
+Run in background (don't wait for completion)
+</ParamField>
+
+<ParamField path="-C" type="flag">
+Execute as tmux command instead of shell command
+</ParamField>
+
+<ParamField path="-d" type="string">
+Delay in seconds before running (fractional values allowed)
+</ParamField>
+
+<ParamField path="-t" type="string">
+Target pane for output
+</ParamField>
+
+<CodeGroup>
+```bash Basic Commands
+# Run shell command
+tmux run-shell 'date > /tmp/tmux-date.txt'
+
+# Run in background
+tmux run-shell -b 'sleep 5 && notify-send "Done"'
+
+# Run with delay
+tmux run-shell -d 2 'echo "2 seconds later"'
+```
+
+```bash With Output
+# Display command output
+tmux run-shell 'uptime'
+
+# Pipe to pane
+tmux run-shell -t :.1 'df -h'
+
+# Show in message
+tmux run-shell 'tmux display-message "$(date)"'
+```
+
+```bash Execute tmux Commands
+# Run tmux command with -C
+tmux run-shell -C 'new-window'
+tmux run-shell -C 'split-window -h'
+
+# Dynamic command
+tmux run-shell -C 'if-shell "true" "display \"Success\""'
+```
+</CodeGroup>
+
+### if-shell
+
+Conditionally execute commands.
+
+```bash
+tmux if-shell [-bF] [-t target-pane] shell-command \
+              command [command]
+```
+
+**Alias:** `if`
+
+<ParamField path="-b" type="flag">
+Run shell command in background
+</ParamField>
+
+<ParamField path="-F" type="flag">
+Expand shell-command as format string (no shell execution)
+</ParamField>
+
+<ParamField path="shell-command" type="string">
+Shell command or format string to test
+</ParamField>
+
+<ParamField path="command" type="string">
+Command to run if test succeeds (and optionally if it fails)
+</ParamField>
+
+<CodeGroup>
+```bash Basic Conditionals
+# Simple condition
+tmux if-shell 'test -f ~/.tmux.local.conf' \
+    'source-file ~/.tmux.local.conf'
+
+# With else clause
+tmux if-shell '[ -n "$SSH_CONNECTION" ]' \
+    'set-option -g status-style bg=colour166' \
+    'set-option -g status-style bg=colour24'
+
+# Test exit code
+tmux if-shell 'command -v vim' \
+    'bind-key e new-window vim' \
+    'bind-key e new-window vi'
+```
+
+```bash Format Strings
+# Test format with -F (no shell)
+tmux if-shell -F '#{==:#{host},myhost}' \
+    'set-option -g status-style bg=red'
+
+# Check window count
+tmux if-shell -F '#{>:#{session_windows},5}' \
+    'display "Many windows!"'
+
+# Test pane state
+tmux if-shell -F '#{pane_in_mode}' \
+    'send-keys -X cancel'
+```
+
+```bash Complex Conditions
+# Multiple tests
+tmux if-shell '[ -d ~/projects ] && [ -n "$EDITOR" ]' \
+    'new-window -c ~/projects $EDITOR'
+
+# Background execution
+tmux if-shell -b 'ping -c 1 google.com' \
+    'display "Online"' \
+    'display "Offline"'
+```
+</CodeGroup>
+
+## Display and Messaging
+
+### display-message
+
+Display a message.
+
+```bash
+tmux display-message [-aINpv] [-c target-client] \
+                     [-d delay] [-F format] [-t target-pane] \
+                     [message]
+```
+
+**Alias:** `display`
+
+<ParamField path="-a" type="flag">
+List all format variables with values
+</ParamField>
+
+<ParamField path="-I" type="flag">
+Forward to stdin of a command
+</ParamField>
+
+<ParamField path="-N" type="flag">
+Ignore key presses
+</ParamField>
+
+<ParamField path="-p" type="flag">
+Print to stdout instead of showing in status line
+</ParamField>
+
+<ParamField path="-v" type="flag">
+Verbose - print verbose messages
+</ParamField>
+
+<ParamField path="-d" type="string">
+Delay in milliseconds (0 = until key press)
+</ParamField>
+
+<ParamField path="-F" type="flag">
+Expand format in message
+</ParamField>
+
+<CodeGroup>
+```bash Simple Messages
+# Show message in status line
+tmux display-message "Hello, tmux!"
+
+# Show for specific duration
+tmux display-message -d 3000 "This shows for 3 seconds"
+
+# Show until key press
+tmux display-message -d 0 "Press any key"
+```
+
+```bash Format Variables
+# Show session name
+tmux display-message "Session: #{session_name}"
+
+# Show pane details
+tmux display-message "Pane #{pane_index}: #{pane_title}"
+
+# Show window info
+tmux display-message "Window #{window_index}: #{window_name} (#{window_width}x#{window_height})"
+
+# Complex format
+tmux display-message "#{session_name}:#{window_index}.#{pane_index} - #{pane_current_command}"
+```
+
+```bash Print to Stdout
+# Get value and print
+tmux display-message -p '#{session_name}'
+
+# Get multiple values
+tmux display-message -p '#{session_windows}'
+tmux display-message -p '#{pane_current_path}'
+
+# Use in scripts
+SESSION=$(tmux display-message -p '#S')
+WINDOW=$(tmux display-message -p '#I')
+echo "Current: $SESSION:$WINDOW"
+```
+
+```bash List Variables
+# Show all format variables
+tmux display-message -a
+
+# Show variables for specific target
+tmux display-message -a -t :2.1
+```
+</CodeGroup>
+
+### command-prompt
+
+Open command prompt.
+
+```bash
+tmux command-prompt [-1bFikNTW] [-I inputs] [-p prompts] \
+                    [-t target-client] [-T type] [template]
+```
+
+<ParamField path="-I" type="string">
+Comma-separated default values for prompts
+</ParamField>
+
+<ParamField path="-p" type="string">
+Comma-separated prompt strings
+</ParamField>
+
+<ParamField path="-t" type="string">
+Target client
+</ParamField>
+
+<CodeGroup>
+```bash Basic Prompts
+# Simple prompt
+tmux command-prompt
+
+# Prompt with text
+tmux command-prompt -p "Command:"
+
+# With default value
+tmux command-prompt -I "new-window" -p "Command:"
+```
+
+```bash Custom Prompts
+# Rename window
+tmux command-prompt -I "#W" "rename-window '%%'"
+
+# Rename session
+tmux command-prompt -I "#S" "rename-session '%%'"
+
+# Join pane from prompt
+tmux command-prompt -p "Join pane from:" "join-pane -s '%%'"
+```
+
+```bash Multiple Inputs
+# Two prompts
+tmux command-prompt -p "Session:","Window:" \
+    "switch-client -t '%1:%2'"
+
+# With defaults
+tmux command-prompt -I "default,1" -p "Session:","Window:" \
+    "switch-client -t '%1:%2'"
+```
+
+```bash Common Bindings
+# Command prompt
+tmux bind-key : command-prompt
+
+# Rename window
+tmux bind-key , command-prompt -I "#W" "rename-window '%%'"
+
+# Rename session
+tmux bind-key '$' command-prompt -I "#S" "rename-session '%%'"
+
+# Go to window
+tmux bind-key "'" command-prompt -p "Window:" "select-window -t '%%'"
+```
+</CodeGroup>
+
+## Information Commands
+
+### list-commands
+
+List available commands.
+
+```bash
+tmux list-commands [-F format] [command]
+```
+
+**Alias:** `lscm`
+
+```bash
+# List all commands
+tmux list-commands
+
+# Show specific command
+tmux list-commands new-window
+
+# With custom format
+tmux list-commands -F '#{command_list_name}: #{command_list_usage}'
+```
+
+### server-access
+
+Manage server access permissions.
+
+```bash
+tmux server-access [-adlrw] [user]
+```
+
+<ParamField path="-a" type="flag">
+Grant access to user
+</ParamField>
+
+<ParamField path="-d" type="flag">
+Revoke access (detach user's clients)
+</ParamField>
+
+<ParamField path="-l" type="flag">
+List access permissions
+</ParamField>
+
+<ParamField path="-r" type="flag">
+Make user read-only
+</ParamField>
+
+<ParamField path="-w" type="flag">
+Give user write access
+</ParamField>
+
+```bash
+# List permissions
+tmux server-access -l
+
+# Grant access
+tmux server-access -a username
+
+# Make read-only
+tmux server-access -r username
+
+# Revoke access
+tmux server-access -d username
+```
+
+## Advanced Examples
+
+<Accordion title="Conditional Configuration">
+```bash
+# In ~/.tmux.conf
+
+# Load machine-specific config
+if-shell 'test -f ~/.tmux.#{host}.conf' \
+    'source-file ~/.tmux.#{host}.conf'
+
+# SSH-specific settings
+if-shell '[ -n "$SSH_CONNECTION" ]' {
+    set-option -g status-style bg=colour166,fg=colour255
+    set-option -g status-left "[SSH] #S "
+}
+
+# OS-specific settings
+if-shell 'uname | grep -q Darwin' {
+    # macOS-specific
+    set-option -g default-command "reattach-to-user-namespace -l $SHELL"
+} {
+    # Linux-specific
+    set-option -g default-shell /bin/bash
+}
+```
+</Accordion>
+
+<Accordion title="Dynamic Status Bar">
+```bash
+# Show different info based on conditions
+set-option -g status-right '#{?client_prefix,#[bg=colour166] PREFIX ,}'
+set-option -ag status-right '#{?pane_in_mode,#[bg=colour24] COPY ,}'
+set-option -ag status-right '#[fg=colour250]%H:%M'
+
+# Update based on window count
+if-shell -F '#{>:#{session_windows},10}' \
+    'set-option -g status-left-length 40' \
+    'set-option -g status-left-length 20'
+
+# Different colors for different sessions
+if-shell -F '#{==:#{session_name},prod}' \
+    'set-option -g status-style bg=colour52'
+```
+</Accordion>
+
+<Accordion title="Automated Tasks">
+```bash
+# Run command periodically
+set-hook -g after-new-window \
+    'run-shell -b "sleep 60 && tmux refresh-client"'
+
+# Backup on detach
+set-hook -g client-detached \
+    'run-shell "tmux-backup.sh"'
+
+# Auto-rename based on directory
+set-hook -g after-select-pane \
+    'run-shell "tmux rename-window $(basename $(tmux display -p \"#{pane_current_path}\"))"'
+
+# Notification on completion
+set-hook -g pane-died \
+    'run-shell "notify-send \"Pane #{pane_id} completed\""'
+```
+</Accordion>
+
+<Accordion title="Interactive Scripts">
+```bash
+# Project launcher
+bind-key P command-prompt -p "Project:" \
+    "run-shell 'cd ~/projects/%%  && tmux new-window'"
+
+# Quick note taker
+bind-key N command-prompt -p "Note:" \
+    "run-shell 'echo \"%% $(date)\" >> ~/notes.txt'"
+
+# SSH session creator
+bind-key S command-prompt -p "Host:" \
+    "new-window -n ssh 'ssh %%'"
+
+# Git branch switcher
+bind-key B run-shell \
+    "tmux display-menu -T 'Select Branch' \
+     -x P -y P \
+     $(git branch | awk '{print $NF, \"git checkout \" $NF}')"
+```
+</Accordion>
+
+<Accordion title="Environment Detection">
+```bash
+# Check for dependencies
+if-shell 'command -v fzf' {
+    bind-key f run-shell \
+        "tmux split-window -l 10 'tmux-fzf-helper'"
+}
+
+# Check Docker
+if-shell 'command -v docker && docker info' {
+    bind-key D split-window -h 'docker ps -a'
+}
+
+# Check for git repo
+bind-key g if-shell '[ -d .git ]' {
+    split-window -h 'git status'
+} {
+    display-message "Not a git repository"
+}
+```
+</Accordion>
+
+<Accordion title="Status Line Indicators">
+```bash
+# Show current mode
+set-option -g status-right \
+    '#{?pane_in_mode,#[bg=colour24] #{pane_mode} ,}'
+
+# Show pane synchronization
+set-option -ag status-right \
+    '#{?pane_synchronized,#[bg=colour166] SYNC ,}'
+
+# Show zoom state
+set-option -ag status-right \
+    '#{?window_zoomed_flag,#[bg=colour22] ZOOM ,}'
+
+# Show prefix state
+set-option -ag status-right \
+    '#{?client_prefix,#[bg=colour166] PREFIX ,}'
+
+# Display message with status
+bind-key S if-shell -F '#{pane_synchronized}' {
+    set-option -w synchronize-panes off
+    display-message "Sync: OFF"
+} {
+    set-option -w synchronize-panes on
+    display-message "Sync: ON"
+}
+```
+</Accordion>
+
+## Tips
+
+<Note>
+**Format Variables**: Use `display-message -a` to see all available format variables and their current values.
+</Note>
+
+<Note>
+**Shell vs Format**: `if-shell -F` tests format strings (no shell execution), while `if-shell` without `-F` executes shell commands.
+</Note>
+
+<Warning>
+**Command Execution**: `run-shell -b` runs commands in background. Without `-b`, tmux waits for command completion.
+</Warning>

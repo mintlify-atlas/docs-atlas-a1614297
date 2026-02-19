@@ -1,0 +1,225 @@
+---
+title: 'Command Overview'
+description: 'tmux command syntax, parsing, and execution'
+---
+
+## Command Structure
+
+tmux supports a large number of commands to control its behavior. Each command is named and can accept zero or more flags and arguments.
+
+### Command Components
+
+A typical tmux command consists of:
+- **Command name**: The action to perform (e.g., `new-session`, `split-window`)
+- **Flags**: Options that modify command behavior (e.g., `-d`, `-h`, `-t`)
+- **Arguments**: Values passed to the command (e.g., session names, window indices)
+
+```bash
+tmux set-option -g status-style bg=cyan
+     └─command  └flags  └──arguments──┘
+```
+
+## Command Parsing
+
+tmux distinguishes between command parsing and execution. Commands can be parsed from:
+
+<Accordion title="Configuration Files">
+Commands in `~/.tmux.conf` are parsed when the server starts:
+
+```bash
+set-option -g status-style bg=cyan
+bind-key C set-option -g status-style bg=cyan
+```
+</Accordion>
+
+<Accordion title="Shell Prompt">
+Commands run from the shell are parsed by the shell first, then by tmux:
+
+```bash
+$ tmux set-option -g status-style bg=cyan
+$ tmux new-session \; split-window
+```
+</Accordion>
+
+<Accordion title="Command Prompt">
+Inside tmux, press `Ctrl-b :` to enter the command prompt:
+
+```bash
+: new-window
+: split-window -h
+```
+</Accordion>
+
+<Accordion title="Key Bindings">
+Commands bound to keys via `bind-key`:
+
+```bash
+bind-key F1 set-option status off
+```
+</Accordion>
+
+## Parsing Syntax
+
+### Command Separators
+
+Commands are terminated by newlines or semicolons (`;`). Semicolons create command sequences:
+
+```bash
+new-session ; new-window ; split-window
+```
+
+<Warning>
+If a command in the sequence fails, subsequent commands are not executed.
+</Warning>
+
+### Quoting and Escaping
+
+Command arguments may be specified as:
+- **Single quotes** (`'`): Literal strings
+- **Double quotes** (`"`): Strings with variable expansion
+- **Braces** (`{}`): Command lists (span multiple lines)
+
+```bash
+# Single quotes - literal
+new-window 'vi ~/.tmux.conf'
+
+# Double quotes - with expansion
+new-window "vi $HOME/.tmux.conf"
+
+# Braces - command blocks
+bind-key x if-shell "true" {
+    display "true!"
+}
+```
+
+### Variable Expansion
+
+Outside quotes and inside double quotes:
+- Environment variables: `$VARIABLE` or `${VARIABLE}`
+- Tilde expansion: `~` expands to home directory
+- Escape sequences: `\n` (newline), `\t` (tab), `\e` (escape)
+
+```bash
+new-session -c ~/projects
+set-option -g default-shell $SHELL
+```
+
+## Command Execution
+
+Each client has a command queue. Commands are added to the queue and executed in order.
+
+<Note>
+Some commands like `if-shell` and `run-shell` stop execution until completion:
+- `if-shell`: Waits for shell command to finish
+- `run-shell`: Waits for shell command to finish  
+- `display-panes`: Waits for key press
+</Note>
+
+### Execution Example
+
+```bash
+new-session; new-window
+if-shell "true" "split-window"
+kill-session
+```
+
+This executes in order:
+1. `new-session` - creates session
+2. `new-window` - creates window
+3. `if-shell` - runs shell command and waits
+4. `split-window` - runs if condition true
+5. `kill-session` - destroys session
+
+## Target Specification
+
+Many commands accept target arguments:
+
+<ParamField path="target-client" type="string">
+Specify a client by pty name (e.g., `/dev/ttyp1` or `ttyp1`)
+</ParamField>
+
+<ParamField path="target-session" type="string">
+Specify a session by:
+- Session ID: `$0`, `$1`, etc.
+- Exact name: `mysession`
+- Name prefix: `myses` (matches `mysession`)
+- Glob pattern: `my*`
+- Exact match only: `=mysession`
+</ParamField>
+
+<ParamField path="target-window" type="string">
+Format: `session:window`
+- By index: `mysession:1`
+- By ID: `@1`
+- By name: `mysession:mywindow`
+- Special tokens: `{start}`, `{end}`, `{last}`, `{next}`, `{previous}`, `{current}`
+- Short forms: `^`, `$`, `!`, `+`, `-`, `@`
+</ParamField>
+
+<ParamField path="target-pane" type="string">
+Format: `session:window.pane`
+- By index: `mysession:1.0`
+- By ID: `%0`
+- Special tokens: `{last}`, `{next}`, `{previous}`, `{top}`, `{bottom}`, `{left}`, `{right}`, `{active}`
+- Mouse target: `{mouse}` or `=`
+- Marked pane: `{marked}` or `~`
+</ParamField>
+
+## Command Aliases
+
+Most commands have short aliases:
+
+```bash
+new-session  → new
+attach-session → attach
+split-window → splitw
+list-sessions → ls
+list-windows → lsw
+```
+
+## Common Patterns
+
+### Chaining Commands
+
+```bash
+# Create session with custom layout
+tmux new-session -d \; split-window -h \; split-window -v \; attach
+
+# Set multiple options
+tmux set -g status-style bg=black \; set -g status-style fg=white
+```
+
+### Using Braces
+
+```bash
+# Avoid escaping with braces
+bind-key x if-shell "true" {
+    display -p 'Value: }$foo'
+}
+
+# Equivalent with quotes (needs escaping)
+bind-key x if-shell "true" "display -p 'Value: }\\$foo'"
+```
+
+### Conditional Execution
+
+```bash
+%if "#{==:#{host},myhost}"
+set -g status-style bg=red
+%elif "#{==:#{host},myotherhost}"
+set -g status-style bg=green
+%else
+set -g status-style bg=blue
+%endif
+```
+
+## Return Values
+
+Commands return one of:
+- `CMD_RETURN_NORMAL`: Success
+- `CMD_RETURN_ERROR`: Error occurred
+- `CMD_RETURN_WAIT`: Waiting for completion
+
+<Note>
+The command parser validates syntax before execution. Invalid commands fail at parse time with error messages.
+</Note>

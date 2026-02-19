@@ -1,0 +1,642 @@
+---
+title: 'Buffer Commands'
+description: 'Commands for managing tmux paste buffers and copy mode'
+---
+
+## Overview
+
+Buffers store text copied in tmux, similar to a clipboard. Each buffer is named and can be pasted into panes.
+
+## Copy Mode
+
+Copy mode allows you to select and copy text from panes.
+
+### copy-mode
+
+Enter copy mode.
+
+```bash
+tmux copy-mode [-deHMqSu] [-s src-pane] [-t target-pane]
+```
+
+<ParamField path="-d" type="flag">
+Scroll one page down when entering
+</ParamField>
+
+<ParamField path="-e" type="flag">
+Exit copy mode when scrolling to bottom
+</ParamField>
+
+<ParamField path="-H" type="flag">
+Hide position indicator in top right
+</ParamField>
+
+<ParamField path="-M" type="flag">
+Begin mouse drag (for mouse bindings)
+</ParamField>
+
+<ParamField path="-q" type="flag">
+Cancel copy mode and any other modes
+</ParamField>
+
+<ParamField path="-S" type="flag">
+Scroll when bound to mouse drag event
+</ParamField>
+
+<ParamField path="-u" type="flag">
+Scroll one page up when entering
+</ParamField>
+
+<ParamField path="-s" type="string">
+Copy from src-pane instead of target-pane
+</ParamField>
+
+<CodeGroup>
+```bash Basic Usage
+# Enter copy mode
+tmux copy-mode
+
+# Enter and scroll up one page
+tmux copy-mode -u
+
+# Enter and scroll down one page
+tmux copy-mode -d
+```
+
+```bash Mouse Support
+# Bind to PageUp key
+tmux bind-key PageUp copy-mode -u
+
+# Auto-exit when scrolling to bottom
+tmux bind-key PageDown copy-mode -ed
+
+# Mouse drag to enter copy mode
+tmux bind-key -n MouseDrag1Pane copy-mode -M
+```
+
+```bash Copy from Other Pane
+# Copy from different pane
+tmux copy-mode -s :.0 -t :.1
+```
+</CodeGroup>
+
+### Copy Mode Keys
+
+In copy mode, use these keys to navigate and select:
+
+<Accordion title="Vi Mode Keys">
+Set with `set-option -w mode-keys vi`:
+
+```bash
+# Movement
+h, j, k, l      # Left, down, up, right
+w, b            # Next/previous word
+0, $            # Start/end of line
+gg, G           # Top/bottom of buffer
+C-b, C-f        # Page up/down
+
+# Selection
+Space           # Begin selection
+Enter           # Copy selection and exit
+Escape          # Cancel selection
+v               # Toggle rectangle selection
+
+# Search
+/, ?            # Search forward/backward
+n, N            # Next/previous match
+
+# Other
+q               # Exit copy mode
+```
+</Accordion>
+
+<Accordion title="Emacs Mode Keys">
+Set with `set-option -w mode-keys emacs`:
+
+```bash
+# Movement
+C-n, C-p        # Down/up
+C-f, C-b        # Right/left
+M-f, M-b        # Next/previous word
+C-a, C-e        # Start/end of line
+M-<, M->        # Top/bottom of buffer
+C-v, M-v        # Page down/up
+
+# Selection
+C-Space         # Begin selection
+M-w             # Copy selection and exit
+C-g             # Cancel selection
+R               # Toggle rectangle selection
+
+# Search
+C-s, C-r        # Search forward/backward incrementally
+
+# Other
+Escape          # Exit copy mode
+```
+</Accordion>
+
+### send-keys with Copy Mode
+
+Control copy mode programmatically:
+
+```bash
+# Send copy mode commands with -X flag
+tmux send-keys -X -t target-pane copy-mode-command
+```
+
+<CodeGroup>
+```bash Navigation Commands
+# Movement
+tmux send-keys -X cursor-up
+tmux send-keys -X cursor-down
+tmux send-keys -X cursor-left
+tmux send-keys -X cursor-right
+
+# Jump to start/end
+tmux send-keys -X start-of-line
+tmux send-keys -X end-of-line
+tmux send-keys -X top-line
+tmux send-keys -X bottom-line
+
+# Page navigation
+tmux send-keys -X page-up
+tmux send-keys -X page-down
+tmux send-keys -X halfpage-up
+tmux send-keys -X halfpage-down
+```
+
+```bash Selection Commands
+# Begin/end selection
+tmux send-keys -X begin-selection
+tmux send-keys -X copy-selection
+tmux send-keys -X copy-selection-and-cancel
+tmux send-keys -X clear-selection
+
+# Rectangle selection
+tmux send-keys -X rectangle-toggle
+```
+
+```bash Search Commands
+# Search
+tmux send-keys -X search-forward "pattern"
+tmux send-keys -X search-backward "pattern"
+tmux send-keys -X search-again
+tmux send-keys -X search-reverse
+```
+</CodeGroup>
+
+## Buffer Management
+
+### set-buffer
+
+Create or update a paste buffer.
+
+```bash
+tmux set-buffer [-aw] [-b buffer-name] [-t target-client] \
+                [-n new-name] data
+```
+
+**Alias:** `setb`
+
+<ParamField path="-a" type="flag">
+Append to buffer instead of replacing
+</ParamField>
+
+<ParamField path="-w" type="flag">
+Send buffer to clipboard using terminal clipboard feature
+</ParamField>
+
+<ParamField path="-b" type="string">
+Buffer name (default: automatic)
+</ParamField>
+
+<ParamField path="-n" type="string">
+New name for the buffer
+</ParamField>
+
+```bash
+# Create buffer from string
+tmux set-buffer "Hello, tmux!"
+
+# Create named buffer
+tmux set-buffer -b mybuffer "Some text"
+
+# Append to buffer
+tmux set-buffer -a -b mybuffer " more text"
+
+# Create and send to clipboard
+tmux set-buffer -w "Clipboard text"
+```
+
+### delete-buffer
+
+Delete a paste buffer.
+
+```bash
+tmux delete-buffer [-b buffer-name]
+```
+
+**Alias:** `deleteb`
+
+```bash
+# Delete most recent buffer
+tmux delete-buffer
+
+# Delete specific buffer
+tmux delete-buffer -b buffer0
+
+# Delete named buffer
+tmux delete-buffer -b mybuffer
+```
+
+### list-buffers
+
+List paste buffers.
+
+```bash
+tmux list-buffers [-F format] [-f filter]
+```
+
+**Alias:** `lsb`
+
+<ParamField path="-F" type="string">
+Format string for output
+</ParamField>
+
+<ParamField path="-f" type="string">
+Filter expression
+</ParamField>
+
+```bash
+# List all buffers
+tmux list-buffers
+
+# List with custom format
+tmux list-buffers -F "#{buffer_name}: #{buffer_size} bytes"
+
+# Default output:
+buffer0: 42 bytes: "Hello, tmux!"
+buffer1: 15 bytes: "More content"
+```
+
+### show-buffer
+
+Display buffer contents.
+
+```bash
+tmux show-buffer [-b buffer-name]
+```
+
+**Alias:** `showb`
+
+```bash
+# Show most recent buffer
+tmux show-buffer
+
+# Show specific buffer
+tmux show-buffer -b buffer0
+
+# Save buffer to file
+tmux show-buffer > saved-buffer.txt
+tmux show-buffer -b mybuffer > mybuffer.txt
+```
+
+## Pasting Buffers
+
+### paste-buffer
+
+Paste buffer contents into a pane.
+
+```bash
+tmux paste-buffer [-dpr] [-b buffer-name] [-s separator] \
+                  [-t target-pane]
+```
+
+**Alias:** `pasteb`
+
+<ParamField path="-d" type="flag">
+Delete buffer after pasting
+</ParamField>
+
+<ParamField path="-p" type="flag">
+Paste using bracketed paste mode (if supported)
+</ParamField>
+
+<ParamField path="-r" type="flag">
+Do not replace newlines with separator
+</ParamField>
+
+<ParamField path="-b" type="string">
+Buffer to paste (default: most recent)
+</ParamField>
+
+<ParamField path="-s" type="string">
+Separator to replace newlines (default: CR)
+</ParamField>
+
+```bash
+# Paste most recent buffer
+tmux paste-buffer
+
+# Paste specific buffer
+tmux paste-buffer -b buffer0
+
+# Paste and delete buffer
+tmux paste-buffer -d
+
+# Paste to specific pane
+tmux paste-buffer -t :.1
+
+# Paste with custom separator
+tmux paste-buffer -s "; "
+
+# Paste without replacing newlines
+tmux paste-buffer -r
+```
+
+## Loading and Saving Buffers
+
+### load-buffer
+
+Load file contents into a buffer.
+
+```bash
+tmux load-buffer [-w] [-b buffer-name] [-t target-client] path
+```
+
+**Alias:** `loadb`
+
+<ParamField path="-w" type="flag">
+Send to clipboard
+</ParamField>
+
+<ParamField path="-b" type="string">
+Buffer name
+</ParamField>
+
+```bash
+# Load file into buffer
+tmux load-buffer file.txt
+
+# Load into named buffer
+tmux load-buffer -b myfile file.txt
+
+# Load and send to clipboard
+tmux load-buffer -w file.txt
+
+# Load from stdin
+echo "text" | tmux load-buffer -
+```
+
+### save-buffer
+
+Save buffer contents to a file.
+
+```bash
+tmux save-buffer [-a] [-b buffer-name] path
+```
+
+**Alias:** `saveb`
+
+<ParamField path="-a" type="flag">
+Append to file instead of overwriting
+</ParamField>
+
+<ParamField path="-b" type="string">
+Buffer to save
+</ParamField>
+
+```bash
+# Save most recent buffer
+tmux save-buffer output.txt
+
+# Save specific buffer
+tmux save-buffer -b buffer0 buffer0.txt
+
+# Append to file
+tmux save-buffer -a log.txt
+
+# Save to stdout
+tmux save-buffer -
+```
+
+## Interactive Buffer Selection
+
+### choose-buffer
+
+Interactively select a buffer.
+
+```bash
+tmux choose-buffer [-NrZ] [-F format] [-f filter] \
+                   [-K key-format] [-O sort-order] \
+                   [-t target-pane] [template]
+```
+
+<ParamField path="-N" type="flag">
+Start without preview
+</ParamField>
+
+<ParamField path="-r" type="flag">
+Reverse sort order
+</ParamField>
+
+<ParamField path="-Z" type="flag">
+Zoom the pane
+</ParamField>
+
+<ParamField path="-O" type="string">
+Sort order: `name`, `time`, or `size`
+</ParamField>
+
+```bash
+# Interactive buffer selection
+tmux choose-buffer
+
+# With custom template
+tmux choose-buffer 'paste-buffer -b "%%"'
+
+# Sorted by size
+tmux choose-buffer -O size
+```
+
+**Keys in choose-buffer mode:**
+- `Enter`: Paste selected buffer
+- `d`: Delete selected buffer
+- `D`: Delete tagged buffers
+- `t`: Toggle tag on buffer
+- `q`: Exit mode
+
+## Copy Mode Configuration
+
+### Vi-Style Copy Mode
+
+```bash
+# Enable vi mode
+tmux set-option -w mode-keys vi
+
+# Bind keys for vi-style selection
+tmux bind-key -T copy-mode-vi v send-keys -X begin-selection
+tmux bind-key -T copy-mode-vi y send-keys -X copy-selection-and-cancel
+tmux bind-key -T copy-mode-vi C-v send-keys -X rectangle-toggle
+
+# Visual line selection
+tmux bind-key -T copy-mode-vi V send-keys -X select-line
+
+# Copy to system clipboard (requires xclip or pbcopy)
+tmux bind-key -T copy-mode-vi y send-keys -X copy-pipe-and-cancel 'xclip -in -selection clipboard'
+
+# Or for macOS
+tmux bind-key -T copy-mode-vi y send-keys -X copy-pipe-and-cancel 'pbcopy'
+```
+
+### Emacs-Style Copy Mode
+
+```bash
+# Enable emacs mode
+tmux set-option -w mode-keys emacs
+
+# Standard emacs bindings work by default
+# C-Space to begin selection
+# M-w to copy
+# C-g to cancel
+
+# Copy to system clipboard
+tmux bind-key -T copy-mode M-w send-keys -X copy-pipe-and-cancel 'xclip -in -selection clipboard'
+```
+
+## Examples
+
+<Accordion title="Quick Copy Workflow">
+```bash
+# In ~/.tmux.conf
+
+# Vi mode
+set-option -w mode-keys vi
+
+# Enter copy mode with prefix + [
+bind-key [ copy-mode
+
+# Paste with prefix + ]
+bind-key ] paste-buffer
+
+# Quick copy with mouse drag
+bind-key -T copy-mode-vi MouseDragEnd1Pane \
+    send-keys -X copy-pipe-and-cancel 'xclip -in -selection clipboard'
+
+# Select and copy line
+bind-key -T copy-mode-vi V send-keys -X select-line
+```
+</Accordion>
+
+<Accordion title="System Clipboard Integration">
+```bash
+# Linux (xclip)
+bind-key -T copy-mode-vi y send-keys -X copy-pipe-and-cancel 'xclip -in -selection clipboard'
+bind-key -T copy-mode-vi Enter send-keys -X copy-pipe-and-cancel 'xclip -in -selection clipboard'
+
+# Linux (xsel)
+bind-key -T copy-mode-vi y send-keys -X copy-pipe-and-cancel 'xsel --clipboard --input'
+
+# macOS
+bind-key -T copy-mode-vi y send-keys -X copy-pipe-and-cancel 'pbcopy'
+
+# Windows (WSL)
+bind-key -T copy-mode-vi y send-keys -X copy-pipe-and-cancel 'clip.exe'
+
+# Paste from system clipboard
+bind-key C-v run 'xclip -out -selection clipboard | tmux load-buffer - ; tmux paste-buffer'
+```
+</Accordion>
+
+<Accordion title="Buffer Management Script">
+```bash
+#!/bin/bash
+# Save all buffers to files
+
+BUFFER_DIR="$HOME/.tmux/buffers"
+mkdir -p "$BUFFER_DIR"
+
+tmux list-buffers -F '#{buffer_name}' | while read -r buffer; do
+    tmux save-buffer -b "$buffer" "$BUFFER_DIR/$buffer.txt"
+    echo "Saved $buffer"
+done
+
+# Load buffers from files
+for file in "$BUFFER_DIR"/*.txt; do
+    name=$(basename "$file" .txt)
+    tmux load-buffer -b "$name" "$file"
+    echo "Loaded $name"
+done
+```
+</Accordion>
+
+<Accordion title="Advanced Copy Mode Bindings">
+```bash
+# In ~/.tmux.conf
+
+# Copy entire line
+bind-key -T copy-mode-vi Y send-keys -X copy-line
+
+# Copy to end of line
+bind-key -T copy-mode-vi D send-keys -X copy-end-of-line
+
+# Select word
+bind-key -T copy-mode-vi w send-keys -X next-word
+bind-key -T copy-mode-vi b send-keys -X previous-word
+
+# Search and highlight
+bind-key / copy-mode \; send-keys -X search-forward
+bind-key ? copy-mode \; send-keys -X search-backward
+
+# Copy and execute
+bind-key -T copy-mode-vi e send-keys -X copy-pipe "xargs -I {} tmux send-keys {}"
+```
+</Accordion>
+
+<Accordion title="Multiple Buffer Management">
+```bash
+# Create named buffers
+tmux set-buffer -b cmd "docker ps -a"
+tmux set-buffer -b log "tail -f /var/log/app.log"
+tmux set-buffer -b ssh "ssh user@server"
+
+# Quick paste bindings
+tmux bind-key C-d paste-buffer -b cmd
+tmux bind-key C-l paste-buffer -b log
+tmux bind-key C-s paste-buffer -b ssh
+
+# List and choose
+tmux bind-key b choose-buffer
+```
+</Accordion>
+
+<Accordion title="Copy with Formatting">
+```bash
+# Copy with prefix
+bind-key -T copy-mode-vi y send-keys -X copy-pipe-and-cancel \
+    "sed 's/^/> /' | xclip -in -selection clipboard"
+
+# Copy and transform
+bind-key -T copy-mode-vi Y send-keys -X copy-pipe-and-cancel \
+    "tr '[:lower:]' '[:upper:]' | xclip -in -selection clipboard"
+
+# Copy as markdown code block
+bind-key -T copy-mode-vi C send-keys -X copy-pipe-and-cancel \
+    "awk 'BEGIN{print \"\`\`\`\"} {print} END{print \"\`\`\`\"}' | xclip -in -selection clipboard"
+```
+</Accordion>
+
+## Tips
+
+<Note>
+**Buffer Naming**: Automatic buffers are named `buffer0`, `buffer1`, etc. Create named buffers for persistent snippets.
+</Note>
+
+<Note>
+**Scrollback Size**: Set `history-limit` option to control how much history is available in copy mode.
+</Note>
+
+<Warning>
+**Clipboard Access**: System clipboard integration requires external tools like `xclip`, `xsel`, `pbcopy`, or `clip.exe` depending on your platform.
+</Warning>

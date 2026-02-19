@@ -1,0 +1,598 @@
+---
+title: 'Control Mode'
+description: 'Integrate tmux with external applications using control mode'
+---
+
+## Overview
+
+Control mode is a text-based protocol that allows external applications to communicate with tmux programmatically. Instead of displaying a terminal interface, tmux outputs structured notifications and accepts commands via standard input.
+
+## Starting Control Mode
+
+<CodeGroup>
+```bash Basic Control Mode
+tmux -C attach-session
+tmux -C new-session
+```
+
+```bash Disable Echo (Quieter)
+tmux -CC attach-session    # -CC disables echo
+```
+
+```bash Attach to Existing Session
+tmux -C attach-session -t mysession
+```
+</CodeGroup>
+
+<Note>
+In control mode, the `-C` flag makes tmux send all output as structured notifications instead of rendering a visual interface. The `-CC` variant additionally disables terminal echo.
+</Note>
+
+## Protocol Structure
+
+### Command Input
+
+Send tmux commands to standard input, terminated by newlines:
+
+```text
+new-window
+split-window -h
+list-windows
+```
+
+### Output Blocks
+
+Each command produces an output block:
+
+```text
+%begin 1363006971 2 1
+0: ksh* (1 panes) [80x24] [layout b25f,80x24,0,0,2] @2 (active)
+%end 1363006971 2 1
+```
+
+Structure:
+- `%begin <timestamp> <command-number> <flags>` - Start of output
+- Command output (may be empty)
+- `%end <timestamp> <command-number> <flags>` - Successful completion
+- `%error <timestamp> <command-number> <flags>` - Command failed
+
+## Notifications
+
+Notifications are sent outside of output blocks and report state changes:
+
+### Session Notifications
+
+<CodeGroup>
+```text Session Lifecycle
+%session-created $1 mysession
+%session-renamed newsession
+%session-closed $1 mysession
+```
+
+```text Session State
+%session-changed $1 mysession
+%session-window-changed $1 @5
+%sessions-changed
+```
+</CodeGroup>
+
+### Window Notifications
+
+<CodeGroup>
+```text Window Lifecycle
+%window-add @3
+%window-close @3
+%window-renamed @3 newname
+%unlinked-window-add @4
+%unlinked-window-close @4
+%unlinked-window-renamed @4
+```
+
+```text Window State
+%window-pane-changed @3 %5
+%layout-change @3 <layout> <visible-layout> <flags>
+```
+</CodeGroup>
+
+### Pane Notifications
+
+<CodeGroup>
+```text Pane Output
+%output %5 <escaped-data>
+%extended-output %5 123 : <escaped-data>
+```
+
+```text Pane State
+%pane-mode-changed %5
+%pause %5
+%continue %5
+```
+</CodeGroup>
+
+### Client Notifications
+
+<CodeGroup>
+```text Client State
+%client-detached client0
+%client-session-changed client0 $1 mysession
+```
+</CodeGroup>
+
+### Buffer Notifications
+
+```text
+%paste-buffer-changed buffer0
+%paste-buffer-deleted buffer0
+```
+
+### Other Notifications
+
+<CodeGroup>
+```text Messages
+%message <message-text>
+```
+
+```text Configuration
+%config-error <error-message>
+```
+
+```text Exit
+%exit [reason]
+```
+
+```text Subscriptions
+%subscription-changed name $1 @3 5 %7 : value
+```
+</CodeGroup>
+
+## Output Escaping
+
+The `%output` notification escapes non-printable characters:
+
+```text
+%output %5 hello\012world    # \012 is newline (octal)
+%output %5 test\134data      # \134 is backslash
+%output %5 normal text
+```
+
+Non-printable characters and backslashes are escaped as `\xxx` in octal notation.
+
+## Controlling Pane Output
+
+Control which panes send output using `refresh-client -A`:
+
+<CodeGroup>
+```bash Turn Pane Off
+refresh-client -A %5:off     # Stop receiving output
+```
+
+```bash Turn Pane On
+refresh-client -A %5:on      # Resume receiving output
+```
+
+```bash Pause/Continue
+refresh-client -A %5:pause   # Pause output
+refresh-client -A %5:continue # Resume after pause
+```
+</CodeGroup>
+
+When all clients turn a pane off, tmux stops reading from it.
+
+## Setting Client Size
+
+Set the size of control mode clients or their windows:
+
+<CodeGroup>
+```bash Client Size
+refresh-client -C 80x24      # Set client to 80x24
+```
+
+```bash Window Size
+refresh-client -C @0:80x24   # Set window @0 to 80x24
+```
+</CodeGroup>
+
+## Subscriptions
+
+Subscribe to format changes with `refresh-client -B`:
+
+<CodeGroup>
+```bash Session Subscription
+refresh-client -B mystatus::#{session_name}
+# Notifies when session name changes
+```
+
+```bash Pane Subscription
+refresh-client -B panestatus:%5:#{pane_current_command}
+# Notifies when pane %5 command changes
+```
+
+```bash Window Subscription
+refresh-client -B winstatus:@3:#{window_flags}
+# Notifies when window @3 flags change
+```
+
+```bash All Panes
+refresh-client -B allpanes:%*:#{pane_title}
+# Subscribe to all panes in session
+```
+
+```bash All Windows
+refresh-client -B allwins:@*:#{window_name}
+# Subscribe to all windows in session
+```
+</CodeGroup>
+
+Subscription format: `name:what:format`
+- `name` - Subscription identifier
+- `what` - Target: `%N` (pane), `%*` (all panes), `@N` (window), `@*` (all windows), or empty (session)
+- `format` - Format string to monitor
+
+### Subscription Notifications
+
+When a subscribed value changes:
+
+```text
+%subscription-changed mystatus $1 - - - : newsession
+%subscription-changed panestatus $1 @3 5 %7 : vim
+```
+
+Format: `name session-id window-id window-index pane-id : value`
+
+<Note>
+Subscriptions are checked at most once per second.
+</Note>
+
+### Removing Subscriptions
+
+```bash
+refresh-client -B mystatus    # Remove by name only
+```
+
+## Extended Output
+
+With the `pause-after` client flag, pane output uses `%extended-output`:
+
+```text
+%extended-output %5 234 : <data>
+```
+
+The age field (234ms) shows how long tmux buffered the output before sending it.
+
+## Pause Mode
+
+When output falls behind by more than `pause-after` milliseconds:
+
+```text
+%pause %5                     # Pane paused
+# ... client catches up ...
+%continue %5                  # Pane continued
+```
+
+<Warning>
+If a client without `pause-after` falls too far behind (300 seconds by default), tmux will disconnect the client with reason "too far behind".
+</Warning>
+
+## Client Flags
+
+Set client flags when attaching or with `refresh-client -f`:
+
+<CodeGroup>
+```bash Read-only
+attach-session -f read-only
+refresh-client -f read-only
+```
+
+```bash No Output
+attach-session -f no-output
+refresh-client -f no-output
+```
+
+```bash Pause After
+attach-session -f pause-after=5000    # Pause after 5 seconds
+refresh-client -f pause-after=10000   # Pause after 10 seconds
+```
+
+```bash Wait for Exit
+attach-session -f wait-exit
+```
+
+```bash Remove Flags
+refresh-client -f !read-only          # Turn off read-only
+```
+</CodeGroup>
+
+Available flags:
+- `active-pane` - Independent active pane
+- `ignore-size` - Don't affect other client sizes
+- `no-detach-on-destroy` - Stay connected when session destroyed
+- `no-output` - Don't receive pane output
+- `pause-after=N` - Pause when N milliseconds behind
+- `read-only` - Read-only mode
+- `wait-exit` - Wait for empty line before exiting
+
+## Sending Reports
+
+Send terminal reports from the client:
+
+```bash
+refresh-client -r %5:"\033]10;?\033\\"    # Request foreground color
+```
+
+This is typically used for responding to escape sequences that query terminal state.
+
+## Practical Examples
+
+<Accordion title="Basic Control Mode Client (Python)">
+```python
+#!/usr/bin/env python3
+import subprocess
+import sys
+
+# Start tmux in control mode
+proc = subprocess.Popen(
+    ['tmux', '-C', 'attach-session'],
+    stdin=subprocess.PIPE,
+    stdout=subprocess.PIPE,
+    stderr=subprocess.PIPE,
+    text=True,
+    bufsize=1
+)
+
+# Send commands
+proc.stdin.write("list-windows\n")
+proc.stdin.flush()
+
+# Read output
+in_block = False
+for line in proc.stdout:
+    line = line.rstrip()
+    
+    if line.startswith('%begin'):
+        in_block = True
+        print(f"Command started: {line}")
+    elif line.startswith('%end'):
+        in_block = False
+        print(f"Command ended: {line}")
+    elif line.startswith('%'):
+        print(f"Notification: {line}")
+    elif in_block:
+        print(f"Output: {line}")
+
+proc.stdin.close()
+proc.wait()
+```
+</Accordion>
+
+<Accordion title="Monitor Window Changes">
+```python
+#!/usr/bin/env python3
+import subprocess
+import re
+
+proc = subprocess.Popen(
+    ['tmux', '-C', 'attach-session'],
+    stdin=subprocess.PIPE,
+    stdout=subprocess.PIPE,
+    text=True,
+    bufsize=1
+)
+
+print("Monitoring window changes...")
+
+for line in proc.stdout:
+    line = line.rstrip()
+    
+    if line.startswith('%window-add'):
+        _, window_id = line.split()
+        print(f"New window: {window_id}")
+    
+    elif line.startswith('%window-close'):
+        _, window_id = line.split()
+        print(f"Window closed: {window_id}")
+    
+    elif line.startswith('%window-renamed'):
+        parts = line.split(maxsplit=2)
+        window_id, name = parts[1], parts[2]
+        print(f"Window {window_id} renamed to: {name}")
+```
+</Accordion>
+
+<Accordion title="Capture Pane Output">
+```python
+#!/usr/bin/env python3
+import subprocess
+import sys
+import re
+
+proc = subprocess.Popen(
+    ['tmux', '-C', 'new-session', '-d'],
+    stdin=subprocess.PIPE,
+    stdout=subprocess.PIPE,
+    text=True,
+    bufsize=1
+)
+
+# Start a command in the pane
+proc.stdin.write("send-keys 'echo Hello from tmux' Enter\n")
+proc.stdin.flush()
+
+# Capture output
+pane_id = None
+for line in proc.stdout:
+    line = line.rstrip()
+    
+    # Get pane ID from output
+    if '%' in line and pane_id is None:
+        match = re.search(r'%\d+', line)
+        if match:
+            pane_id = match.group()
+    
+    # Capture pane output
+    if line.startswith('%output'):
+        parts = line.split(maxsplit=2)
+        if len(parts) == 3:
+            _, pid, data = parts
+            # Decode octal escapes
+            decoded = data.replace('\\012', '\n')
+            print(f"Pane output: {decoded}")
+
+proc.stdin.write("kill-session\n")
+proc.stdin.flush()
+proc.wait()
+```
+</Accordion>
+
+<Accordion title="Subscribe to Status Changes">
+```bash
+#!/bin/bash
+
+# Start control mode
+{
+    echo "refresh-client -B winstatus:@*:#{window_name},#{window_flags}"
+    sleep 1
+    echo "new-window -n test"
+    sleep 1
+    echo "rename-window -t test changed"
+    sleep 1
+    echo "kill-window -t changed"
+    sleep 2
+} | tmux -C new-session -d | while IFS= read -r line; do
+    case "$line" in
+        %subscription-changed*)
+            echo "Status changed: $line"
+            ;;
+        %window-*)
+            echo "Window event: $line"
+            ;;
+    esac
+done
+```
+</Accordion>
+
+<Accordion title="Control Multiple Panes">
+```python
+#!/usr/bin/env python3
+import subprocess
+import time
+
+proc = subprocess.Popen(
+    ['tmux', '-C', 'new-session', '-d'],
+    stdin=subprocess.PIPE,
+    stdout=subprocess.PIPE,
+    text=True,
+    bufsize=1
+)
+
+# Create a split layout
+commands = [
+    "split-window -h",
+    "split-window -v",
+    "select-pane -t 0",
+    "send-keys 'htop' Enter",
+    "select-pane -t 1", 
+    "send-keys 'watch -n 1 date' Enter",
+    "select-pane -t 2",
+    "send-keys 'tail -f /var/log/syslog' Enter",
+]
+
+for cmd in commands:
+    proc.stdin.write(f"{cmd}\n")
+    proc.stdin.flush()
+    time.sleep(0.1)
+
+# Attach to see the result
+proc.stdin.write("attach-session\n")
+proc.stdin.flush()
+proc.wait()
+```
+</Accordion>
+
+## Implementing a Control Mode Client
+
+Key considerations when building a control mode client:
+
+1. **Non-blocking I/O**: Use non-blocking reads to handle notifications
+2. **Parse output blocks**: Track `%begin` and `%end`/`%error` pairs
+3. **Handle notifications**: Process `%` notifications outside blocks
+4. **Decode escapes**: Convert octal escapes in `%output`
+5. **Track state**: Maintain state of sessions, windows, and panes
+6. **Size management**: Set appropriate client/window sizes
+7. **Error handling**: Handle `%error` and `%exit` notifications
+
+## Integration Examples
+
+### Terminal Emulators
+
+Control mode is used by terminal emulators like:
+- iTerm2 (macOS) - tmux integration
+- WezTerm - tmux domain support
+- Custom terminal applications
+
+### Monitoring Tools
+
+```bash
+# Watch for session changes
+tmux -C attach | grep -E '%(session|window)'
+
+# Log all notifications
+tmux -C attach 2>&1 | tee tmux-control.log
+```
+
+### Automation Scripts
+
+```bash
+#!/bin/bash
+# Auto-restart failed panes
+
+tmux -C attach | while IFS= read -r line; do
+    if [[ $line =~ %pane-exited[[:space:]](%[0-9]+) ]]; then
+        pane="${BASH_REMATCH[1]}"
+        echo "respawn-pane -t $pane"
+    fi
+done
+```
+
+## Debugging Control Mode
+
+<CodeGroup>
+```bash Enable Verbose Logging
+tmux -v -C attach-session    # Log to tmux-client-PID.log
+```
+
+```bash Test Output Format
+echo "list-windows" | tmux -C attach-session -t test
+```
+
+```bash Monitor All Events
+tmux -C attach 2>&1 | tee -a control-debug.log
+```
+</CodeGroup>
+
+## Best Practices
+
+<Note>
+**Performance**: Control mode clients should process notifications quickly. Long-running operations should be asynchronous to avoid blocking tmux.
+</Note>
+
+<Warning>
+**Buffer Management**: Monitor the `client_discarded` format variable to detect when tmux is dropping output because the client is too slow.
+</Warning>
+
+Tips for reliable control mode clients:
+
+1. **Handle partial reads**: Notifications may span multiple reads
+2. **Maintain window/pane maps**: Track IDs to avoid lookups
+3. **Use subscriptions**: More efficient than polling
+4. **Set appropriate pause-after**: Balance responsiveness and resource usage
+5. **Handle disconnections**: Reconnect gracefully on `%exit`
+6. **Test edge cases**: Session destruction, pane exits, rapid changes
+7. **Document protocol version**: tmux protocol evolves, document which version you support
+
+## Limitations
+
+- Control mode is text-based; no binary protocol
+- Output is buffered and may be delayed
+- No built-in RPC or request-response pairing beyond command numbers
+- Octal encoding can be inefficient for binary data
+- No authentication or encryption (use SSH tunneling if needed)

@@ -1,0 +1,695 @@
+---
+title: Real-World Use Cases
+description: Practical tmux workflows and usage patterns for common scenarios
+---
+
+## Overview
+
+This page demonstrates real-world tmux use cases, from development workflows to system administration tasks. Each example includes complete, working configurations you can adapt to your needs.
+
+## Development Workflows
+
+### Full-Stack Development Setup
+
+Create a comprehensive development environment with multiple panes for different tasks.
+
+<Tabs>
+<Tab title="Manual Setup">
+```bash
+# Create new session
+tmux new-session -s dev -n editor
+
+# Split for terminal
+tmux split-window -h -p 30
+
+# Split terminal vertically for logs
+tmux split-pane -v
+
+# Select editor pane and start vim
+tmux select-pane -t 0
+tmux send-keys 'vim .' C-m
+
+# Select terminal pane
+tmux select-pane -t 1
+tmux send-keys 'npm run dev' C-m
+
+# Select logs pane
+tmux select-pane -t 2
+tmux send-keys 'tail -f logs/development.log' C-m
+
+# Create additional windows
+tmux new-window -n git
+tmux send-keys 'git status' C-m
+
+tmux new-window -n database
+tmux send-keys 'psql mydb' C-m
+
+# Return to editor window
+tmux select-window -t editor
+```
+</Tab>
+
+<Tab title="Key Binding">
+```conf
+# Add to ~/.tmux.conf
+bind D new-session -s dev -n editor \; \
+  split-window -h -p 30 \; \
+  split-pane -v \; \
+  select-pane -t 0 \; \
+  send-keys 'vim .' C-m \; \
+  select-pane -t 1 \; \
+  send-keys 'npm run dev' C-m \; \
+  select-pane -t 2 \; \
+  send-keys 'tail -f logs/development.log' C-m \; \
+  new-window -n git \; \
+  send-keys 'git status' C-m \; \
+  new-window -n database \; \
+  send-keys 'psql mydb' C-m \; \
+  select-window -t editor
+
+# Use with: prefix + D
+```
+</Tab>
+
+<Tab title="Shell Script">
+```bash
+#!/bin/bash
+# ~/bin/tmux-dev-setup.sh
+
+SESSION="dev"
+PROJECT_DIR="$HOME/projects/myapp"
+
+# Check if session exists
+tmux has-session -t $SESSION 2>/dev/null
+
+if [ $? != 0 ]; then
+  # Create session
+  tmux new-session -d -s $SESSION -c $PROJECT_DIR -n editor
+  
+  # Editor pane
+  tmux send-keys -t $SESSION:editor "vim ." C-m
+  
+  # Terminal pane
+  tmux split-window -h -p 30 -t $SESSION:editor -c $PROJECT_DIR
+  tmux send-keys -t $SESSION:editor.1 "npm run dev" C-m
+  
+  # Logs pane
+  tmux split-pane -v -t $SESSION:editor.1 -c $PROJECT_DIR
+  tmux send-keys -t $SESSION:editor.2 "tail -f logs/development.log" C-m
+  
+  # Git window
+  tmux new-window -t $SESSION -n git -c $PROJECT_DIR
+  tmux send-keys -t $SESSION:git "git status" C-m
+  
+  # Database window
+  tmux new-window -t $SESSION -n database -c $PROJECT_DIR
+  tmux send-keys -t $SESSION:database "psql mydb" C-m
+  
+  # Select editor window
+  tmux select-window -t $SESSION:editor
+fi
+
+# Attach to session
+tmux attach-session -t $SESSION
+```
+</Tab>
+</Tabs>
+
+### Pair Programming Setup
+
+Configure tmux for remote pair programming with synchronized panes.
+
+```conf
+# Pair programming configuration
+bind P new-session -s pair \; \
+  set -w synchronize-panes on \; \
+  split-window -h \; \
+  display "Pair programming mode enabled"
+
+# Toggle sync in existing session
+bind S set synchronize-panes\; display 'synchronize-panes #{?synchronize-panes,ON,OFF}'
+```
+
+**Workflow:**
+1. Create session: `tmux new -s pair`
+2. Share socket: `chmod 777 /tmp/tmux-$(id -u)/default`
+3. Partner joins: `tmux attach -t pair`
+4. Toggle sync: `prefix + S`
+
+### Testing Different Environments
+
+Run tests across multiple environments simultaneously.
+
+```bash
+#!/bin/bash
+# ~/bin/tmux-multi-test.sh
+
+SESSION="testing"
+
+tmux new-session -d -s $SESSION -n "node-14"
+tmux send-keys -t $SESSION "nvm use 14 && npm test" C-m
+
+tmux new-window -t $SESSION -n "node-16"
+tmux send-keys -t $SESSION "nvm use 16 && npm test" C-m
+
+tmux new-window -t $SESSION -n "node-18"
+tmux send-keys -t $SESSION "nvm use 18 && npm test" C-m
+
+tmux select-layout -t $SESSION tiled
+tmux attach -t $SESSION
+```
+
+## System Administration
+
+### Server Monitoring Dashboard
+
+Create a comprehensive monitoring dashboard.
+
+<CodeGroup>
+
+```bash Script
+#!/bin/bash
+# ~/bin/tmux-monitor.sh
+
+SESSION="monitor"
+
+if tmux has-session -t $SESSION 2>/dev/null; then
+  tmux attach -t $SESSION
+  exit
+fi
+
+# Create session with system stats
+tmux new-session -d -s $SESSION -n system
+
+# Top pane: htop
+tmux send-keys -t $SESSION "htop" C-m
+
+# Split right: disk usage
+tmux split-window -h -t $SESSION
+tmux send-keys -t $SESSION "watch -n 5 df -h" C-m
+
+# Split bottom: network
+tmux split-pane -v -t $SESSION
+tmux send-keys -t $SESSION "watch -n 2 'netstat -an | grep ESTABLISHED | wc -l'" C-m
+
+# New window for logs
+tmux new-window -t $SESSION -n logs
+tmux send-keys -t $SESSION "tail -f /var/log/syslog" C-m
+
+# Split for auth logs
+tmux split-window -v -t $SESSION
+tmux send-keys -t $SESSION "tail -f /var/log/auth.log" C-m
+
+# New window for docker
+tmux new-window -t $SESSION -n docker
+tmux send-keys -t $SESSION "watch -n 5 docker ps" C-m
+
+# Select first window
+tmux select-window -t $SESSION:system
+
+tmux attach -t $SESSION
+```
+
+```conf Binding
+# Add to ~/.tmux.conf
+bind M run-shell "~/bin/tmux-monitor.sh"
+```
+
+</CodeGroup>
+
+### Multi-Server Management
+
+Manage multiple servers with synchronized input.
+
+```bash
+#!/bin/bash
+# ~/bin/tmux-multi-server.sh
+
+SESSION="servers"
+SERVERS=("web1.example.com" "web2.example.com" "web3.example.com")
+
+tmux new-session -d -s $SESSION
+
+# First server
+tmux send-keys -t $SESSION "ssh ${SERVERS[0]}" C-m
+
+# Additional servers
+for server in "${SERVERS[@]:1}"; do
+  tmux split-window -t $SESSION
+  tmux select-layout -t $SESSION tiled
+  tmux send-keys -t $SESSION "ssh $server" C-m
+done
+
+# Enable synchronized panes
+tmux set-window-option -t $SESSION synchronize-panes on
+
+tmux attach -t $SESSION
+```
+
+**Usage:**
+```bash
+./tmux-multi-server.sh
+# Type once, execute on all servers
+# Toggle sync: prefix + :setw synchronize-panes off
+```
+
+### Log Monitoring
+
+Monitor multiple log files simultaneously.
+
+```conf
+# Log monitoring binding
+bind L new-session -s logs \; \
+  rename-window "app-logs" \; \
+  send-keys "tail -f /var/log/app/error.log" C-m \; \
+  split-window -v \; \
+  send-keys "tail -f /var/log/app/access.log" C-m \; \
+  split-window -v \; \
+  send-keys "tail -f /var/log/app/debug.log" C-m \; \
+  select-layout even-vertical \; \
+  new-window -n "system-logs" \; \
+  send-keys "tail -f /var/log/syslog" C-m \; \
+  split-window -h \; \
+  send-keys "journalctl -f" C-m \; \
+  select-window -t app-logs
+```
+
+## Remote Work Scenarios
+
+### SSH Session Management
+
+Maintain persistent SSH sessions that survive disconnections.
+
+```bash
+#!/bin/bash
+# ~/bin/tmux-ssh-session.sh
+
+HOST="$1"
+SESSION=$(echo "$HOST" | tr '.' '-')
+
+if [ -z "$HOST" ]; then
+  echo "Usage: $0 <hostname>"
+  exit 1
+fi
+
+tmux has-session -t "$SESSION" 2>/dev/null
+
+if [ $? != 0 ]; then
+  # Create new session
+  tmux new-session -d -s "$SESSION"
+  tmux send-keys -t "$SESSION" "ssh $HOST" C-m
+  
+  # Create additional windows
+  tmux new-window -t "$SESSION" -n "files"
+  tmux send-keys -t "$SESSION" "ssh $HOST 'cd /var/www && bash'" C-m
+  
+  tmux new-window -t "$SESSION" -n "logs"
+  tmux send-keys -t "$SESSION" "ssh $HOST 'tail -f /var/log/nginx/error.log'" C-m
+  
+  tmux select-window -t "$SESSION":0
+fi
+
+tmux attach -t "$SESSION"
+```
+
+### Persistent Work Sessions
+
+Create a session that automatically starts your work environment.
+
+<Accordion title="View Complete Work Session Script">
+
+```bash
+#!/bin/bash
+# ~/bin/tmux-work.sh
+
+SESSION="work"
+PROJECT_DIR="$HOME/work"
+
+# Check if session exists
+if tmux has-session -t $SESSION 2>/dev/null; then
+  tmux attach -t $SESSION
+  exit 0
+fi
+
+# Create session
+tmux new-session -d -s $SESSION -c $PROJECT_DIR
+
+# Window 1: Email
+tmux rename-window -t $SESSION:0 "email"
+tmux send-keys -t $SESSION:email "neomutt" C-m
+
+# Window 2: Code
+tmux new-window -t $SESSION -n "code" -c "$PROJECT_DIR/myproject"
+tmux send-keys -t $SESSION:code "vim ." C-m
+tmux split-window -h -t $SESSION:code -p 30 -c "$PROJECT_DIR/myproject"
+tmux send-keys -t $SESSION:code.1 "npm run dev" C-m
+
+# Window 3: Terminal
+tmux new-window -t $SESSION -n "term" -c $PROJECT_DIR
+
+# Window 4: Chat
+tmux new-window -t $SESSION -n "chat"
+tmux send-keys -t $SESSION:chat "weechat" C-m
+
+# Window 5: Music
+tmux new-window -t $SESSION -n "music"
+tmux send-keys -t $SESSION:music "ncmpcpp" C-m
+
+# Window 6: System Monitor
+tmux new-window -t $SESSION -n "monitor"
+tmux send-keys -t $SESSION:monitor "htop" C-m
+tmux split-window -v -t $SESSION:monitor
+tmux send-keys -t $SESSION:monitor.1 "watch -n 5 df -h" C-m
+
+# Select code window
+tmux select-window -t $SESSION:code
+
+# Attach
+tmux attach -t $SESSION
+```
+
+</Accordion>
+
+Add to shell profile for automatic restoration:
+```bash
+# In ~/.bashrc or ~/.zshrc
+if command -v tmux &> /dev/null && [ -z "$TMUX" ]; then
+  tmux attach -t work || ~/bin/tmux-work.sh
+fi
+```
+
+## Database Administration
+
+### Database Management Session
+
+```bash
+#!/bin/bash
+# ~/bin/tmux-db-admin.sh
+
+SESSION="db-admin"
+DB_NAME="mydb"
+
+tmux new-session -d -s $SESSION -n "query"
+
+# Query window
+tmux send-keys -t $SESSION "psql $DB_NAME" C-m
+
+# Logs window
+tmux new-window -t $SESSION -n "logs"
+tmux send-keys -t $SESSION "tail -f /var/log/postgresql/postgresql.log" C-m
+
+# Monitoring window
+tmux new-window -t $SESSION -n "monitor"
+tmux send-keys -t $SESSION "watch -n 2 'psql $DB_NAME -c \"SELECT * FROM pg_stat_activity;\"'" C-m
+
+# Backup window
+tmux new-window -t $SESSION -n "backup"
+tmux send-keys -t $SESSION "cd /backups" C-m
+
+tmux select-window -t $SESSION:query
+tmux attach -t $SESSION
+```
+
+## Content Creation
+
+### Video/Streaming Setup
+
+Setup for recording or live coding.
+
+```conf
+# Recording/streaming layout
+bind R new-session -s stream \; \
+  rename-window "main" \; \
+  split-window -h -p 25 \; \
+  split-pane -v \; \
+  split-pane -v \; \
+  select-pane -t 0 \; \
+  \
+  new-window -n "preview" \; \
+  select-window -t main
+```
+
+Layout:
+```
+┌─────────────────┬──────┐
+│                 │ chat │
+│                 ├──────┤
+│   Main Code     │notes │
+│                 ├──────┤
+│                 │stats │
+└─────────────────┴──────┘
+```
+
+### Writing Environment
+
+Focus mode for writing with automatic saving.
+
+```conf
+# Writing mode
+bind W new-session -s writing \; \
+  rename-window "editor" \; \
+  send-keys "vim ~/Documents/draft.md" C-m \; \
+  split-window -v -p 20 \; \
+  send-keys "watch -n 60 'git add . && git commit -m \"Auto-save: $(date)\"'" C-m \; \
+  select-pane -t 0
+```
+
+## Automation and Batch Processing
+
+### Parallel Task Execution
+
+Run multiple tasks in parallel and monitor progress.
+
+```bash
+#!/bin/bash
+# ~/bin/tmux-parallel-tasks.sh
+
+SESSION="tasks"
+TASKS=("task1.sh" "task2.sh" "task3.sh" "task4.sh")
+
+tmux new-session -d -s $SESSION
+
+for i in "${!TASKS[@]}"; do
+  if [ $i -eq 0 ]; then
+    tmux send-keys -t $SESSION "./${TASKS[$i]}" C-m
+  else
+    tmux split-window -t $SESSION
+    tmux select-layout -t $SESSION tiled
+    tmux send-keys -t $SESSION "./${TASKS[$i]}" C-m
+  fi
+done
+
+tmux attach -t $SESSION
+```
+
+### Build Pipeline Monitoring
+
+Monitor CI/CD pipeline stages.
+
+```bash
+#!/bin/bash
+# ~/bin/tmux-build-monitor.sh
+
+SESSION="build"
+PROJECT="myapp"
+
+tmux new-session -d -s $SESSION -n "build"
+
+# Build output
+tmux send-keys -t $SESSION "npm run build 2>&1 | tee build.log" C-m
+
+# Test output
+tmux split-window -v -t $SESSION
+tmux send-keys -t $SESSION "npm test 2>&1 | tee test.log" C-m
+
+# Lint output
+tmux split-window -v -t $SESSION
+tmux send-keys -t $SESSION "npm run lint 2>&1 | tee lint.log" C-m
+
+# Status window
+tmux new-window -t $SESSION -n "status"
+tmux send-keys -t $SESSION "watch -n 1 'echo \"Build: \$(tail -1 build.log)\" && echo \"Test: \$(tail -1 test.log)\" && echo \"Lint: \$(tail -1 lint.log)\"'" C-m
+
+tmux select-layout -t $SESSION:build even-vertical
+tmux select-window -t $SESSION:build
+
+tmux attach -t $SESSION
+```
+
+## Session Templates
+
+### Project-Specific Templates
+
+Create reusable templates for different project types.
+
+<CodeGroup>
+
+```bash Python Project
+#!/bin/bash
+# ~/bin/tmux-python-project.sh
+
+SESSION="${1:-python-dev}"
+PROJECT_DIR="${2:-$(pwd)}"
+
+tmux new-session -d -s $SESSION -c $PROJECT_DIR -n "editor"
+tmux send-keys -t $SESSION "source venv/bin/activate && vim ." C-m
+
+tmux split-window -h -t $SESSION -p 30 -c $PROJECT_DIR
+tmux send-keys -t $SESSION "source venv/bin/activate && python manage.py runserver" C-m
+
+tmux split-pane -v -t $SESSION -c $PROJECT_DIR
+tmux send-keys -t $SESSION "source venv/bin/activate && pytest --watch" C-m
+
+tmux new-window -t $SESSION -n "shell" -c $PROJECT_DIR
+tmux send-keys -t $SESSION "source venv/bin/activate" C-m
+
+tmux new-window -t $SESSION -n "db" -c $PROJECT_DIR
+tmux send-keys -t $SESSION "source venv/bin/activate && python manage.py dbshell" C-m
+
+tmux select-window -t $SESSION:editor
+tmux attach -t $SESSION
+```
+
+```bash Go Project
+#!/bin/bash
+# ~/bin/tmux-go-project.sh
+
+SESSION="${1:-go-dev}"
+PROJECT_DIR="${2:-$(pwd)}"
+
+tmux new-session -d -s $SESSION -c $PROJECT_DIR -n "editor"
+tmux send-keys -t $SESSION "vim ." C-m
+
+tmux split-window -h -t $SESSION -p 30 -c $PROJECT_DIR
+tmux send-keys -t $SESSION "go run ." C-m
+
+tmux split-pane -v -t $SESSION -c $PROJECT_DIR
+tmux send-keys -t $SESSION "go test -v ./..." C-m
+
+tmux new-window -t $SESSION -n "shell" -c $PROJECT_DIR
+
+tmux select-window -t $SESSION:editor
+tmux attach -t $SESSION
+```
+
+```bash Rust Project
+#!/bin/bash
+# ~/bin/tmux-rust-project.sh
+
+SESSION="${1:-rust-dev}"
+PROJECT_DIR="${2:-$(pwd)}"
+
+tmux new-session -d -s $SESSION -c $PROJECT_DIR -n "editor"
+tmux send-keys -t $SESSION "vim ." C-m
+
+tmux split-window -h -t $SESSION -p 30 -c $PROJECT_DIR
+tmux send-keys -t $SESSION "cargo watch -x run" C-m
+
+tmux split-pane -v -t $SESSION -c $PROJECT_DIR
+tmux send-keys -t $SESSION "cargo watch -x test" C-m
+
+tmux new-window -t $SESSION -n "shell" -c $PROJECT_DIR
+
+tmux select-window -t $SESSION:editor
+tmux attach -t $SESSION
+```
+
+</CodeGroup>
+
+## Tips and Best Practices
+
+<AccordionGroup>
+
+<Accordion title="Session Naming Conventions">
+Use descriptive, consistent names:
+- `work-project-name` for work projects
+- `personal-hobby` for personal projects
+- `admin-servername` for server management
+- `learn-technology` for learning sessions
+</Accordion>
+
+<Accordion title="Window Organization">
+Standard window layout:
+1. `editor` - Main development
+2. `term` - Command line tasks
+3. `git` - Version control
+4. `test` - Testing and QA
+5. `docs` - Documentation browsing
+6. `monitor` - System monitoring
+</Accordion>
+
+<Accordion title="Pane Size Guidelines">
+Common pane ratios:
+- Code + terminal: 70/30 horizontal
+- Code + logs: 80/20 horizontal
+- Four equal panes: `select-layout tiled`
+- Main + side panels: Use `-p` percentage flag
+</Accordion>
+
+<Accordion title="Keyboard-Centric Workflow">
+Minimize mouse usage:
+- Use `prefix + q` then number to select panes
+- Use `prefix + w` for window selection menu
+- Use `prefix + s` for session selection menu
+- Create custom key bindings for frequent tasks
+</Accordion>
+
+</AccordionGroup>
+
+## Quick Start Checklist
+
+<Steps>
+<Step title="Create your first project session">
+```bash
+tmux new-session -s myproject
+```
+</Step>
+
+<Step title="Split into useful panes">
+```bash
+# Vertical split: prefix + %
+# Horizontal split: prefix + "
+```
+</Step>
+
+<Step title="Create additional windows">
+```bash
+# New window: prefix + c
+# Name window: prefix + ,
+```
+</Step>
+
+<Step title="Save your session">
+If using tmux-resurrect plugin:
+```bash
+# Save: prefix + Ctrl-s
+```
+</Step>
+
+<Step title="Detach when done">
+```bash
+# Detach: prefix + d
+# Reattach later: tmux attach -t myproject
+```
+</Step>
+</Steps>
+
+## Next Steps
+
+<CardGroup cols={2}>
+<Card title="Basic Configuration" icon="sliders" href="/examples/basic-config">
+Essential configuration for your workflow
+</Card>
+
+<Card title="Advanced Configuration" icon="gear" href="/examples/advanced-config">
+Status line and hooks for automation
+</Card>
+
+<Card title="Plugins" icon="puzzle-piece" href="/examples/plugins">
+Extend functionality with plugins
+</Card>
+
+<Card title="Scripting Guide" icon="code" href="/guides/scripting">
+Automate complex workflows
+</Card>
+</CardGroup>

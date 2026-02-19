@@ -1,0 +1,723 @@
+---
+title: Copy Mode
+description: Using copy mode to navigate scrollback and copy text
+---
+
+## Overview
+
+Copy mode allows you to navigate the scrollback buffer, search text, and copy content to paste buffers. It's one of tmux's most powerful features for text manipulation without using the mouse.
+
+## Copy Mode Architecture
+
+From `window-copy.c:156-180`, copy mode is implemented as a window mode:
+
+<Tabs>
+  <Tab title="Mode Structure">
+    ```c
+    const struct window_mode window_copy_mode = {
+        .name = "copy-mode",
+        .init = window_copy_init,
+        .free = window_copy_free,
+        .resize = window_copy_resize,
+        .style_changed = window_copy_style_changed,
+        .key_table = window_copy_key_table,
+        .command = window_copy_command,
+        .formats = window_copy_formats,
+        .get_screen = window_copy_get_screen
+    };
+    ```
+  </Tab>
+
+  <Tab title="Data Structure">
+    From `window-copy.c:235-317`:
+    ```c
+    struct window_copy_mode_data {
+        struct screen screen;
+        struct screen *backing;
+        int backing_written;
+        
+        u_int oy;        // Lines scrolled up
+        u_int selx;      // Selection start
+        u_int sely;
+        u_int endselx;   // Selection end
+        u_int endsely;
+        
+        int modekeys;    // Emacs or vi mode
+        int rectflag;    // Rectangle selection
+        int searchtype;  // Search direction
+        char *searchstr; // Search string
+    };
+    ```
+  </Tab>
+</Tabs>
+
+## Entering Copy Mode
+
+### Basic Entry
+
+<CodeGroup>
+
+```bash Default Binding
+# Press prefix + [
+C-b [
+```
+
+```bash With Scroll Up
+# Enter and scroll up one page
+C-b PgUp
+
+# Equivalent command
+bind PPage copy-mode -u
+```
+
+```bash From Command
+# Enter copy mode
+tmux copy-mode
+
+# Enter and scroll to top
+tmux copy-mode -u
+```
+
+```bash Custom Binding
+# Bind to a convenient key
+bind Escape copy-mode
+bind -n M-v copy-mode
+```
+
+</CodeGroup>
+
+## Navigation Keys
+
+### Vi Mode Keys
+
+From `key-bindings.c:567-654`, vi-style bindings:
+
+<Tabs>
+  <Tab title="Basic Movement">
+    ```bash
+    h       # Move left
+    j       # Move down
+    k       # Move up
+    l       # Move right
+    
+    C-d     # Half page down
+    C-u     # Half page up
+    C-f     # Full page down
+    C-b     # Full page up
+    
+    w       # Next word
+    b       # Previous word
+    e       # End of word
+    ```
+  </Tab>
+
+  <Tab title="Line Movement">
+    ```bash
+    0       # Start of line
+    ^       # First non-whitespace
+    $       # End of line
+    
+    H       # Top of screen
+    M       # Middle of screen
+    L       # Bottom of screen
+    ```
+  </Tab>
+
+  <Tab title="Document Movement">
+    ```bash
+    g       # Go to top
+    G       # Go to bottom
+    :       # Go to line (prompt)
+    
+    {       # Previous paragraph
+    }       # Next paragraph
+    ```
+  </Tab>
+
+  <Tab title="Search">
+    ```bash
+    /       # Search forward
+    ?       # Search backward
+    n       # Next match
+    N       # Previous match
+    ```
+  </Tab>
+</Tabs>
+
+### Emacs Mode Keys
+
+From `key-bindings.c:491-565`, emacs-style bindings:
+
+<Tabs>
+  <Tab title="Basic Movement">
+    ```bash
+    C-f     # Move right
+    C-b     # Move left
+    C-n     # Move down
+    C-p     # Move up
+    
+    C-v     # Page down
+    M-v     # Page up
+    
+    M-f     # Next word
+    M-b     # Previous word
+    ```
+  </Tab>
+
+  <Tab title="Line Movement">
+    ```bash
+    C-a     # Start of line
+    C-e     # End of line
+    M-m     # Back to indentation
+    
+    M-R     # Top of screen
+    M-r     # Middle of screen
+    ```
+  </Tab>
+
+  <Tab title="Document Movement">
+    ```bash
+    M-<     # Go to top
+    M->     # Go to bottom
+    
+    M-{     # Previous paragraph
+    M-}     # Next paragraph
+    ```
+  </Tab>
+
+  <Tab title="Search">
+    ```bash
+    C-r     # Search backward (incremental)
+    C-s     # Search forward (incremental)
+    ```
+  </Tab>
+</Tabs>
+
+## Selection and Copying
+
+### Vi-style Selection
+
+<Steps>
+
+<Step title="Begin Selection">
+```bash
+# Start character selection
+Space
+
+# Start line selection
+V
+
+# Start rectangle selection
+C-v
+```
+</Step>
+
+<Step title="Navigate to End">
+Use movement keys (h, j, k, l, w, b, etc.) to extend selection
+</Step>
+
+<Step title="Copy Selection">
+```bash
+Enter           # Copy and exit
+y               # Copy (stay in copy mode)
+A               # Append to buffer and exit
+D               # Copy to end of line and exit
+```
+</Step>
+
+</Steps>
+
+### Emacs-style Selection
+
+<Steps>
+
+<Step title="Begin Selection">
+```bash
+C-Space         # Set mark (begin selection)
+```
+</Step>
+
+<Step title="Navigate to End">
+Use movement keys (C-f, C-b, C-n, C-p, M-f, M-b, etc.)
+</Step>
+
+<Step title="Copy Selection">
+```bash
+M-w             # Copy selection
+C-w             # Copy and exit
+```
+</Step>
+
+</Steps>
+
+### Rectangle Selection
+
+From `window-copy.c:143`:
+
+```bash
+# Vi mode: C-v for rectangle toggle
+bind -Tcopy-mode-vi C-v send -X rectangle-toggle
+
+# Emacs mode: activate rectangle
+bind -Tcopy-mode R send -X rectangle-toggle
+
+# Copy rectangular region
+1. Enter copy mode
+2. Press C-v (vi) or R (emacs)
+3. Move to define rectangle
+4. Press Enter/y to copy
+```
+
+## Searching
+
+### Search Commands
+
+<CodeGroup>
+
+```bash Vi Mode
+# Search forward
+/pattern
+
+# Search backward
+?pattern
+
+# Next occurrence
+n
+
+# Previous occurrence
+N
+
+# Search for word under cursor
+* (forward)
+# (backward)
+```
+
+```bash Emacs Mode
+# Incremental search backward
+C-r
+
+# Incremental search forward
+C-s
+
+# Repeat search
+n
+
+# Reverse search direction
+N
+```
+
+</CodeGroup>
+
+### Search Options
+
+From `window-copy.c:294-310`:
+
+```bash
+# Case-sensitive search by default
+# Lowercase pattern = case-insensitive
+# Any uppercase = case-sensitive
+
+# Search with regex
+tmux copy-mode \; send -X search-forward-regex "pattern"
+
+# Clear search highlighting
+C-g (emacs) or Escape (vi)
+```
+
+## Paste Buffers
+
+### Managing Buffers
+
+<Tabs>
+  <Tab title="List Buffers">
+    ```bash
+    # Show all paste buffers
+    C-b #
+    
+    # Or command
+    tmux list-buffers
+    
+    # Choose buffer to paste
+    C-b =
+    tmux choose-buffer
+    ```
+  </Tab>
+
+  <Tab title="Paste Buffer">
+    ```bash
+    # Paste most recent buffer
+    C-b ]
+    
+    # Paste specific buffer
+    tmux paste-buffer -b buffer0
+    
+    # Paste to command line
+    tmux paste-buffer -p
+    ```
+  </Tab>
+
+  <Tab title="Delete Buffers">
+    ```bash
+    # Delete most recent buffer
+    C-b -
+    
+    # Delete specific buffer
+    tmux delete-buffer -b buffer0
+    
+    # Delete all buffers
+    tmux delete-buffer -a
+    ```
+  </Tab>
+
+  <Tab title="Save Buffer">
+    ```bash
+    # Save buffer to file
+    tmux save-buffer ~/copied-text.txt
+    
+    # Save specific buffer
+    tmux save-buffer -b buffer0 ~/text.txt
+    
+    # Load from file
+    tmux load-buffer ~/text.txt
+    ```
+  </Tab>
+</Tabs>
+
+## Copy Mode Commands
+
+From tmux.1 manual, complete command reference:
+
+<Accordion title="Copy Mode Commands">
+
+### Selection Commands
+```bash
+begin-selection              # Start selection
+clear-selection              # Clear selection
+copy-selection              # Copy selection
+copy-selection-and-cancel   # Copy and exit
+copy-selection-no-clear     # Copy without clearing
+append-selection            # Append to buffer
+append-selection-and-cancel # Append and exit
+```
+
+### Movement Commands
+```bash
+cursor-up                   # Move up
+cursor-down                 # Move down
+cursor-left                 # Move left
+cursor-right                # Move right
+start-of-line               # Move to line start
+end-of-line                 # Move to line end
+back-to-indentation         # Move to first non-space
+```
+
+### Scrolling Commands
+```bash
+halfpage-up                 # Scroll half page up
+halfpage-down               # Scroll half page down
+page-up                     # Scroll page up
+page-down                   # Scroll page down
+scroll-up                   # Scroll one line up
+scroll-down                 # Scroll one line down
+history-top                 # Go to top
+history-bottom              # Go to bottom
+```
+
+### Search Commands
+```bash
+search-forward pattern      # Search forward
+search-backward pattern     # Search backward
+search-forward-incremental  # Incremental forward
+search-backward-incremental # Incremental backward
+search-again                # Repeat search
+search-reverse              # Reverse search direction
+```
+
+</Accordion>
+
+## Customization
+
+### Mode Keys Option
+
+```bash
+# Use vi keys (default for many)
+set -g mode-keys vi
+
+# Use emacs keys
+set -g mode-keys emacs
+```
+
+### Custom Copy Bindings
+
+<CodeGroup>
+
+```bash Vi Mode Customization
+# Custom vi bindings
+setw -g mode-keys vi
+
+# v for begin selection
+bind -T copy-mode-vi v send -X begin-selection
+
+# y for copy
+bind -T copy-mode-vi y send -X copy-selection-and-cancel
+
+# Y for copy line
+bind -T copy-mode-vi Y send -X copy-line
+
+# Rectangle selection
+bind -T copy-mode-vi C-v send -X rectangle-toggle
+```
+
+```bash Emacs Mode Customization
+# Custom emacs bindings
+setw -g mode-keys emacs
+
+# Better search
+bind -T copy-mode C-s send -X search-forward-incremental
+bind -T copy-mode C-r send -X search-backward-incremental
+
+# Easy copy
+bind -T copy-mode M-w send -X copy-selection-and-cancel
+```
+
+```bash Mouse Integration
+# Enable mouse for copy mode
+set -g mouse on
+
+# Click to enter copy mode and select
+bind -n MouseDrag1Pane {
+    if -F '#{||:#{pane_in_mode},#{mouse_any_flag}}' {
+        send -M
+    } {
+        copy-mode -M
+    }
+}
+
+# Double-click to copy word
+bind -n DoubleClick1Pane {
+    select-pane -t=
+    if -F '#{||:#{pane_in_mode},#{mouse_any_flag}}' {
+        send -M
+    } {
+        copy-mode -H
+        send -X select-word
+        run -d0.3
+        send -X copy-pipe-and-cancel
+    }
+}
+```
+
+</CodeGroup>
+
+## System Clipboard Integration
+
+### Linux (X11)
+
+<CodeGroup>
+
+```bash Using xclip
+# Vi mode
+bind -T copy-mode-vi y send -X copy-pipe-and-cancel 'xclip -selection clipboard'
+bind -T copy-mode-vi Enter send -X copy-pipe-and-cancel 'xclip -selection clipboard'
+
+# Mouse selection
+bind -T copy-mode-vi MouseDragEnd1Pane send -X copy-pipe-and-cancel 'xclip -selection clipboard'
+```
+
+```bash Using xsel
+# Vi mode
+bind -T copy-mode-vi y send -X copy-pipe-and-cancel 'xsel --clipboard'
+
+# Emacs mode
+bind -T copy-mode M-w send -X copy-pipe-and-cancel 'xsel --clipboard'
+```
+
+</CodeGroup>
+
+### macOS
+
+```bash
+# Using pbcopy
+bind -T copy-mode-vi y send -X copy-pipe-and-cancel 'pbcopy'
+bind -T copy-mode-vi Enter send -X copy-pipe-and-cancel 'pbcopy'
+bind -T copy-mode-vi MouseDragEnd1Pane send -X copy-pipe-and-cancel 'pbcopy'
+
+# Using reattach-to-user-namespace (older macOS)
+bind -T copy-mode-vi y send -X copy-pipe-and-cancel 'reattach-to-user-namespace pbcopy'
+```
+
+### Windows (WSL)
+
+```bash
+# Using clip.exe
+bind -T copy-mode-vi y send -X copy-pipe-and-cancel 'clip.exe'
+bind -T copy-mode-vi Enter send -X copy-pipe-and-cancel 'clip.exe'
+
+# Or with dos2unix to handle line endings
+bind -T copy-mode-vi y send -X copy-pipe-and-cancel 'dos2unix | clip.exe'
+```
+
+### Wayland
+
+```bash
+# Using wl-copy
+bind -T copy-mode-vi y send -X copy-pipe-and-cancel 'wl-copy'
+bind -T copy-mode-vi Enter send -X copy-pipe-and-cancel 'wl-copy'
+bind -T copy-mode-vi MouseDragEnd1Pane send -X copy-pipe-and-cancel 'wl-copy'
+```
+
+## Advanced Techniques
+
+### Copy to Multiple Destinations
+
+```bash
+# Copy to both tmux buffer and clipboard
+bind -T copy-mode-vi y send -X copy-pipe 'xclip -selection clipboard'
+
+# Note: copy-pipe keeps selection, copy-pipe-and-cancel exits
+
+# Copy to tmux buffer, clipboard, and file
+bind -T copy-mode-vi y send -X copy-pipe-and-cancel 'tee ~/.tmux-buffer | xclip -selection clipboard'
+```
+
+### Scrollback Buffer Size
+
+From `window-copy.c:431-432`:
+
+```bash
+# Set history limit (lines in scrollback)
+set -g history-limit 50000   # Default: 2000
+
+# Unlimited history (use with caution)
+set -g history-limit 999999999
+
+# Save scrollback to file
+tmux capture-pane -pS -50000 > scrollback.txt
+```
+
+### Capture Pane Content
+
+```bash
+# Capture visible area
+tmux capture-pane
+
+# Capture entire history
+tmux capture-pane -S -
+
+# Capture to file
+tmux capture-pane -pS - > full-history.txt
+
+# Capture specific pane
+tmux capture-pane -t 1 -pS -
+
+# Capture with ANSI codes
+tmux capture-pane -ep
+```
+
+## Quick Reference
+
+<Tabs>
+  <Tab title="Vi Mode">
+    ```bash
+    Enter Copy Mode:    Prefix + [
+    
+    Navigation:
+      h,j,k,l          Basic movement
+      w,b,e            Word movement
+      0,^,$            Line movement
+      H,M,L            Screen positions
+      g,G              Document top/bottom
+      {,}              Paragraphs
+    
+    Selection:
+      Space            Begin selection
+      V                Line selection
+      C-v              Rectangle
+      Enter            Copy and exit
+      y                Copy
+      A                Append and exit
+    
+    Search:
+      /,?              Forward/backward
+      n,N              Next/previous
+      *,#              Word search
+    
+    Exit:             q or Escape
+    ```
+  </Tab>
+
+  <Tab title="Emacs Mode">
+    ```bash
+    Enter Copy Mode:    Prefix + [
+    
+    Navigation:
+      C-f,C-b,C-n,C-p  Basic movement
+      M-f,M-b          Word movement
+      C-a,C-e          Line movement
+      M-R,M-r          Screen positions
+      M-<,M->          Document top/bottom
+      M-{,M-}          Paragraphs
+    
+    Selection:
+      C-Space          Set mark
+      M-w              Copy selection
+      C-w              Copy and exit
+    
+    Search:
+      C-r,C-s          Incremental search
+      n,N              Next/previous
+    
+    Exit:             Escape
+    ```
+  </Tab>
+</Tabs>
+
+## Troubleshooting
+
+<Accordion title="Common Issues">
+
+**Copy mode not responding:**
+```bash
+# Check mode-keys setting
+tmux show-options -gw mode-keys
+
+# Verify key bindings
+tmux list-keys -T copy-mode-vi
+tmux list-keys -T copy-mode
+```
+
+**Clipboard integration not working:**
+```bash
+# Test clipboard command directly
+echo "test" | xclip -selection clipboard
+xclip -selection clipboard -o
+
+# Check tmux bindings
+tmux list-keys -T copy-mode-vi | grep copy-pipe
+```
+
+**Search not finding matches:**
+```bash
+# Case sensitivity: patterns with uppercase are case-sensitive
+# Use all lowercase for case-insensitive
+
+# Clear search highlighting
+C-g (emacs) or Escape (vi)
+```
+
+**Selection not visible:**
+```bash
+# Check selection style
+tmux show-options -gw mode-style
+
+# Set visible selection
+set -g mode-style 'bg=yellow,fg=black'
+```
+
+</Accordion>
+
+## See Also
+
+- [Key Bindings](/guides/key-bindings) - Customize copy mode keys
+- [Configuration](/guides/configuration) - Configure mode-keys and history
+- [Mouse Support](/guides/mouse-support) - Mouse-based copy operations
