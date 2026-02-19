@@ -1,0 +1,135 @@
+{
+  "projectType": "cli-tool",
+  "projectName": "tmux",
+  "projectDescription": "A terminal multiplexer that enables multiple terminals to be created, accessed, and controlled from a single screen",
+  "theme": "aspen",
+  "primaryColor": "#1BB91F",
+  "lightColor": "#1BB91F",
+  "darkColor": "#1BB91F",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/sessions",
+              "concepts/windows",
+              "concepts/panes",
+              "concepts/client-server"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/key-bindings",
+              "guides/configuration",
+              "guides/status-line",
+              "guides/copy-mode",
+              "guides/mouse-support",
+              "guides/scripting"
+            ]
+          },
+          {
+            "group": "Advanced",
+            "pages": [
+              "advanced/formats",
+              "advanced/styles",
+              "advanced/hooks",
+              "advanced/control-mode"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Commands",
+        "groups": [
+          {
+            "group": "Command Reference",
+            "pages": [
+              "commands/overview",
+              "commands/sessions",
+              "commands/windows",
+              "commands/panes",
+              "commands/key-bindings",
+              "commands/options",
+              "commands/buffers",
+              "commands/miscellaneous"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Configuration",
+        "groups": [
+          {
+            "group": "Options Reference",
+            "pages": [
+              "options/overview",
+              "options/server",
+              "options/session",
+              "options/window",
+              "options/pane"
+            ]
+          },
+          {
+            "group": "Examples",
+            "pages": [
+              "examples/basic-config",
+              "examples/advanced-config",
+              "examples/plugins",
+              "examples/use-cases"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Terminal multiplexing with session persistence",
+    "Window and pane management",
+    "Customizable key bindings and status line",
+    "Copy mode with vi/emacs keybindings",
+    "Client-server architecture for session sharing",
+    "Extensive scripting and format system",
+    "Mouse support and control mode"
+  ],
+  "publicApiSurface": [
+    "attach-session",
+    "detach-client",
+    "new-session",
+    "kill-session",
+    "switch-client",
+    "new-window",
+    "kill-window",
+    "select-window",
+    "split-window",
+    "select-pane",
+    "resize-pane",
+    "swap-pane",
+    "bind-key",
+    "unbind-key",
+    "set-option",
+    "show-options",
+    "copy-mode",
+    "paste-buffer",
+    "list-sessions",
+    "list-windows",
+    "list-panes",
+    "list-keys",
+    "send-keys",
+    "display-message",
+    "source-file",
+    "if-shell",
+    "run-shell"
+  ]
+}
